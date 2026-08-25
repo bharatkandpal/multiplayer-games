@@ -5,12 +5,25 @@
   "description": "React client: design system, board renderers, seat-config UI, optimistic-UI net layer.",
   "type": "module",
   "scripts": {
-    "build": "echo \"[@mpg/web] Vite build configured in MPG-009\"",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
-    "dev": "echo \"[@mpg/web] Vite dev server configured in MPG-009\""
+    "test:fast": "vitest run --passWithNoTests",
+    "dev": "vite",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@mpg/engine": "workspace:*"
+    "@mpg/engine": "workspace:*",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.0",
+    "jsdom": "^30.0.1",
+    "vite": "^8.2.2"
   }
 }

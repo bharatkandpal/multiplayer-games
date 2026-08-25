@@ -1,0 +1,30 @@
+/*
+ * Minimal, styling-agnostic reset/base.
+ *
+ * This is intentionally NOT a design system: no color/type/spacing tokens or
+ * component styles live here. That work is tracked separately (MPG-029-b/c).
+ * The `data-theme` attribute on <html> (see index.html) is the hook the token
+ * system will use to switch light/dark; it is left unset ("system") for now.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
