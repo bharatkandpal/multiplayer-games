@@ -30,8 +30,9 @@ export interface GamePlayScreenProps<S, M, L = unknown> {
   onExit: () => void;
 }
 
-function seatIndexOf(player: Player): 0 | 1 {
-  return player === 1 ? 0 : 1;
+/** Players are 1-based (`Player`); seats are 0-based array indices — works for any seat count. */
+function seatIndexOf(player: Player): number {
+  return player - 1;
 }
 
 function resultHeadline(result: Result, seats: SeatsConfig): string {

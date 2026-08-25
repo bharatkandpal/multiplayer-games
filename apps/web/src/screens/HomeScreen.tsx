@@ -1,4 +1,4 @@
-import { ENGINE_VERSION } from "@mpg/engine";
+import { ENGINE_VERSION, connectFour, ticTacToe } from "@mpg/engine";
 import type { GameId } from "@mpg/engine";
 import { Button } from "../components/ui";
 import styles from "./HomeScreen.module.css";
@@ -7,6 +7,8 @@ export interface GameCatalogEntry {
   readonly id: GameId;
   readonly title: string;
   readonly description: string;
+  /** Number of seats the game supports (`GameModule.playerCount`) — drives seat setup (MPG-024). */
+  readonly playerCount: number;
 }
 
 export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
@@ -14,11 +16,13 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     id: "tictactoe",
     title: "Tic-Tac-Toe",
     description: "Classic 3x3. Quick games, easy to teach a bot to play well.",
+    playerCount: ticTacToe.playerCount,
   },
   connect4: {
     id: "connect4",
     title: "Connect Four",
     description: "Drop discs, connect four in a row. 7 columns, 6 rows.",
+    playerCount: connectFour.playerCount,
   },
 };
 

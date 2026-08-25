@@ -20,14 +20,25 @@ export interface BotSeatConfig {
 
 export type SeatConfig = HumanSeatConfig | BotSeatConfig;
 
-/** Exactly two seats — every POC game (Tic-Tac-Toe, Connect Four) is 2-player. */
-export type SeatsConfig = readonly [SeatConfig, SeatConfig];
+/**
+ * A game's seats, one per player — length is driven entirely by the game
+ * module's `playerCount` (both current POC games happen to report 2, but
+ * nothing here assumes exactly two).
+ */
+export type SeatsConfig = readonly SeatConfig[];
 
 export const DEFAULT_DIFFICULTY: Difficulty = "medium";
 
-/** A sensible starting configuration for the setup screen: human vs. medium bot. */
-export function createDefaultSeats(): SeatsConfig {
-  return [{ kind: "human" }, { kind: "bot", difficulty: DEFAULT_DIFFICULTY }];
+/**
+ * A sensible starting configuration for the setup screen: seat 1 is human,
+ * every other seat is a medium bot. `seatCount` should come from the
+ * selected game's `playerCount`; defaults to 2 for callers (and tests) that
+ * don't need to think about seat count.
+ */
+export function createDefaultSeats(seatCount = 2): SeatsConfig {
+  return Array.from({ length: seatCount }, (_, index) =>
+    index === 0 ? { kind: "human" } : { kind: "bot", difficulty: DEFAULT_DIFFICULTY },
+  );
 }
 
 export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
@@ -39,12 +50,16 @@ export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
 export const DIFFICULTIES: readonly Difficulty[] = ["easy", "medium", "hard"];
 
 /**
- * Display-ready copy for one seat, aware of the other seat so a solo human
- * reads as "You" but a local two-human game reads as "Player 1"/"Player 2"
- * (no seat is privileged over the other on a shared device).
+ * Display-ready copy for one seat, aware of the other seats so a solo human
+ * reads as "You" but a local multi-human game reads as "Player 1"/"Player 2"/…
+ * (no seat is privileged over the others on a shared device). Works for any
+ * number of seats.
  */
-export function describeSeat(seats: SeatsConfig, seatIndex: 0 | 1): string {
+export function describeSeat(seats: SeatsConfig, seatIndex: number): string {
   const seat = seats[seatIndex];
+  if (!seat) {
+    throw new Error(`describeSeat: no seat at index ${seatIndex} (${seats.length} seat(s) total)`);
+  }
   if (seat.kind === "bot") {
     return `${DIFFICULTY_LABEL[seat.difficulty]} bot (Player ${seatIndex + 1})`;
   }
