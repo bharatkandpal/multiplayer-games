@@ -18,8 +18,8 @@ Phased so we always have something playable. Each phase ends with a demoable mil
 - [x] Monorepo (pnpm workspaces): `packages/engine`, `apps/web`, `apps/server`. _(MPG-001)_
 - [x] TypeScript config, lint/format, Vitest + Playwright wired. _(MPG-002)_
 - [x] `GameModule` interface + `types.ts` + `registry.ts`. _(MPG-003)_
-- [ ] CI: typecheck + unit tests on push.
-- **Done when:** `pnpm test` runs a trivial engine test green in CI.
+- [x] CI: typecheck + unit tests on push. _(MPG-004)_
+- **Done when:** `pnpm test` runs a trivial engine test green in CI. ✅ (104 tests; `.github/workflows/ci.yml`)
 
 ## Phase 1 — Local playable games + seat model (no network)
 

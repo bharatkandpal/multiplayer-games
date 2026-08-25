@@ -12,6 +12,7 @@
   "scripts": {
     "build": "echo \"[@mpg/engine] bundling configured later\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "test:fast": "vitest run --passWithNoTests --exclude '**/node_modules/**' --exclude '**/ai/difficulty.test.ts'"
   }
 }
