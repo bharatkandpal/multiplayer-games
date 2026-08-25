@@ -1,0 +1,97 @@
+// Difficulty policy + stateless AI move picker. See docs/GAME_LOGIC.md §4-5.
+//
+// Pure and deterministic given a fixed `rng`: the only nondeterminism anywhere in the
+// AI layer is the injected `Rng`, never `Math.random()` called directly (that's only
+// the caller-facing default). Search itself (`searchBestMove`) is fully deterministic;
+// difficulty is layered on top as a search-depth cap plus a "blunder rate" — the
+// probability of playing a uniformly random legal move instead of the minimax choice.
+
+import { searchBestMove } from "./minimax";
+import type { Difficulty, GameId, GameModule } from "../types";
+
+/** A source of randomness, returning a float in `[0, 1)` — same contract as `Math.random`. */
+export type Rng = () => number;
+
+/** Search depth + blunder rate for one (game, difficulty) pair. */
+export interface DifficultyConfig {
+  /** Plies to search via minimax before falling back to the heuristic `evaluate`. */
+  readonly maxDepth: number;
+  /**
+   * Probability `[0, 1]` of playing a uniformly random legal move instead of the
+   * minimax-best move. `0` for Hard — Hard never blunders.
+   */
+  readonly blunderRate: number;
+}
+
+type PerDifficulty = Readonly<Record<Difficulty, DifficultyConfig>>;
+
+/**
+ * Fallback difficulty table for any `GameId` without a bespoke entry below (future
+ * games/plugins). Depth 4 is a reasonable general-purpose search budget; blunder rates
+ * mirror the Tic-Tac-Toe tuning as a conservative default.
+ */
+export const DEFAULT_DIFFICULTY: PerDifficulty = {
+  easy: { maxDepth: 1, blunderRate: 0.7 },
+  medium: { maxDepth: 4, blunderRate: 0.15 },
+  hard: { maxDepth: 6, blunderRate: 0 },
+};
+
+/** Per-game difficulty tables, tuned per docs/GAME_LOGIC.md §4. */
+export const DIFFICULTY_TABLE: Readonly<Partial<Record<GameId, PerDifficulty>>> = {
+  tictactoe: {
+    easy: { maxDepth: 1, blunderRate: 0.7 },
+    medium: { maxDepth: 4, blunderRate: 0.15 },
+    // Tic-Tac-Toe's tree is tiny (≤9 plies): depth 9 is a full, unbounded search, so
+    // Hard is provably never-losing.
+    hard: { maxDepth: 9, blunderRate: 0 },
+  },
+  connect4: {
+    easy: { maxDepth: 2, blunderRate: 0.4 },
+    medium: { maxDepth: 5, blunderRate: 0.1 },
+    // Bounded by the <500ms move-time budget (PRD NFR); depth 7 + alpha-beta + center
+    // -first move ordering comfortably fits that budget.
+    hard: { maxDepth: 7, blunderRate: 0 },
+  },
+};
+
+/** Looks up the tuned `{maxDepth, blunderRate}` for `gameId` + `difficulty`, falling back
+ * to {@link DEFAULT_DIFFICULTY} for games without a bespoke entry. */
+export function getDifficultyConfig(gameId: GameId, difficulty: Difficulty): DifficultyConfig {
+  const perGame = DIFFICULTY_TABLE[gameId];
+  return perGame?.[difficulty] ?? DEFAULT_DIFFICULTY[difficulty];
+}
+
+/**
+ * Picks a move for whichever player is to move in `state`, per `difficulty`'s search
+ * depth and blunder rate. Stateless and pure aside from the injected `rng`: given a
+ * fixed `rng`, `pickMove` is fully deterministic (useful for reproducible tests/replays).
+ *
+ * With probability `blunderRate`, returns a uniformly random legal move; otherwise
+ * returns the minimax-best move from `searchBestMove`. Throws if `state` has no legal
+ * moves (the game is already over).
+ */
+export function pickMove<S, M>(
+  game: GameModule<S, M>,
+  state: S,
+  difficulty: Difficulty,
+  rng: Rng = Math.random,
+): M {
+  const moves = game.legalMoves(state);
+  if (moves.length === 0) {
+    throw new Error(`pickMove: no legal moves available for game "${game.id}".`);
+  }
+
+  const { maxDepth, blunderRate } = getDifficultyConfig(game.id, difficulty);
+
+  if (blunderRate > 0 && rng() < blunderRate) {
+    const index = Math.min(Math.floor(rng() * moves.length), moves.length - 1);
+    const move = moves[index];
+    if (move === undefined) {
+      // Unreachable given the length check above; guards `noUncheckedIndexedAccess`.
+      throw new Error("pickMove: random move index out of range.");
+    }
+    return move;
+  }
+
+  return searchBestMove(game, state, { maxDepth }).move;
+}

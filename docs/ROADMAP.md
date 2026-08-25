@@ -28,7 +28,7 @@ Phased so we always have something playable. Each phase ends with a demoable mil
 - [x] Tic-Tac-Toe engine + full win/draw detection + tests (N-player-generic interface). _(MPG-005)_
 - [x] Connect Four engine + win detection + tests (N-player-generic interface). _(MPG-006)_
 - [x] Generic minimax + alpha-beta; per-game heuristics (each module's `evaluate`); center-first ordering. _(MPG-007)_ — stateless difficulty `pickMove` is MPG-008.
-- [ ] Difficulty policy (Easy/Medium/Hard) + AI strength tests.
+- [x] Difficulty policy (Easy/Medium/Hard) + AI strength tests. _(MPG-008)_
 - [ ] **Seat model** (human/bot per seat, per-seat difficulty) — POC 2 seats, no hardcoded 2.
 - [ ] **Design system / UI kit first** (tokens + core components: Button, Board, Cell,
       Toast, Modal, StatusBadge, Skeleton) so every screen inherits the UX bar.

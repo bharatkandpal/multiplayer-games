@@ -22,3 +22,11 @@ export { builtInGames, registerBuiltInGames } from "./games";
 
 export { minimax, searchBestMove } from "./ai/minimax";
 export type { SearchOptions, SearchResult } from "./ai/minimax";
+
+export {
+  pickMove,
+  getDifficultyConfig,
+  DIFFICULTY_TABLE,
+  DEFAULT_DIFFICULTY,
+} from "./ai/difficulty";
+export type { Rng, DifficultyConfig } from "./ai/difficulty";
