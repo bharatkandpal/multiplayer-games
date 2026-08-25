@@ -25,7 +25,7 @@ Phased so we always have something playable. Each phase ends with a demoable mil
 
 **Goal:** both games playable locally with configurable seats (human/bot) in the browser.
 
-- [ ] Tic-Tac-Toe engine + full win/draw detection + tests (N-player-generic interface).
+- [x] Tic-Tac-Toe engine + full win/draw detection + tests (N-player-generic interface). _(MPG-005)_
 - [ ] Connect Four engine + win detection + tests (N-player-generic interface).
 - [ ] Generic minimax + alpha-beta; per-game heuristics; stateless `pickMove(state, difficulty)`.
 - [ ] Difficulty policy (Easy/Medium/Hard) + AI strength tests.

@@ -11,3 +11,8 @@ export type { IllegalMoveReason } from "./errors";
 
 export { registerGame, getGame, hasGame, listGames, clearRegistry } from "./registry";
 export type { AnyGameModule } from "./registry";
+
+export { ticTacToe } from "./tictactoe";
+export type { TicTacToeState, TicTacToeMove, Cell } from "./tictactoe";
+
+export { builtInGames, registerBuiltInGames } from "./games";
