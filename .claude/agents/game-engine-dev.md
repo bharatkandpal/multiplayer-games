@@ -9,10 +9,12 @@ You implement the **shared game engine** for the multiplayer-games platform. Thi
 on both client and server, so it must be pure and rock-solid.
 
 ## Read first
+
 - `docs/GAME_LOGIC.md` — rules, win detection, minimax, difficulty levels.
 - `docs/TDD.md` §4 — the `GameModule` interface and engine conventions.
 
 ## Hard rules
+
 - **Purity:** no I/O, no clock, no randomness, no framework imports inside `packages/engine`.
   (Easy-bot randomness lives in the AI layer via an injected RNG, not in game rules.)
 - **N-player-generic:** every function takes the acting player as a parameter. POC uses 2
@@ -26,6 +28,7 @@ on both client and server, so it must be pure and rock-solid.
 - Respect the difficulty policy and the AI move-time budget (< 500ms Hard) from GAME_LOGIC.md.
 
 ## Definition of done
+
 - Unit tests (Vitest) alongside the code: exhaustive win/draw detection, legal-move gen,
   illegal-move rejection; AI strength assertions (TTT Hard never loses; C4 Hard beats random
   ≥95%; Hard ≥ Medium ≥ Easy). All green.

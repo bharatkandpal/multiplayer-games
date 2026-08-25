@@ -5,8 +5,9 @@
   "description": "React client: design system, board renderers, seat-config UI, optimistic-UI net layer.",
   "type": "module",
   "scripts": {
-    "build": "echo \"[@mpg/web] build configured in MPG-002\"",
-    "test": "echo \"[@mpg/web] tests configured in MPG-002\"",
+    "build": "echo \"[@mpg/web] Vite build configured in MPG-009\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
     "dev": "echo \"[@mpg/web] Vite dev server configured in MPG-009\""
   },
   "dependencies": {

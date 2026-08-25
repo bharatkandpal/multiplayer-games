@@ -8,11 +8,13 @@ tools: Read, Write, Edit, Grep, Glob, Bash
 You implement the **authoritative backend** for the multiplayer-games platform.
 
 ## Read first
+
 - `docs/API_SPEC.md` — REST + WebSocket contract (source of truth for the wire format).
 - `docs/TDD.md` §4.3, §5, §6 — seat/room model, data model, turn-advancement loop.
 - `docs/ARCHITECTURE.md` — component responsibilities and realtime sequences.
 
 ## Hard rules
+
 - **Server is authoritative.** Validate every move via the shared engine (turn ownership,
   legality). Clients send intents; never trust client-declared outcomes.
 - **Seat model.** Rooms hold N `Seat`s (`human` | `bot` + `difficulty`). No hardcoded 2.
@@ -27,10 +29,12 @@ You implement the **authoritative backend** for the multiplayer-games platform.
   https://rate-limiter-seven.vercel.app/getting-started, tracked as MPG-021).
 
 ## UX contract you must uphold
+
 Emit exactly the states the UI needs for a calm experience: `move:rejected` with a reason,
 `game:over`, `opponent:disconnected`/`reconnected`, `room:abandoned` — see `docs/UX_PRINCIPLES.md`.
 
 ## Definition of done
+
 - Integration tests: room lifecycle, turn enforcement, illegal/out-of-turn rejection,
   reconnect grace, Redis/in-memory parity. Green.
 - Conforms exactly to `docs/API_SPEC.md`; if the contract must change, update the spec and

@@ -12,15 +12,19 @@ Phased so we always have something playable. Each phase ends with a demoable mil
 ---
 
 ## Phase 0 — Foundations (scaffold)
+
 **Goal:** repo, tooling, CI, shared engine skeleton.
-- [ ] Monorepo (pnpm workspaces): `packages/engine`, `apps/web`, `apps/server`.
-- [ ] TypeScript config, lint/format, Vitest + Playwright wired.
+
+- [x] Monorepo (pnpm workspaces): `packages/engine`, `apps/web`, `apps/server`. _(MPG-001)_
+- [x] TypeScript config, lint/format, Vitest + Playwright wired. _(MPG-002)_
 - [ ] `GameModule` interface + `types.ts` + `registry.ts`.
 - [ ] CI: typecheck + unit tests on push.
 - **Done when:** `pnpm test` runs a trivial engine test green in CI.
 
 ## Phase 1 — Local playable games + seat model (no network)
+
 **Goal:** both games playable locally with configurable seats (human/bot) in the browser.
+
 - [ ] Tic-Tac-Toe engine + full win/draw detection + tests (N-player-generic interface).
 - [ ] Connect Four engine + win detection + tests (N-player-generic interface).
 - [ ] Generic minimax + alpha-beta; per-game heuristics; stateless `pickMove(state, difficulty)`.
@@ -35,7 +39,9 @@ Phased so we always have something playable. Each phase ends with a demoable mil
 - **Done when:** a player can play vs each bot level, and watch a Medium-vs-Hard bot game, for both games.
 
 ## Phase 2 — Multiplayer over a link (core v1)
+
 **Goal:** the headline feature — share a link, play together in real time.
+
 - [ ] Node + Socket.IO server; Room Manager; Redis (in-memory dev fallback).
 - [ ] `POST /api/rooms` + invite URL; `join` flow; slot assignment.
 - [ ] Server-authoritative move validation + `game:update` broadcast.
@@ -47,7 +53,9 @@ Phased so we always have something playable. Each phase ends with a demoable mil
   works server-side; illegal/out-of-turn moves are rejected.
 
 ## Phase 3 — Robustness & polish (v1 launch)
+
 **Goal:** production-ready launch quality.
+
 - [ ] Disconnect/reconnect grace window + abandonment handling.
 - [ ] Optional display names; friendly error/expired-room screens.
 - [ ] Accessibility pass (keyboard, ARIA, contrast) + mobile responsive polish.
@@ -59,8 +67,10 @@ Phased so we always have something playable. Each phase ends with a demoable mil
 ---
 
 ## Phase 4+ — Toward the event north-star (later versions)
+
 The real goal: a company/HR **event platform** (100–200 people watch + play). Additive on
 the seat model, not a rewrite. Sequenced roughly:
+
 - [ ] **Teams & multi-player:** 2v2 and 3+ player game variants (more seats, team turn order).
 - [ ] **Spectator seats at scale:** read-only live subscribers; shared big-screen view.
 - [ ] **Event/tournament orchestration:** organizer creates an event, brackets, many rooms.
@@ -71,15 +81,17 @@ the seat model, not a rewrite. Sequenced roughly:
       `npm install`. Keep the `GameModule` boundary clean now so this stays additive. (MPG-031)
 
 ## Suggested Sequencing Rationale
+
 - Engine + AI first (Phase 1) because everything else depends on correct, tested
   rules and they're pure/fast to iterate.
 - Networking second (Phase 2) — the platform's differentiator, built on a proven engine.
 - Hardening last (Phase 3) once the happy paths are stable.
 
 ## Rough Sizing (relative, not calendar commitments)
-| Phase | Relative effort |
-|-------|-----------------|
-| 0 Foundations | S |
-| 1 Engines + AI + local UI | M–L |
-| 2 Multiplayer | L |
-| 3 Robustness + launch | M |
+
+| Phase                     | Relative effort |
+| ------------------------- | --------------- |
+| 0 Foundations             | S               |
+| 1 Engines + AI + local UI | M–L             |
+| 2 Multiplayer             | L               |
+| 3 Robustness + launch     | M               |

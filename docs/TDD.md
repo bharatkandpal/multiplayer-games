@@ -20,17 +20,17 @@ power AI mode, multiplayer mode, and tests without duplication.
 
 ## 2. Technology Choices
 
-| Layer | Choice | Rationale |
-|-------|--------|-----------|
-| Language | TypeScript (front + back) | One language, shared engine + types across client/server. |
-| Frontend | React + Vite | Fast dev, component model fits board UI. |
-| Styling | CSS Modules / Tailwind (TBD) | Small surface; either is fine. |
-| Realtime transport | Socket.IO | Rooms, reconnection, fallbacks out of the box. |
-| Backend | Node.js + Express (HTTP) + Socket.IO | Same runtime as engine; simple. |
-| Ephemeral state | Redis | Room/game state, TTL expiry, horizontal scale later. |
-| Persistent store | Postgres (Phase 3+) | Accounts/stats when we add them. Not in v1. |
-| Monorepo tooling | pnpm workspaces (or npm) | Share `packages/engine` between apps. |
-| Tests | Vitest + Playwright | Unit for engine/AI, e2e for flows. |
+| Layer              | Choice                               | Rationale                                                 |
+| ------------------ | ------------------------------------ | --------------------------------------------------------- |
+| Language           | TypeScript (front + back)            | One language, shared engine + types across client/server. |
+| Frontend           | React + Vite                         | Fast dev, component model fits board UI.                  |
+| Styling            | CSS Modules / Tailwind (TBD)         | Small surface; either is fine.                            |
+| Realtime transport | Socket.IO                            | Rooms, reconnection, fallbacks out of the box.            |
+| Backend            | Node.js + Express (HTTP) + Socket.IO | Same runtime as engine; simple.                           |
+| Ephemeral state    | Redis                                | Room/game state, TTL expiry, horizontal scale later.      |
+| Persistent store   | Postgres (Phase 3+)                  | Accounts/stats when we add them. Not in v1.               |
+| Monorepo tooling   | pnpm workspaces (or npm)             | Share `packages/engine` between apps.                     |
+| Tests              | Vitest + Playwright                  | Unit for engine/AI, e2e for flows.                        |
 
 > **Decision status: ACCEPTED** — see [ADR 0001](adr/0001-tech-stack.md). TypeScript
 > both ends was chosen on technical merit + long-term platform strategy (not stack
@@ -80,14 +80,14 @@ Every game implements one interface so the platform is game-agnostic:
 
 ```ts
 interface GameModule<S = unknown, M = unknown> {
-  id: GameId;                         // 'connect4' | 'tictactoe'
+  id: GameId; // 'connect4' | 'tictactoe'
   createInitialState(): S;
   legalMoves(state: S): M[];
-  applyMove(state: S, move: M, player: Player): S;   // throws on illegal
-  getResult(state: S): Result;        // { status: 'in_progress'|'win'|'draw', winner? }
+  applyMove(state: S, move: M, player: Player): S; // throws on illegal
+  getResult(state: S): Result; // { status: 'in_progress'|'win'|'draw', winner? }
   currentPlayer(state: S): Player;
   // AI support:
-  evaluate(state: S, forPlayer: Player): number;     // heuristic score
+  evaluate(state: S, forPlayer: Player): number; // heuristic score
 }
 ```
 
@@ -107,7 +107,7 @@ full tree; for Connect Four we depth-limit + use a heuristic.
 A **bot is bound to a seat**, not to the room — so a single room can hold bots at
 **different levels** (e.g. Medium vs Hard), or all-bot rooms for watch mode. The AI
 runner is stateless: `pickMove(state, gameModule, difficulty) → move`. When it becomes a
-bot seat's turn, the Room Manager invokes the runner for *that seat's* difficulty and
+bot seat's turn, the Room Manager invokes the runner for _that seat's_ difficulty and
 applies the move. For watchability, bot-vs-bot rooms insert a small pacing delay
 (~600ms, config) between moves.
 
@@ -121,35 +121,35 @@ applies the move. For watchability, bot-vs-bot rooms insert a small pacing delay
 - Room lives in Redis (or in-memory in dev) keyed by unguessable `roomId`.
 - **N-seat capable:** the POC creates 2-seat games, but nothing hardcodes 2. Teams use the
   `team` field; 3+ player games just have more seats.
-- **Server is authoritative:** clients send *intents* (move requests) for their human
+- **Server is authoritative:** clients send _intents_ (move requests) for their human
   seat; the server validates via the engine, drives bot seats via the AI runner, updates
   state, and broadcasts. Spectators (north-star) attach as read-only subscribers, not seats.
 
 ## 5. Data Model (ephemeral, v1)
 
 ```ts
-type Difficulty = 'easy' | 'medium' | 'hard';
+type Difficulty = "easy" | "medium" | "hard";
 
 type Seat = {
-  slot: number;            // 1..N, position in turn order
-  kind: 'human' | 'bot';
+  slot: number; // 1..N, position in turn order
+  kind: "human" | "bot";
   difficulty?: Difficulty; // bot seats only
-  socketId?: string;       // human seats; absent = open/joinable
+  socketId?: string; // human seats; absent = open/joinable
   displayName?: string;
-  team?: number;           // for team modes (2v2); undefined = free-for-all
+  team?: number; // for team modes (2v2); undefined = free-for-all
   connected: boolean;
 };
 
 type Room = {
-  roomId: string;          // e.g. 12-char base62, unguessable
-  gameId: 'connect4' | 'tictactoe';
-  state: GameState;        // engine state (opaque JSON)
-  seats: Seat[];           // N seats; POC = 2. No `mode` — it's emergent from seats.
-  status: 'waiting' | 'active' | 'finished' | 'abandoned';
-  turn: number;            // slot whose turn it is
-  pacingMs?: number;       // delay between auto (bot) moves, for watchability
+  roomId: string; // e.g. 12-char base62, unguessable
+  gameId: "connect4" | "tictactoe";
+  state: GameState; // engine state (opaque JSON)
+  seats: Seat[]; // N seats; POC = 2. No `mode` — it's emergent from seats.
+  status: "waiting" | "active" | "finished" | "abandoned";
+  turn: number; // slot whose turn it is
+  pacingMs?: number; // delay between auto (bot) moves, for watchability
   createdAt: number;
-  expiresAt: number;       // TTL; waiting rooms expire faster than active
+  expiresAt: number; // TTL; waiting rooms expire faster than active
 };
 ```
 
@@ -160,22 +160,25 @@ or all humans joined) can go straight to `active`.
 ## 6. Key Flows
 
 ### 6.1 Turn advancement (unified — humans and bots)
+
 One loop drives every seat type. After any applied move:
+
 1. Server applies the move via the engine, checks the result.
 2. If terminal → broadcast `game:over`. Else advance `turn` to the next seat.
 3. **Look at the seat now on turn:**
    - `human` → wait for that socket's `move` intent (broadcast `game:update` so the client renders).
-   - `bot` → invoke the AI runner with *that seat's* `difficulty`, apply the move (after an
+   - `bot` → invoke the AI runner with _that seat's_ `difficulty`, apply the move (after an
      optional `pacingMs` delay), then repeat from step 1.
 4. This naturally handles: human-vs-bot (bot moves auto-run between human moves),
    **mixed-level bots**, and **all-bot watch rooms** (the loop runs bot→bot until terminal,
    emitting a paced `game:update` per move so a spectator can follow along).
 
 > Bots run **server-side** (single authoritative path, thin client). Because the engine +
-> minimax are shared TS, a bot *could* run client-side for a pure solo game, but we keep it
+> minimax are shared TS, a bot _could_ run client-side for a pure solo game, but we keep it
 > server-side so the same loop serves solo, link-share, and watch rooms identically.
 
 ### 6.2 Create room with a seat configuration
+
 1. Host `POST /api/rooms` `{ gameId, seats }` where `seats` declares each slot as
    `human` (self, or open/joinable) or `bot` (with a `difficulty`). Examples:
    - vs bot → `[{human, self}, {bot, hard}]`
@@ -188,12 +191,14 @@ One loop drives every seat type. After any applied move:
    slot 1, and runs the turn-advancement loop (§6.1) — which auto-plays any leading bot seats.
 
 ### 6.3 Move sync (PvP)
+
 1. Player emits `move` `{ roomId, move }`.
 2. Server checks it's that player's turn + move is legal (engine).
 3. Server applies, flips turn, computes result, broadcasts `game:update`.
 4. On terminal result, broadcasts `game:over`.
 
 ### 6.4 Disconnect / reconnect (P1)
+
 - On socket disconnect, mark player `connected: false`, start grace timer (e.g. 30s).
 - Notify opponent (`opponent:disconnected`).
 - If reconnect within grace (same session token), resume. Else `status: abandoned`,
@@ -252,9 +257,9 @@ One loop drives every seat type. After any applied move:
 
 ## 13. Risks & Mitigations
 
-| Risk | Mitigation |
-|------|-----------|
-| Connect Four Hard AI too slow | Depth-limit + alpha-beta + move ordering; cache; bitboard rep if needed. |
-| Socket scaling / sticky sessions | Socket.IO Redis adapter; single node for launch. |
-| Reconnect complexity | Ship P1; degrade gracefully (abandon) if out of scope for launch. |
-| Scope creep (accounts, more games) | Framework is game-agnostic; hold the line on v1 Non-Goals. |
+| Risk                               | Mitigation                                                               |
+| ---------------------------------- | ------------------------------------------------------------------------ |
+| Connect Four Hard AI too slow      | Depth-limit + alpha-beta + move ordering; cache; bitboard rep if needed. |
+| Socket scaling / sticky sessions   | Socket.IO Redis adapter; single node for launch.                         |
+| Reconnect complexity               | Ship P1; degrade gracefully (abandon) if out of scope for launch.        |
+| Scope creep (accounts, more games) | Framework is game-agnostic; hold the line on v1 Non-Goals.               |

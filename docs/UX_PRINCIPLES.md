@@ -7,7 +7,7 @@
 > everything that goes in and out — every input, every state change, every message,
 > every error — must feel considered, responsive, and calm. A feature that works but
 > feels janky is **not done**. The UX bar below is part of the Definition of Done for
-> *every* task, not a phase at the end.
+> _every_ task, not a phase at the end.
 
 ---
 
@@ -15,7 +15,7 @@
 
 1. **Instant-feeling by default.** Every user action gets visible feedback in < 100 ms,
    even if the real result is still in flight. Use optimistic UI (reconciled to the
-   server's authoritative broadcast) so a move *lands* the moment you make it.
+   server's authoritative broadcast) so a move _lands_ the moment you make it.
 2. **Never a dead moment.** Every asynchronous state has an explicit, designed
    representation: loading, empty, success, error, offline. No blank screens, no spinners
    with no context, no silent failures.
@@ -39,15 +39,15 @@
 Every screen/component must design and implement all applicable states — reviewers check
 for these explicitly:
 
-| State | Requirement |
-|-------|-------------|
-| **Loading** | Skeletons or inline progress with context (never a bare spinner). |
-| **Empty** | Helpful empty state with a clear call to action. |
-| **Optimistic** | Local action reflects instantly; reconciles to server broadcast. |
-| **Success** | Clear, satisfying confirmation (subtle motion / state change). |
-| **Error** | Plain-language message + a recovery action. Never a dead-end or raw code. |
-| **Offline / reconnecting** | Visible connection status; auto-reconnect with clear messaging. |
-| **Disabled / not-your-turn** | Illegal actions are visibly disabled *before* they're attempted, with a reason on interaction. |
+| State                        | Requirement                                                                                    |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Loading**                  | Skeletons or inline progress with context (never a bare spinner).                              |
+| **Empty**                    | Helpful empty state with a clear call to action.                                               |
+| **Optimistic**               | Local action reflects instantly; reconciles to server broadcast.                               |
+| **Success**                  | Clear, satisfying confirmation (subtle motion / state change).                                 |
+| **Error**                    | Plain-language message + a recovery action. Never a dead-end or raw code.                      |
+| **Offline / reconnecting**   | Visible connection status; auto-reconnect with clear messaging.                                |
+| **Disabled / not-your-turn** | Illegal actions are visibly disabled _before_ they're attempted, with a reason on interaction. |
 
 ## 3. Interaction & feedback standards
 
@@ -82,6 +82,7 @@ for these explicitly:
 ## 6. Definition of Done — UX gate (applies to every task)
 
 A task is not done unless, for what it touches:
+
 - [ ] All applicable states from §2 are implemented (not just the happy path).
 - [ ] First-feedback < 100 ms; optimistic where a server round-trip is involved.
 - [ ] Errors are plain-language with a recovery path.

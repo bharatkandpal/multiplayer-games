@@ -6,8 +6,9 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "build": "echo \"[@mpg/server] build configured in MPG-002\"",
-    "test": "echo \"[@mpg/server] tests configured in MPG-002\"",
+    "build": "echo \"[@mpg/server] bundling configured later\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
     "dev": "echo \"[@mpg/server] dev server configured in MPG-011\""
   },
   "dependencies": {

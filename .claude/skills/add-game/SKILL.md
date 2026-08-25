@@ -10,6 +10,7 @@ game is **additive** — you implement one `GameModule` + a renderer and registe
 special-case a game in the room/transport/AI layers.
 
 ## Prerequisites (read)
+
 - `docs/TDD.md` §4 (the `GameModule` interface), `docs/GAME_LOGIC.md` (rules + minimax + heuristics),
   `docs/UX_PRINCIPLES.md` (the UX DoD your renderer must meet).
 
@@ -37,5 +38,6 @@ special-case a game in the room/transport/AI layers.
    (escalate to `staff-architect`).
 
 ## Definition of done
+
 - Playable vs bot (all levels), 1v1 via link, and all-bot watch — with no core changes.
 - Engine tests green; renderer passes UX review; API contract unchanged (or spec updated).

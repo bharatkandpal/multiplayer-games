@@ -47,12 +47,12 @@ The **same engine package** runs in the browser (optimistic UI) and on the serve
 No separate "AI mode" and "multiplayer mode." A room has **N seats**, each `human` or
 `bot` (with its own level). The experience is emergent from the seat configuration:
 
-| "Mode" | Seat config | Sockets | Sharing | Bot moves |
-|--------|-------------|---------|---------|-----------|
-| Play vs bot | 1 human + 1 bot | 1 | none | server auto-runs |
-| Play with a friend | 2 humans | 2 | invite link | — |
-| Fill empty seat | human(s) + bot(s) | ≥1 | link (for humans) | server auto-runs |
-| Watch (bot-vs-bot) | all bots | 0 players; N watchers | link (optional) | server auto-runs, paced |
+| "Mode"             | Seat config       | Sockets               | Sharing           | Bot moves               |
+| ------------------ | ----------------- | --------------------- | ----------------- | ----------------------- |
+| Play vs bot        | 1 human + 1 bot   | 1                     | none              | server auto-runs        |
+| Play with a friend | 2 humans          | 2                     | invite link       | —                       |
+| Fill empty seat    | human(s) + bot(s) | ≥1                    | link (for humans) | server auto-runs        |
+| Watch (bot-vs-bot) | all bots          | 0 players; N watchers | link (optional)   | server auto-runs, paced |
 
 The Room Manager runs a **single turn-advancement loop** (TDD §6.1): when the seat on turn
 is a bot, it invokes the AI runner at that seat's level and applies the move; when it's a
@@ -92,6 +92,7 @@ Watcher(s)        Server
   │ ◄─ game:update ──┤ ... until terminal ...
   │ ◄─ game:over ────┤
 ```
+
 No player intents arrive; the loop self-drives, emitting a paced `game:update` per bot
 move so watchers can follow. This is the seed of north-star spectator mode.
 

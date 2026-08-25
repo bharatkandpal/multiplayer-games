@@ -10,7 +10,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "echo \"[@mpg/engine] build configured in MPG-002\"",
-    "test": "echo \"[@mpg/engine] tests configured in MPG-002\""
+    "build": "echo \"[@mpg/engine] bundling configured later\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
   }
 }

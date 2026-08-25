@@ -58,6 +58,7 @@ function minimax(state, depth, alpha, beta, maximizing, game):
 ```
 
 **Scoring conventions**
+
 - Terminal AI win: `+LARGE - distance` (prefer faster wins).
 - Terminal loss: `-LARGE + distance` (prefer slower losses).
 - Draw: `0`.
@@ -79,15 +80,16 @@ function minimax(state, depth, alpha, beta, maximizing, game):
 ## 4. Difficulty Levels
 
 Difficulty = **search depth** + **randomness / blunder rate**. Tuned per game so
-each level *feels* right and Hard ≥ Medium ≥ Easy in strength (enforced by tests).
+each level _feels_ right and Hard ≥ Medium ≥ Easy in strength (enforced by tests).
 
-| Level | Behavior | Tic-Tac-Toe | Connect Four |
-|-------|----------|-------------|--------------|
-| **Easy** | Mostly weak; makes mistakes | ~70% random legal move, else depth-1 | depth 2, 40% random move |
-| **Medium** | Decent, occasionally imperfect | depth 4, 15% random | depth 4–5, 10% random |
-| **Hard** | Strong / near-optimal | full search (never loses) | depth 6–8, no randomness, move ordering |
+| Level      | Behavior                       | Tic-Tac-Toe                          | Connect Four                            |
+| ---------- | ------------------------------ | ------------------------------------ | --------------------------------------- |
+| **Easy**   | Mostly weak; makes mistakes    | ~70% random legal move, else depth-1 | depth 2, 40% random move                |
+| **Medium** | Decent, occasionally imperfect | depth 4, 15% random                  | depth 4–5, 10% random                   |
+| **Hard**   | Strong / near-optimal          | full search (never loses)            | depth 6–8, no randomness, move ordering |
 
 Notes:
+
 - "Random %" = probability of playing a uniformly random legal move instead of the
   minimax choice — a simple, legible way to weaken the AI without breaking legality.
 - **Hard Tic-Tac-Toe is a solved game:** with full minimax it cannot lose; a perfect
@@ -104,6 +106,7 @@ offload) is a drop-in swap with no rule duplication. See TDD §6.1.
 
 The AI runner is a **pure, stateless** function `pickMove(state, gameModule, difficulty) →
 move`. Difficulty is a property of the **seat**, not the room, so:
+
 - A room can hold **bots at different levels** (e.g. Medium seat vs Hard seat).
 - **Bot-vs-bot watch** rooms just have every seat as a bot; the server's turn loop runs
   `pickMove` for each seat in turn, paced (~600ms) so a human can watch.

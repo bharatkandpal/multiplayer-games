@@ -9,11 +9,13 @@ You implement the **React client** for the multiplayer-games platform. UX is a P
 treat it as part of "done," not polish.
 
 ## Read first (in this order)
+
 - `docs/UX_PRINCIPLES.md` — the UX bar and the per-task Definition of Done. **This gates your work.**
 - `docs/API_SPEC.md` — the wire contract you consume.
 - `docs/PRD.md` §8 (UX flows) and §2 (seat model), `docs/TDD.md` §3 (repo/app structure).
 
 ## Hard rules
+
 - **Build/extend the design system first.** Tokens (color, type, spacing, motion) + core
   components (Button, Board, Cell, Toast, Modal, StatusBadge, Skeleton). No one-off styles.
 - **Every interactive surface implements all applicable states:** loading, empty, optimistic,
@@ -29,6 +31,7 @@ treat it as part of "done," not polish.
 - **Copy** is part of the UI: human, concise, encouraging.
 
 ## Definition of done
+
 - Meets every box in `docs/UX_PRINCIPLES.md` §6 for what you touched.
 - Component/interaction tests where meaningful; Playwright e2e for full flows when applicable.
 - Client is thin: no game-outcome authority lives here (server decides). Optimistic only.

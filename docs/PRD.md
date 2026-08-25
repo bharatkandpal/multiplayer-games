@@ -25,7 +25,7 @@ Everything in the POC is built so the north-star is additive, not a rewrite.
 **Product pillar — UX-centric first.** This is a defining, P0 quality bar, not polish:
 everything that goes in and out (every input, state change, message, and error) must feel
 responsive, calm, and considered. A feature that works but feels janky is **not done**. The
-UX bar is part of the Definition of Done for *every* task — see [UX_PRINCIPLES.md](UX_PRINCIPLES.md).
+UX bar is part of the Definition of Done for _every_ task — see [UX_PRINCIPLES.md](UX_PRINCIPLES.md).
 
 ## 2. The Seat & Bot Model (core concept)
 
@@ -37,14 +37,15 @@ has **N seats**, and each seat is either:
 
 The "mode" is simply how the seats are filled:
 
-| Configuration | Seats | Experience |
-|---------------|-------|------------|
-| Play vs computer | 1 human + 1 bot | Solo practice vs AI |
-| Play with a friend | 2 humans | 1v1 over a shared link |
-| Fill empty seats | humans + bots (any levels) | Not enough people? Assign bots to the open seats |
-| Watch mode | all bots | Assign e.g. a Medium bot vs a Hard bot and **spectate them play** |
+| Configuration      | Seats                      | Experience                                                        |
+| ------------------ | -------------------------- | ----------------------------------------------------------------- |
+| Play vs computer   | 1 human + 1 bot            | Solo practice vs AI                                               |
+| Play with a friend | 2 humans                   | 1v1 over a shared link                                            |
+| Fill empty seats   | humans + bots (any levels) | Not enough people? Assign bots to the open seats                  |
+| Watch mode         | all bots                   | Assign e.g. a Medium bot vs a Hard bot and **spectate them play** |
 
 Requirements that follow from this model:
+
 - The user can **assign any seat to a bot** and pick that bot's level.
 - **Mixed bot levels in one room** are supported (e.g. one Medium + one Hard).
 - **Bot-vs-bot** rooms let a human watch instead of play.
@@ -54,6 +55,7 @@ Requirements that follow from this model:
 ## 3. Goals & Non-Goals
 
 ### POC Goals
+
 - Polished, low-friction 1v1 Connect Four and Tic-Tac-Toe in the browser.
 - Bots via minimax at three levels (Easy / Medium / Hard), assignable **per seat**.
 - Fill an empty seat with a bot at a chosen level; support **bot-vs-bot watch**.
@@ -61,6 +63,7 @@ Requirements that follow from this model:
 - A reusable seat + engine framework so new games and more seats are additive.
 
 ### North-star Goals (later versions — designed for, not built in POC)
+
 - Company/HR **event mode**: organizer creates an event, many rooms, a shared big-screen view.
 - **Spectators** watching live games at scale (hundreds of concurrent viewers).
 - **Tournaments / brackets** and **leaderboards**.
@@ -70,6 +73,7 @@ Requirements that follow from this model:
   now — shapes how we keep the engine/`GameModule` boundary clean.)
 
 ### Non-Goals (not now, maybe never)
+
 - User accounts / logins / persistent profiles in the POC (introduced with event mode).
 - Matchmaking with strangers (POC is link-share only).
 - Ranked ELO ratings, real-money, ads, or monetization.
@@ -77,7 +81,7 @@ Requirements that follow from this model:
 - Voice/video chat.
 
 > Changed from v0.1: "max 2 players" and "spectators" are **no longer non-goals** — they
-> are core to the north-star. The POC scopes them out only by *timing*, not by design.
+> are core to the north-star. The POC scopes them out only by _timing_, not by design.
 
 ## 4. Target Users & Personas
 
@@ -87,12 +91,13 @@ Requirements that follow from this model:
 - **Curious watcher** — assigns two bots at different levels and watches them play to see
   how the AI behaves. (Also the seed of spectator mode.)
 - **HR / event organizer (north-star)** — runs a company event, sets up rooms/brackets,
-  drives a big-screen view for a crowd. *Not a POC persona; captured so we don't design against it.*
+  drives a big-screen view for a crowd. _Not a POC persona; captured so we don't design against it._
 - **Event spectator (north-star)** — an employee watching games live on a shared screen.
 
 ## 5. User Stories
 
 ### Setting up a game (seat configuration)
+
 - As a player, I can start a game and see the seats for that game.
 - As a player, I can set each seat to **human** or **bot**, and choose the bot's level.
 - As a player, I can fill an empty seat with a bot when I don't have enough people.
@@ -100,11 +105,13 @@ Requirements that follow from this model:
 - As a player, I can mix bot levels (e.g. Medium vs Hard) in the same game.
 
 ### 1v1 vs a bot
+
 - As a player, I can start a 1v1 vs a bot in one click and pick Easy/Medium/Hard.
 - As a player, I see whose turn it is and when a bot is "thinking."
 - As a player, I see the result (win / lose / draw) and can start a rematch.
 
 ### 1v1 vs a friend (link share)
+
 - As a host, I create a room, get a shareable link, and share it.
 - As an invitee, I open the link and join as the second player.
 - As a player, I see the opponent's moves in real time and whose turn it is.
@@ -113,31 +120,32 @@ Requirements that follow from this model:
 - As a player, I can request a rematch after a game ends without re-sharing a link.
 
 ### Cross-cutting
+
 - As a player, illegal / out-of-turn moves are prevented (server-authoritative).
 - As a player, the board is readable and playable on mobile and desktop.
 
 ## 6. Functional Requirements
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-1 | Home lists games; game setup shows configurable **seats**. | P0 |
-| FR-2 | Connect Four with correct win detection (H / V / both diagonals). | P0 |
-| FR-3 | Tic-Tac-Toe with correct win/draw detection. | P0 |
-| FR-4 | Bot opponent using minimax + alpha-beta. | P0 |
-| FR-5 | Three bot levels: Easy / Medium / Hard (see GAME_LOGIC.md). | P0 |
-| FR-6 | **Per-seat player type** — assign any seat to human or bot. | P0 |
-| FR-7 | **Per-seat bot difficulty**, including mixed levels in one room. | P0 |
-| FR-8 | **Bot-vs-bot watch** — all seats bots; human spectates. | P1 |
-| FR-9 | Create room → shareable invite link. | P0 |
-| FR-10 | Join room via link; assign to an open human seat; reject if full/expired. | P0 |
-| FR-11 | Real-time move sync (server-authoritative). | P0 |
-| FR-12 | Turn enforcement + server-side legal-move validation, all seat types. | P0 |
-| FR-13 | End-of-game state (win/lose/draw) + rematch. | P0 |
-| FR-14 | Disconnect handling with reconnect grace; option to convert seat to bot. | P1 |
-| FR-15 | Optional display name (no auth) shown to others. | P1 |
-| FR-16 | Engine + room are **N-seat capable** (no hardcoded 2). | P0 |
-| FR-17 | *(North-star)* Spectator seats: read-only live view, scalable to hundreds. | P2 |
-| FR-18 | *(North-star)* Event/tournament orchestration + leaderboards. | P3 |
+| ID    | Requirement                                                                | Priority |
+| ----- | -------------------------------------------------------------------------- | -------- |
+| FR-1  | Home lists games; game setup shows configurable **seats**.                 | P0       |
+| FR-2  | Connect Four with correct win detection (H / V / both diagonals).          | P0       |
+| FR-3  | Tic-Tac-Toe with correct win/draw detection.                               | P0       |
+| FR-4  | Bot opponent using minimax + alpha-beta.                                   | P0       |
+| FR-5  | Three bot levels: Easy / Medium / Hard (see GAME_LOGIC.md).                | P0       |
+| FR-6  | **Per-seat player type** — assign any seat to human or bot.                | P0       |
+| FR-7  | **Per-seat bot difficulty**, including mixed levels in one room.           | P0       |
+| FR-8  | **Bot-vs-bot watch** — all seats bots; human spectates.                    | P1       |
+| FR-9  | Create room → shareable invite link.                                       | P0       |
+| FR-10 | Join room via link; assign to an open human seat; reject if full/expired.  | P0       |
+| FR-11 | Real-time move sync (server-authoritative).                                | P0       |
+| FR-12 | Turn enforcement + server-side legal-move validation, all seat types.      | P0       |
+| FR-13 | End-of-game state (win/lose/draw) + rematch.                               | P0       |
+| FR-14 | Disconnect handling with reconnect grace; option to convert seat to bot.   | P1       |
+| FR-15 | Optional display name (no auth) shown to others.                           | P1       |
+| FR-16 | Engine + room are **N-seat capable** (no hardcoded 2).                     | P0       |
+| FR-17 | _(North-star)_ Spectator seats: read-only live view, scalable to hundreds. | P2       |
+| FR-18 | _(North-star)_ Event/tournament orchestration + leaderboards.              | P3       |
 
 ## 7. Non-Functional Requirements
 
@@ -161,7 +169,7 @@ Requirements that follow from this model:
 **Play vs bot:** Home → pick game → seats: [me] vs [bot: level] → play → result → rematch.
 
 **Play with a friend:** Home → pick game → seats: [me] vs [open] → create link → share →
-guest joins open seat → play → result → rematch. *(Empty seat can be switched to a bot.)*
+guest joins open seat → play → result → rematch. _(Empty seat can be switched to a bot.)_
 
 **Watch bots:** Home → pick game → seats: [bot: Medium] vs [bot: Hard] → watch → result.
 
