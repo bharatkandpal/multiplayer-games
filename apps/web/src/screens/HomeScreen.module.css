@@ -1,0 +1,111 @@
+.main {
+  max-width: var(--container-md);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+  font-family: var(--font-family-base);
+}
+
+.topBar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-2);
+}
+
+.heading {
+  font-size: var(--font-size-700);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  margin: 0 0 var(--space-2);
+}
+
+.tagline {
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-8);
+  max-width: 34rem;
+}
+
+.sectionHeading {
+  font-size: var(--font-size-300);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-4);
+}
+
+.gameGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-4);
+  list-style: none;
+  margin: 0 0 var(--space-8);
+  padding: 0;
+}
+
+.gameCard {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-height: var(--size-touch-target);
+  padding: var(--space-5);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+.gameCard:hover {
+  background-color: var(--color-bg-subtle);
+  border-color: var(--color-accent);
+}
+
+.gameCard:active {
+  transform: translateY(1px);
+}
+
+.gameCard:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.gameTitle {
+  font-size: var(--font-size-400);
+  font-weight: var(--font-weight-bold);
+}
+
+.gameDescription {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-200);
+  margin: 0;
+}
+
+.gameId {
+  color: var(--color-text-disabled);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-100);
+}
+
+.empty {
+  padding: var(--space-6);
+  border: var(--border-width-thin) dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-8);
+}
+
+.footer {
+  padding-top: var(--space-6);
+  border-top: var(--border-width-thin) solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-200);
+}
+
+.footerLink {
+  margin-top: var(--space-2);
+}

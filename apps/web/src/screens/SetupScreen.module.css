@@ -1,0 +1,112 @@
+.main {
+  max-width: var(--container-md);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.backRow {
+  margin-bottom: var(--space-4);
+}
+
+.heading {
+  font-size: var(--font-size-600);
+  font-weight: var(--font-weight-bold);
+  margin: 0 0 var(--space-6);
+}
+
+.seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.seatCard {
+  padding: var(--space-5);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+}
+
+.seatLegend {
+  font-size: var(--font-size-400);
+  font-weight: var(--font-weight-bold);
+  padding: 0 0 var(--space-3);
+}
+
+.kindOptions {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.kindOption {
+  flex: 1;
+}
+
+.kindLabel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--size-touch-target);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium);
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.kindLabel:has(input:checked) {
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+
+.kindLabel:has(input:focus-visible) {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.kindInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.difficultyField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.difficultyLabel {
+  font-size: var(--font-size-200);
+  color: var(--color-text-muted);
+}
+
+.difficultySelect {
+  min-height: var(--size-touch-target);
+  padding: 0 var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-200);
+}
+
+.difficultySelect:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-3);
+}

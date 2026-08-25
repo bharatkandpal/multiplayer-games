@@ -1,0 +1,88 @@
+.board {
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 auto;
+}
+
+.grid {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-accent);
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: var(--size-touch-target);
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.column:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.column:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.column:disabled {
+  cursor: not-allowed;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+}
+
+.disc {
+  width: 82%;
+  height: 82%;
+  border-radius: var(--radius-full);
+  border: var(--border-width-thin) solid rgba(0, 0, 0, 0.2);
+  animation: drop var(--duration-base) var(--ease-emphasized);
+}
+
+@keyframes drop {
+  from {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .disc {
+    animation: none;
+  }
+}
+
+/* Shape/pattern-distinct sides — never color alone (UX_PRINCIPLES §4). */
+.discPlayer1 {
+  background-color: var(--color-player-1);
+}
+
+.discPlayer2 {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--color-player-2) 0 4px,
+    var(--color-bg) 4px 8px
+  );
+}
+
+.lastMove {
+  box-shadow: 0 0 0 3px var(--color-accent-text);
+}

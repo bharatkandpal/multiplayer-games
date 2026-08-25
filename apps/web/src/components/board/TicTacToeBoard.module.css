@@ -1,0 +1,88 @@
+.board {
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 22rem;
+  margin: 0 auto;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  min-height: var(--size-touch-target);
+  min-width: var(--size-touch-target);
+  padding: var(--space-2);
+  border: var(--border-width-thick) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.cell:hover:not(:disabled) {
+  background-color: var(--color-bg-subtle);
+}
+
+.cell:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.cell:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.cell:disabled {
+  cursor: not-allowed;
+}
+
+.lastMove {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent) inset;
+}
+
+.mark {
+  width: 60%;
+  height: 60%;
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  animation: pop var(--duration-base) var(--ease-emphasized);
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark {
+    animation: none;
+  }
+}
+
+.markX {
+  stroke: var(--color-player-1);
+}
+
+.markO {
+  stroke: var(--color-player-2);
+}

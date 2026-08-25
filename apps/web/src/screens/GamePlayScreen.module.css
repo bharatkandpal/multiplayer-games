@@ -1,0 +1,52 @@
+.main {
+  max-width: var(--container-md);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.heading {
+  font-size: var(--font-size-500);
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--space-8);
+  margin-bottom: var(--space-6);
+}
+
+.toastSlot {
+  margin-bottom: var(--space-4);
+  max-width: var(--container-sm);
+}
+
+.boardWrap {
+  margin-bottom: var(--space-6);
+}
+
+.resultBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.resultMessage {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.resultActions {
+  display: flex;
+  gap: var(--space-3);
+}

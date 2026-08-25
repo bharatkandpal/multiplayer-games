@@ -29,14 +29,14 @@ Phased so we always have something playable. Each phase ends with a demoable mil
 - [x] Connect Four engine + win detection + tests (N-player-generic interface). _(MPG-006)_
 - [x] Generic minimax + alpha-beta; per-game heuristics (each module's `evaluate`); center-first ordering. _(MPG-007)_ — stateless difficulty `pickMove` is MPG-008.
 - [x] Difficulty policy (Easy/Medium/Hard) + AI strength tests. _(MPG-008)_
-- [ ] **Seat model** (human/bot per seat, per-seat difficulty) — POC 2 seats, no hardcoded 2.
+- [x] **Seat model** (human/bot per seat, per-seat difficulty) — client seat config landed. _(MPG-009/024; server-side room = Phase 2)_
 - [x] **Design system / UI kit first** (tokens + core components: Button, Toast, Modal,
       StatusBadge, Skeleton) so every screen inherits the UX bar. _(MPG-029; Board/Cell = MPG-009)_
-- [ ] Optimistic-UI + state-driven component helpers (loading/empty/error/success built in).
-- [ ] Seat-config UI on the setup screen (assign each seat human or bot + level).
-- [ ] React board components + Home/Setup/Result screens (all required states, a11y, motion).
-- [ ] Play vs bot end-to-end; **mixed-level** and **bot-vs-bot watch** (paced) work locally.
-- **Done when:** a player can play vs each bot level, and watch a Medium-vs-Hard bot game, for both games.
+- [x] Optimistic-UI + state-driven component helpers (loading/empty/error/success built in). _(MPG-030)_
+- [x] Seat-config UI on the setup screen (assign each seat human or bot + level). _(MPG-009)_
+- [x] React board components + Home/Setup/Result screens. _(MPG-009)_ — a11y in; UX validation deferred to MPG-033.
+- [x] Play vs bot end-to-end; **mixed-level** and **bot-vs-bot watch** (paced) work locally. _(MPG-010)_
+- **Done when:** a player can play vs each bot level, and watch a Medium-vs-Hard bot game, for both games. ✅ _(pending MPG-033 UX validation + MPG-034 tests, deferred by request)_
 
 ## Phase 2 — Multiplayer over a link (core v1)
 
