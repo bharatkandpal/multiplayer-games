@@ -19,3 +19,6 @@ export { connectFour } from "./connect4";
 export type { ConnectFourState, ConnectFourMove } from "./connect4";
 
 export { builtInGames, registerBuiltInGames } from "./games";
+
+export { minimax, searchBestMove } from "./ai/minimax";
+export type { SearchOptions, SearchResult } from "./ai/minimax";

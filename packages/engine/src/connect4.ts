@@ -189,6 +189,20 @@ function evaluate(state: ConnectFourState, forPlayer: Player): number {
   return score;
 }
 
+/** Column visit order for search: center-out, since central columns open more lines. */
+const CENTER_FIRST_COLUMNS = [3, 2, 4, 1, 5, 0, 6];
+
+/** Center-first move ordering (see docs/GAME_LOGIC.md §3) — improves alpha-beta pruning. */
+function orderMoves(_state: ConnectFourState, moves: ConnectFourMove[]): ConnectFourMove[] {
+  const byColumn = new Map(moves.map((move) => [move.column, move]));
+  const ordered: ConnectFourMove[] = [];
+  for (const column of CENTER_FIRST_COLUMNS) {
+    const move = byColumn.get(column);
+    if (move !== undefined) ordered.push(move);
+  }
+  return ordered;
+}
+
 function createInitialState(): ConnectFourState {
   const board: Cell[][] = [];
   for (let col = 0; col < COLUMNS; col++) {
@@ -207,4 +221,5 @@ export const connectFour: GameModule<ConnectFourState, ConnectFourMove> = {
   getResult,
   currentPlayer,
   evaluate,
+  orderMoves,
 };

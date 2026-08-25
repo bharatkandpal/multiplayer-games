@@ -63,4 +63,13 @@ export interface GameModule<S, M> {
    * Used by minimax at non-terminal depth cutoffs. See docs/GAME_LOGIC.md.
    */
   evaluate(state: S, forPlayer: Player): number;
+
+  /**
+   * Optional move ordering hint for search: returns `moves` reordered so that
+   * better-looking moves are tried first (e.g. center columns in Connect Four),
+   * which improves alpha-beta pruning. Purely a speed optimization — omitting it
+   * (or returning `moves` unchanged) must not change the search's decision, only
+   * how fast it's reached. Defaults to identity order when absent.
+   */
+  orderMoves?(state: S, moves: M[]): M[];
 }
