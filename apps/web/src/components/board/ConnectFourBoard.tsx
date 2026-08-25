@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import type { ConnectFourMove, ConnectFourState } from "@mpg/engine";
+import type { ConnectFourLine, ConnectFourMove, ConnectFourState } from "@mpg/engine";
 import type { AppliedMove } from "../../game";
 import { cx } from "../ui/cx";
 import styles from "./ConnectFourBoard.module.css";
@@ -12,6 +12,13 @@ export interface ConnectFourBoardProps {
   /** True when it isn't the local human's turn (bot thinking, game over, spectating). */
   disabled: boolean;
   lastMove: AppliedMove<ConnectFourMove> | null;
+  /** The 4 winning {column,row} cells once the game is won, else null — highlighted. */
+  winningLine?: ConnectFourLine | null;
+}
+
+/** Stable key for a {column,row} cell, for winning-line membership checks. */
+function cellKey(column: number, row: number): string {
+  return `${column},${row}`;
 }
 
 /** The row (from the top) the most recently-dropped disc in `column` landed in. */
@@ -40,11 +47,15 @@ export function ConnectFourBoard({
   onMove,
   disabled,
   lastMove,
+  winningLine = null,
 }: ConnectFourBoardProps): React.JSX.Element {
   const columnCount = state.board.length;
   const rowCount = state.board[0]?.length ?? 0;
   const [focusColumn, setFocusColumn] = useState(0);
   const columnRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const winningCells = winningLine
+    ? new Set(winningLine.map((c) => cellKey(c.column, c.row)))
+    : null;
 
   const isColumnFull = (column: number): boolean => {
     const col = state.board[column];
@@ -93,6 +104,7 @@ export function ConnectFourBoard({
       >
         {Array.from({ length: columnCount }, (_, column) => {
           const full = isColumnFull(column);
+          const isActivatable = !full && !disabled;
           const lastMoveRow = lastMove?.move.column === column ? topFilledRow(state, column) : null;
           return (
             <button
@@ -103,20 +115,21 @@ export function ConnectFourBoard({
               type="button"
               className={styles.column}
               tabIndex={column === focusColumn ? 0 : -1}
-              disabled={disabled || full}
+              aria-disabled={!isActivatable}
               aria-label={
                 full ? `Column ${column + 1}, full` : `Drop a disc in column ${column + 1}`
               }
               onFocus={() => setFocusColumn(column)}
               onKeyDown={(event) => handleKeyDown(event, column)}
               onClick={() => {
-                if (full || disabled) return;
+                if (!isActivatable) return;
                 onMove({ column });
               }}
             >
               {Array.from({ length: rowCount }, (_, rowFromTop) => {
                 const row = rowCount - 1 - rowFromTop;
                 const mark = state.board[column]?.[row] as 1 | 2 | null | undefined;
+                const isWinning = winningCells?.has(cellKey(column, row)) ?? false;
                 return (
                   <span key={row} className={styles.cell}>
                     {mark ? (
@@ -125,6 +138,7 @@ export function ConnectFourBoard({
                           styles.disc,
                           discClassName(mark),
                           lastMoveRow === row && styles.lastMove,
+                          isWinning && styles.winning,
                         )}
                         aria-hidden="true"
                       />

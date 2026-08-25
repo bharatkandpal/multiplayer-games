@@ -16,6 +16,9 @@ export interface TicTacToeMove {
   readonly cell: number;
 }
 
+/** A winning line: the 3 board indices (0..8) that complete it. */
+export type TicTacToeLine = readonly [number, number, number];
+
 const BOARD_SIZE = 9;
 const PLAYER_X = 1;
 const PLAYER_O = 2;
@@ -45,20 +48,21 @@ function currentPlayer(state: TicTacToeState): Player {
   return countFilled(state.board) % 2 === 0 ? PLAYER_X : PLAYER_O;
 }
 
-function winnerOf(board: readonly Cell[]): Player | null {
-  for (const [a, b, c] of LINES) {
+function winnerOf(board: readonly Cell[]): { winner: Player; line: TicTacToeLine } | null {
+  for (const line of LINES) {
+    const [a, b, c] = line;
     const mark = board[a];
     if (mark !== null && mark !== undefined && mark === board[b] && mark === board[c]) {
-      return mark;
+      return { winner: mark, line };
     }
   }
   return null;
 }
 
-function getResult(state: TicTacToeState): Result {
-  const winner = winnerOf(state.board);
-  if (winner !== null) {
-    return { status: "win", winner };
+function getResult(state: TicTacToeState): Result<TicTacToeLine> {
+  const win = winnerOf(state.board);
+  if (win !== null) {
+    return { status: "win", winner: win.winner, line: win.line };
   }
   if (countFilled(state.board) === BOARD_SIZE) {
     return { status: "draw" };
@@ -123,7 +127,7 @@ function evaluate(state: TicTacToeState, forPlayer: Player): number {
 }
 
 /** The Tic-Tac-Toe `GameModule`: a solved, 2-player, 3x3 grid game. */
-export const ticTacToe: GameModule<TicTacToeState, TicTacToeMove> = {
+export const ticTacToe: GameModule<TicTacToeState, TicTacToeMove, TicTacToeLine> = {
   id: "tictactoe",
   playerCount: 2,
   createInitialState: () => ({ board: new Array<Cell>(BOARD_SIZE).fill(null) }),

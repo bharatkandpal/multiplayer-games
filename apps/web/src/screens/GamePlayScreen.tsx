@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { GameModule, Player, Result } from "@mpg/engine";
-import { Button, Modal, Skeleton, StatusBadge, Toast, VisuallyHidden } from "../components/ui";
+import { Button, Modal, StatusBadge, Toast, VisuallyHidden } from "../components/ui";
 import type { StatusBadgeStatus } from "../components/ui";
 import {
   type AppliedMove,
@@ -11,18 +11,20 @@ import {
 } from "../game";
 import styles from "./GamePlayScreen.module.css";
 
-export interface BoardRenderProps<S, M> {
+export interface BoardRenderProps<S, M, L = unknown> {
   state: S;
   onMove: (move: M) => void;
   disabled: boolean;
   lastMove: AppliedMove<M> | null;
+  /** The winning line (game-native coords) once the game is won, else null — for highlighting. */
+  winningLine: L | null;
 }
 
-export interface GamePlayScreenProps<S, M> {
-  game: GameModule<S, M>;
+export interface GamePlayScreenProps<S, M, L = unknown> {
+  game: GameModule<S, M, L>;
   gameTitle: string;
   seats: SeatsConfig;
-  renderBoard: (props: BoardRenderProps<S, M>) => ReactNode;
+  renderBoard: (props: BoardRenderProps<S, M, L>) => ReactNode;
   /** Plain-language description of one move, for the screen-reader live region. */
   describeMove: (move: M, player: Player) => string;
   onExit: () => void;
@@ -45,14 +47,14 @@ function resultHeadline(result: Result, seats: SeatsConfig): string {
  * Engine-agnostic: callers supply `renderBoard`/`describeMove` for their game's
  * concrete state/move shape.
  */
-export function GamePlayScreen<S, M>({
+export function GamePlayScreen<S, M, L = unknown>({
   game,
   gameTitle,
   seats,
   renderBoard,
   describeMove,
   onExit,
-}: GamePlayScreenProps<S, M>): React.JSX.Element {
+}: GamePlayScreenProps<S, M, L>): React.JSX.Element {
   const {
     session,
     isHumanTurn,
@@ -68,6 +70,11 @@ export function GamePlayScreen<S, M>({
     clearError,
     rematch,
   } = useLocalPlayController(game, seats);
+
+  // The result modal can be dismissed (Esc / backdrop / ×) to reveal the
+  // final board without leaving the game — only the explicit Rematch /
+  // "Back to home" buttons below navigate away from the terminal state.
+  const [resultDismissed, setResultDismissed] = useState(false);
 
   const turnSeatIndex = seatIndexOf(session.turn);
   const turnSeatName = describeSeat(seats, turnSeatIndex);
@@ -101,6 +108,9 @@ export function GamePlayScreen<S, M>({
 
   const boardDisabled = !isHumanTurn;
   const isGameOver = session.status.type === "game_over";
+  // The session layer erases the line's game-specific type to `unknown`; each
+  // route re-supplies its concrete `L`, so this cast is safe and localized here.
+  const winningLine = session.result.status === "win" ? (session.result.line as L) : null;
 
   return (
     <div className={styles.main}>
@@ -112,8 +122,9 @@ export function GamePlayScreen<S, M>({
       </div>
 
       <div className={styles.statusRow}>
-        <StatusBadge status={badgeStatus}>{badgeText}</StatusBadge>
-        {thinkingSeat !== null ? <Skeleton variant="text" width="6rem" /> : null}
+        <StatusBadge status={badgeStatus} busy={thinkingSeat !== null}>
+          {badgeText}
+        </StatusBadge>
       </div>
 
       {isAllBots && !isGameOver ? (
@@ -164,6 +175,7 @@ export function GamePlayScreen<S, M>({
           onMove: play,
           disabled: boardDisabled,
           lastMove: session.lastMove,
+          winningLine,
         })}
       </div>
 
@@ -171,7 +183,19 @@ export function GamePlayScreen<S, M>({
         <VisuallyHidden>{announcement}</VisuallyHidden>
       </div>
 
-      <Modal isOpen={isGameOver} title={resultHeadline(session.result, seats)} onClose={onExit}>
+      {/*
+        MPG-036: Esc / backdrop-click / × only dismiss this modal — they
+        reveal the finished board underneath rather than exiting to Home.
+        The board is already disabled once the game is over (boardDisabled
+        above), so revealing it can't accept further moves. The only ways
+        to navigate off the terminal state are the explicit Rematch and
+        "Back to home" buttons.
+      */}
+      <Modal
+        isOpen={isGameOver && !resultDismissed}
+        title={resultHeadline(session.result, seats)}
+        onClose={() => setResultDismissed(true)}
+      >
         <div className={styles.resultBody}>
           <p className={styles.resultMessage}>
             {session.result.status === "draw"
@@ -179,7 +203,13 @@ export function GamePlayScreen<S, M>({
               : "Nice game! Ready for a rematch?"}
           </p>
           <div className={styles.resultActions}>
-            <Button variant="primary" onClick={rematch}>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setResultDismissed(false);
+                rematch();
+              }}
+            >
               Rematch
             </Button>
             <Button variant="secondary" onClick={onExit}>

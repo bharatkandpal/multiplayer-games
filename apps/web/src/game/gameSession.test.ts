@@ -54,7 +54,7 @@ describe("gameSessionReducer", () => {
       { cell: 2 }, // X wins top row
     ]);
 
-    expect(session.result).toEqual({ status: "win", winner: 1 });
+    expect(session.result).toMatchObject({ status: "win", winner: 1 });
     expect(session.status).toEqual({ type: "game_over" });
   });
 
@@ -103,7 +103,7 @@ describe("gameSessionReducer", () => {
     const rejected = gameSessionReducer(over, { type: "apply_local_move", move: { cell: 8 } });
 
     expect(rejected.status).toMatchObject({ type: "error", reason: "game_over" });
-    expect(rejected.result).toEqual({ status: "win", winner: 1 });
+    expect(rejected.result).toMatchObject({ status: "win", winner: 1 });
   });
 
   it("set_thinking marks a bot as computing a move without altering state", () => {
@@ -164,7 +164,7 @@ describe("gameSessionReducer", () => {
       const reconciled = gameSessionReducer(started, { type: "reconcile", state: { board } });
 
       expect(reconciled.status).toEqual({ type: "game_over" });
-      expect(reconciled.result).toEqual({ status: "win", winner: 1 });
+      expect(reconciled.result).toMatchObject({ status: "win", winner: 1 });
     });
 
     it("preserves lastMove when reconcile omits it", () => {

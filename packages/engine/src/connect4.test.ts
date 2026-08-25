@@ -26,14 +26,32 @@ describe("connect4: win detection — all 4 orientations", () => {
     // P1: col0,col1,col2,col3 (all row 0). P2 stacks a second disc on col0-2
     // in between, never completing a line of its own.
     const state = play([0, 0, 1, 1, 2, 2, 3]);
-    expect(connectFour.getResult(state)).toEqual({ status: "win", winner: PLAYER_ONE });
+    expect(connectFour.getResult(state)).toEqual({
+      status: "win",
+      winner: PLAYER_ONE,
+      line: [
+        { column: 0, row: 0 },
+        { column: 1, row: 0 },
+        { column: 2, row: 0 },
+        { column: 3, row: 0 },
+      ],
+    });
   });
 
   it("detects a vertical win (column 0, rows 0-3) for player 1", () => {
     // P1 drops into col0 four times; P2 drops into col1 in between (only 3
     // discs there — no vertical win of its own).
     const state = play([0, 1, 0, 1, 0, 1, 0]);
-    expect(connectFour.getResult(state)).toEqual({ status: "win", winner: PLAYER_ONE });
+    expect(connectFour.getResult(state)).toEqual({
+      status: "win",
+      winner: PLAYER_ONE,
+      line: [
+        { column: 0, row: 0 },
+        { column: 0, row: 1 },
+        { column: 0, row: 2 },
+        { column: 0, row: 3 },
+      ],
+    });
   });
 
   it("detects an up-right diagonal (↗) win for player 1", () => {
@@ -46,7 +64,16 @@ describe("connect4: win detection — all 4 orientations", () => {
     //   col3: [P2,P1,P2,P1]
     //   col6: [P2]
     const state = play([0, 1, 1, 2, 2, 6, 2, 3, 3, 3, 3]);
-    expect(connectFour.getResult(state)).toEqual({ status: "win", winner: PLAYER_ONE });
+    expect(connectFour.getResult(state)).toEqual({
+      status: "win",
+      winner: PLAYER_ONE,
+      line: [
+        { column: 0, row: 0 },
+        { column: 1, row: 1 },
+        { column: 2, row: 2 },
+        { column: 3, row: 3 },
+      ],
+    });
   });
 
   it("detects a down-right diagonal (↘) win for player 2 (not just player 1)", () => {
@@ -60,7 +87,16 @@ describe("connect4: win detection — all 4 orientations", () => {
     //   col4: [P1]
     //   col5: [P1]
     const state = play([4, 3, 2, 2, 1, 1, 5, 1, 0, 0, 0, 0]);
-    expect(connectFour.getResult(state)).toEqual({ status: "win", winner: PLAYER_TWO });
+    expect(connectFour.getResult(state)).toEqual({
+      status: "win",
+      winner: PLAYER_TWO,
+      line: [
+        { column: 0, row: 3 },
+        { column: 1, row: 2 },
+        { column: 2, row: 1 },
+        { column: 3, row: 0 },
+      ],
+    });
   });
 });
 

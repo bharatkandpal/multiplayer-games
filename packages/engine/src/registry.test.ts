@@ -10,7 +10,8 @@ const fakeGame: GameModule<number, number> = {
   createInitialState: () => 0,
   legalMoves: (state) => (state === 0 ? [1] : []),
   applyMove: (state, move, _player) => state + move,
-  getResult: (state) => (state > 0 ? { status: "win", winner: 1 } : { status: "in_progress" }),
+  getResult: (state) =>
+    state > 0 ? { status: "win", winner: 1, line: [] } : { status: "in_progress" },
   currentPlayer: (state) => (state % 2) + 1,
   evaluate: (state, forPlayer) => state * forPlayer,
 };

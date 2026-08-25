@@ -27,6 +27,20 @@ export interface ConnectFourMove {
   readonly column: number;
 }
 
+/** A single board cell coordinate, in the same `{column, row}` space as {@link ConnectFourState}. */
+export interface ConnectFourCoord {
+  readonly column: number;
+  readonly row: number;
+}
+
+/** A winning line: the 4 board cells (in play order) that complete it. */
+export type ConnectFourLine = readonly [
+  ConnectFourCoord,
+  ConnectFourCoord,
+  ConnectFourCoord,
+  ConnectFourCoord,
+];
+
 function countFilled(state: ConnectFourState): number {
   let count = 0;
   for (const col of state.board) {
@@ -65,7 +79,7 @@ const DIRECTIONS: readonly (readonly [number, number])[] = [
   [1, -1], // diagonal down-right (↘)
 ];
 
-function winnerOf(state: ConnectFourState): Player | null {
+function winnerOf(state: ConnectFourState): { winner: Player; line: ConnectFourLine } | null {
   for (let col = 0; col < COLUMNS; col++) {
     for (let row = 0; row < ROWS; row++) {
       const mark = cellAt(state, col, row);
@@ -79,17 +93,24 @@ function winnerOf(state: ConnectFourState): Player | null {
             break;
           }
         }
-        if (inARow >= 4) return mark;
+        if (inARow >= 4) {
+          const coordAt = (step: number): ConnectFourCoord => ({
+            column: col + dc * step,
+            row: row + dr * step,
+          });
+          const line: ConnectFourLine = [coordAt(0), coordAt(1), coordAt(2), coordAt(3)];
+          return { winner: mark, line };
+        }
       }
     }
   }
   return null;
 }
 
-function getResult(state: ConnectFourState): Result {
-  const winner = winnerOf(state);
-  if (winner !== null) {
-    return { status: "win", winner };
+function getResult(state: ConnectFourState): Result<ConnectFourLine> {
+  const win = winnerOf(state);
+  if (win !== null) {
+    return { status: "win", winner: win.winner, line: win.line };
   }
   if (countFilled(state) === COLUMNS * ROWS) {
     return { status: "draw" };
@@ -212,7 +233,7 @@ function createInitialState(): ConnectFourState {
 }
 
 /** The Connect Four `GameModule`: a 2-player, 7x6 gravity-drop grid game. */
-export const connectFour: GameModule<ConnectFourState, ConnectFourMove> = {
+export const connectFour: GameModule<ConnectFourState, ConnectFourMove, ConnectFourLine> = {
   id: "connect4",
   playerCount: 2,
   createInitialState,

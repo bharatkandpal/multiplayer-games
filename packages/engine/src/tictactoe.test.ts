@@ -23,23 +23,27 @@ function play(cells: readonly number[]): TicTacToeState {
 
 describe("tictactoe: win detection — all 8 lines", () => {
   it.each([
-    { name: "row 0 (0,1,2)", cells: [0, 3, 1, 4, 2], winner: PLAYER_X },
-    { name: "row 1 (3,4,5)", cells: [3, 0, 4, 1, 5], winner: PLAYER_X },
-    { name: "row 2 (6,7,8)", cells: [6, 0, 7, 1, 8], winner: PLAYER_X },
-    { name: "col 0 (0,3,6)", cells: [0, 1, 3, 2, 6], winner: PLAYER_X },
-    { name: "col 1 (1,4,7)", cells: [1, 0, 4, 2, 7], winner: PLAYER_X },
-    { name: "col 2 (2,5,8)", cells: [2, 0, 5, 1, 8], winner: PLAYER_X },
-    { name: "diagonal (0,4,8)", cells: [0, 1, 4, 2, 8], winner: PLAYER_X },
-    { name: "anti-diagonal (2,4,6)", cells: [2, 0, 4, 1, 6], winner: PLAYER_X },
-  ])("detects a win on $name", ({ cells, winner }) => {
+    { name: "row 0 (0,1,2)", cells: [0, 3, 1, 4, 2], winner: PLAYER_X, line: [0, 1, 2] },
+    { name: "row 1 (3,4,5)", cells: [3, 0, 4, 1, 5], winner: PLAYER_X, line: [3, 4, 5] },
+    { name: "row 2 (6,7,8)", cells: [6, 0, 7, 1, 8], winner: PLAYER_X, line: [6, 7, 8] },
+    { name: "col 0 (0,3,6)", cells: [0, 1, 3, 2, 6], winner: PLAYER_X, line: [0, 3, 6] },
+    { name: "col 1 (1,4,7)", cells: [1, 0, 4, 2, 7], winner: PLAYER_X, line: [1, 4, 7] },
+    { name: "col 2 (2,5,8)", cells: [2, 0, 5, 1, 8], winner: PLAYER_X, line: [2, 5, 8] },
+    { name: "diagonal (0,4,8)", cells: [0, 1, 4, 2, 8], winner: PLAYER_X, line: [0, 4, 8] },
+    { name: "anti-diagonal (2,4,6)", cells: [2, 0, 4, 1, 6], winner: PLAYER_X, line: [2, 4, 6] },
+  ])("detects a win on $name", ({ cells, winner, line }) => {
     const state = play(cells);
-    expect(ticTacToe.getResult(state)).toEqual({ status: "win", winner });
+    expect(ticTacToe.getResult(state)).toEqual({ status: "win", winner, line });
   });
 
   it("also detects a win for player O (not just whoever moves first)", () => {
     // X plays 0, 3, 8; O plays 1, 4, 7 -> O completes column 1 (1,4,7).
     const state = play([0, 1, 3, 4, 8, 7]);
-    expect(ticTacToe.getResult(state)).toEqual({ status: "win", winner: PLAYER_O });
+    expect(ticTacToe.getResult(state)).toEqual({
+      status: "win",
+      winner: PLAYER_O,
+      line: [1, 4, 7],
+    });
   });
 });
 

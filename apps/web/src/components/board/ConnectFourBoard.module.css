@@ -47,7 +47,7 @@
   }
 }
 
-.column:hover:not(:disabled) {
+.column:hover:not([aria-disabled="true"]) {
   background-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -56,7 +56,7 @@
   outline-offset: 2px;
 }
 
-.column:disabled {
+.column[aria-disabled="true"] {
   cursor: not-allowed;
 }
 
@@ -107,4 +107,31 @@
 
 .lastMove {
   box-shadow: 0 0 0 3px var(--color-accent-text);
+}
+
+/* Winning line (MPG-035): success ring + glow on the 4 winning discs. The discs
+   keep their solid/striped fill so the win reads without relying on color. */
+.winning {
+  box-shadow:
+    0 0 0 3px var(--color-success),
+    0 0 10px 2px var(--color-success);
+  animation: winPulse var(--duration-slow) var(--ease-emphasized);
+}
+
+@keyframes winPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .winning {
+    animation: none;
+  }
 }

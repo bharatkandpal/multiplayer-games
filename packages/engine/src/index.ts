@@ -13,10 +13,15 @@ export { registerGame, getGame, hasGame, listGames, clearRegistry } from "./regi
 export type { AnyGameModule } from "./registry";
 
 export { ticTacToe } from "./tictactoe";
-export type { TicTacToeState, TicTacToeMove, Cell } from "./tictactoe";
+export type { TicTacToeState, TicTacToeMove, TicTacToeLine, Cell } from "./tictactoe";
 
 export { connectFour } from "./connect4";
-export type { ConnectFourState, ConnectFourMove } from "./connect4";
+export type {
+  ConnectFourState,
+  ConnectFourMove,
+  ConnectFourCoord,
+  ConnectFourLine,
+} from "./connect4";
 
 export { builtInGames, registerBuiltInGames } from "./games";
 

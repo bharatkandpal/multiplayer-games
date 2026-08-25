@@ -37,7 +37,7 @@ describe("TicTacToeBoard", () => {
     expect(onMove).toHaveBeenCalledExactlyOnceWith({ cell: 4 });
   });
 
-  it("does not call onMove for an already-occupied cell, and disables it", async () => {
+  it("does not call onMove for an already-occupied cell, and marks it aria-disabled", async () => {
     const user = userEvent.setup();
     const onMove = vi.fn();
     const board = emptyState().board.slice();
@@ -45,22 +45,46 @@ describe("TicTacToeBoard", () => {
     render(<TicTacToeBoard state={{ board }} onMove={onMove} disabled={false} lastMove={null} />);
 
     const cell = screen.getByRole("gridcell", { name: "Row 1, column 1, X" });
-    expect(cell).toBeDisabled();
+    expect(cell).toHaveAttribute("aria-disabled", "true");
+    expect(cell).not.toBeDisabled();
     await user.click(cell);
     expect(onMove).not.toHaveBeenCalled();
   });
 
-  it("disables every cell and ignores clicks when disabled", async () => {
+  it("marks every cell aria-disabled and ignores clicks when disabled, without removing them from the tab order", async () => {
     const user = userEvent.setup();
     const onMove = vi.fn();
     render(<TicTacToeBoard state={emptyState()} onMove={onMove} disabled lastMove={null} />);
 
     const cells = screen.getAllByRole("gridcell");
-    for (const cell of cells) expect(cell).toBeDisabled();
+    for (const cell of cells) {
+      expect(cell).toHaveAttribute("aria-disabled", "true");
+      expect(cell).not.toBeDisabled();
+    }
+
+    // The roving-tabindex cell must stay keyboard-reachable even while disabled
+    // (native `disabled` would yank the whole board out of the tab order).
+    expect(cells[0]).toHaveAttribute("tabindex", "0");
+    (cells[0] as HTMLElement).focus();
+    expect(cells[0]).toHaveFocus();
 
     await user.click(cells[4] as HTMLElement);
     expect(onMove).not.toHaveBeenCalled();
     expect(screen.getByRole("grid")).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("keeps arrow-key navigation working across a disabled board", async () => {
+    const user = userEvent.setup();
+    const onMove = vi.fn();
+    render(<TicTacToeBoard state={emptyState()} onMove={onMove} disabled lastMove={null} />);
+
+    const first = screen.getByRole("gridcell", { name: "Row 1, column 1, empty" });
+    first.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("gridcell", { name: "Row 1, column 2, empty" })).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    expect(onMove).not.toHaveBeenCalled();
   });
 
   it("marks the last-moved cell distinctly from other filled cells", () => {
@@ -78,6 +102,30 @@ describe("TicTacToeBoard", () => {
     const lastMoveCell = screen.getByRole("gridcell", { name: "Row 2, column 2, X" });
     const otherEmptyCell = screen.getByRole("gridcell", { name: "Row 1, column 1, empty" });
     expect(lastMoveCell.className).not.toBe(otherEmptyCell.className);
+  });
+
+  it("highlights the three winning cells when a winningLine is supplied", () => {
+    const board = emptyState().board.slice();
+    board[0] = 1;
+    board[1] = 1;
+    board[2] = 1; // X wins the top row
+    render(
+      <TicTacToeBoard
+        state={{ board }}
+        onMove={vi.fn()}
+        disabled
+        lastMove={{ move: { cell: 2 }, player: 1 }}
+        winningLine={[0, 1, 2]}
+      />,
+    );
+
+    for (const name of ["Row 1, column 1, X", "Row 1, column 2, X", "Row 1, column 3, X"]) {
+      expect(screen.getByRole("gridcell", { name }).className).toMatch(/winning/);
+    }
+    // A non-winning empty cell must not be highlighted.
+    expect(screen.getByRole("gridcell", { name: "Row 3, column 1, empty" }).className).not.toMatch(
+      /winning/,
+    );
   });
 
   it("supports arrow-key roving-tabindex navigation between cells", async () => {

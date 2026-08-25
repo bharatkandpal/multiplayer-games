@@ -31,11 +31,11 @@
     border-color var(--duration-fast) var(--ease-standard);
 }
 
-.cell:hover:not(:disabled) {
+.cell:hover:not([aria-disabled="true"]) {
   background-color: var(--color-bg-subtle);
 }
 
-.cell:active:not(:disabled) {
+.cell:active:not([aria-disabled="true"]) {
   transform: scale(0.96);
 }
 
@@ -44,13 +44,40 @@
   outline-offset: 2px;
 }
 
-.cell:disabled {
+.cell[aria-disabled="true"] {
   cursor: not-allowed;
 }
 
 .lastMove {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 2px var(--color-accent) inset;
+}
+
+/* Winning line (MPG-035): success ring + tint, not color-only — the winning
+   marks (shapes) remain the primary signal. AA-safe non-text contrast. */
+.winning {
+  border-color: var(--color-success);
+  background-color: var(--color-success-bg);
+  box-shadow: 0 0 0 3px var(--color-success) inset;
+  animation: winPulse var(--duration-slow) var(--ease-emphasized);
+}
+
+@keyframes winPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .winning {
+    animation: none;
+  }
 }
 
 .mark {

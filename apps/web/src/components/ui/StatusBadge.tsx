@@ -8,6 +8,13 @@ export interface StatusBadgeProps {
   status: StatusBadgeStatus;
   children: ReactNode;
   className?: string | undefined;
+  /**
+   * Shows a small pulsing dot-group after the label to indicate an
+   * in-progress background action (e.g. a bot "thinking"). Purely
+   * decorative — the label text (and any live-region announcement) carries
+   * the actual meaning; honors `prefers-reduced-motion` (dots go static).
+   */
+  busy?: boolean;
 }
 
 /**
@@ -28,13 +35,25 @@ const STATUS_ICON: Record<StatusBadgeStatus, string> = {
  * color-only: pairs a semantic color token with a distinct icon glyph and
  * requires a text label.
  */
-export function StatusBadge({ status, children, className }: StatusBadgeProps): React.JSX.Element {
+export function StatusBadge({
+  status,
+  children,
+  className,
+  busy = false,
+}: StatusBadgeProps): React.JSX.Element {
   return (
     <span className={cx(styles.badge, styles[status], className)}>
       <span className={styles.icon} aria-hidden="true">
         {STATUS_ICON[status]}
       </span>
       {children}
+      {busy ? (
+        <span className={styles.thinkingDots} aria-hidden="true">
+          <span className={styles.thinkingDot} />
+          <span className={styles.thinkingDot} />
+          <span className={styles.thinkingDot} />
+        </span>
+      ) : null}
     </span>
   );
 }

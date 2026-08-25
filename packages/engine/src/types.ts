@@ -19,9 +19,16 @@ export type Difficulty = "easy" | "medium" | "hard";
 
 export type GameStatus = "in_progress" | "win" | "draw";
 
-/** The outcome of a position. `winner` is present only on a win. */
-export type Result =
-  { status: "in_progress" } | { status: "win"; winner: Player } | { status: "draw" };
+/**
+ * The outcome of a position. `winner` and `line` are present only on a win. `Line` is a
+ * per-game coordinate shape (e.g. Tic-Tac-Toe's 3 board indices, Connect Four's 4
+ * `{column, row}` cells) — see each game's own `*Line` type. Defaults to `unknown` so
+ * `Result` remains usable where the concrete game (and thus coordinate shape) is erased.
+ */
+export type Result<Line = unknown> =
+  | { status: "in_progress" }
+  | { status: "win"; winner: Player; line: Line }
+  | { status: "draw" };
 
 /**
  * The one interface every game implements. The platform (room manager, transport, AI
@@ -32,8 +39,9 @@ export type Result =
  *
  * @typeParam S - the game's state shape (an opaque, serializable value)
  * @typeParam M - the game's move shape
+ * @typeParam Line - the game's winning-line coordinate shape (see {@link Result})
  */
-export interface GameModule<S, M> {
+export interface GameModule<S, M, Line = unknown> {
   /** Stable identifier used by the registry and the wire protocol. */
   readonly id: GameId;
 
@@ -53,7 +61,7 @@ export interface GameModule<S, M> {
   applyMove(state: S, move: M, player: Player): S;
 
   /** Terminal/ongoing status of `state`. */
-  getResult(state: S): Result;
+  getResult(state: S): Result<Line>;
 
   /** The player whose turn it is in `state`. */
   currentPlayer(state: S): Player;

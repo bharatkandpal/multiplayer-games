@@ -25,4 +25,18 @@ describe("StatusBadge", () => {
 
     expect(successIcon).not.toBe(warningIcon);
   });
+
+  it("renders a decorative busy indicator when `busy` is set, absent otherwise", () => {
+    const { container: idle } = render(<StatusBadge status="info">Idle</StatusBadge>);
+    expect(idle.querySelector('[class*="thinkingDots"]')).toBeNull();
+
+    const { container: busy } = render(
+      <StatusBadge status="info" busy>
+        Hard bot is thinking…
+      </StatusBadge>,
+    );
+    const dots = busy.querySelector('[class*="thinkingDots"]');
+    expect(dots).not.toBeNull();
+    expect(dots).toHaveAttribute("aria-hidden", "true");
+  });
 });

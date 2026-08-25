@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import type { TicTacToeMove, TicTacToeState } from "@mpg/engine";
+import type { TicTacToeLine, TicTacToeMove, TicTacToeState } from "@mpg/engine";
 import type { AppliedMove } from "../../game";
 import { cx } from "../ui/cx";
 import styles from "./TicTacToeBoard.module.css";
@@ -12,6 +12,8 @@ export interface TicTacToeBoardProps {
   /** True when it isn't the local human's turn (bot thinking, game over, spectating). */
   disabled: boolean;
   lastMove: AppliedMove<TicTacToeMove> | null;
+  /** The 3 winning cell indices once the game is won, else null — highlighted. */
+  winningLine?: TicTacToeLine | null;
 }
 
 const SIZE = 3;
@@ -54,9 +56,11 @@ export function TicTacToeBoard({
   onMove,
   disabled,
   lastMove,
+  winningLine = null,
 }: TicTacToeBoardProps): React.JSX.Element {
   const [focusIndex, setFocusIndex] = useState(0);
   const cellRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const winningCells = winningLine ? new Set<number>(winningLine) : null;
 
   const moveTo = (nextIndex: number): void => {
     const clamped = ((nextIndex % (SIZE * SIZE)) + SIZE * SIZE) % (SIZE * SIZE);
@@ -111,6 +115,8 @@ export function TicTacToeBoard({
             const mark = state.board[index] as 1 | 2 | null | undefined;
             const isEmpty = mark === null || mark === undefined;
             const isLastMove = lastMove?.move.cell === index;
+            const isWinning = winningCells?.has(index) ?? false;
+            const isActivatable = isEmpty && !disabled;
             return (
               <button
                 key={index}
@@ -119,14 +125,14 @@ export function TicTacToeBoard({
                 }}
                 type="button"
                 role="gridcell"
-                className={cx(styles.cell, isLastMove && styles.lastMove)}
+                className={cx(styles.cell, isLastMove && styles.lastMove, isWinning && styles.winning)}
                 tabIndex={index === focusIndex ? 0 : -1}
-                disabled={disabled || !isEmpty}
+                aria-disabled={!isActivatable}
                 aria-label={cellLabel(mark ?? null, row, col)}
                 onFocus={() => setFocusIndex(index)}
                 onKeyDown={(event) => handleKeyDown(event, index)}
                 onClick={() => {
-                  if (!isEmpty || disabled) return;
+                  if (!isActivatable) return;
                   onMove({ cell: index });
                 }}
               >
