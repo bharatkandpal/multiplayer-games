@@ -1,0 +1,16 @@
+{
+  "name": "@mpg/server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Authoritative Node backend: HTTP + Socket.IO, room/seat manager, server-side bots.",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "echo \"[@mpg/server] build configured in MPG-002\"",
+    "test": "echo \"[@mpg/server] tests configured in MPG-002\"",
+    "dev": "echo \"[@mpg/server] dev server configured in MPG-011\""
+  },
+  "dependencies": {
+    "@mpg/engine": "workspace:*"
+  }
+}

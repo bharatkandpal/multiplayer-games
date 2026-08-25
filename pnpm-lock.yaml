@@ -1,0 +1,23 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .: {}
+
+  apps/server:
+    dependencies:
+      '@mpg/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
+
+  apps/web:
+    dependencies:
+      '@mpg/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
+
+  packages/engine: {}

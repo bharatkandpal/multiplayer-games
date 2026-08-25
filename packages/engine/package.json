@@ -1,0 +1,16 @@
+{
+  "name": "@mpg/engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pure, shared game engine: rules, win detection, and minimax AI. Runs on client and server.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "echo \"[@mpg/engine] build configured in MPG-002\"",
+    "test": "echo \"[@mpg/engine] tests configured in MPG-002\""
+  }
+}

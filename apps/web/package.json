@@ -1,0 +1,15 @@
+{
+  "name": "@mpg/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "React client: design system, board renderers, seat-config UI, optimistic-UI net layer.",
+  "type": "module",
+  "scripts": {
+    "build": "echo \"[@mpg/web] build configured in MPG-002\"",
+    "test": "echo \"[@mpg/web] tests configured in MPG-002\"",
+    "dev": "echo \"[@mpg/web] Vite dev server configured in MPG-009\""
+  },
+  "dependencies": {
+    "@mpg/engine": "workspace:*"
+  }
+}
