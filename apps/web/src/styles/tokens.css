@@ -1,0 +1,382 @@
+/*
+ * Design tokens (MPG-029-b).
+ *
+ * CSS-variable design tokens, no Tailwind / CSS-in-JS. Every component built
+ * on top of this (MPG-029-c) should consume these variables rather than
+ * hard-coding colors, spacing, type, motion, etc. — that's what "uses shared
+ * design tokens, no one-off styling" (UX_PRINCIPLES §6) means in practice.
+ *
+ * Theming:
+ *  - Default light values live on `:root`.
+ *  - `@media (prefers-color-scheme: dark)` swaps to dark values automatically
+ *    when the app hasn't been told otherwise (`data-theme="system"`, the
+ *    default set in index.html).
+ *  - `:root[data-theme="dark"]` / `:root[data-theme="light"]` let an in-app
+ *    toggle (see ../lib/theme.ts) force a theme regardless of OS preference.
+ *  - `:root[data-theme="system"]` is the explicit "follow the OS" state; it
+ *    carries no color rules of its own, so the plain `:root` values (light)
+ *    and the `prefers-color-scheme: dark` override still apply as expected.
+ *
+ * Accessibility:
+ *  - Player-side colors (--color-player-1 / --color-player-2) are chosen from
+ *    the Okabe–Ito colorblind-safe palette (blue / vermillion) and are
+ *    intended to be paired with distinct SHAPES/PATTERNS at the component
+ *    layer (e.g. circle vs. cross, solid vs. hatched) — never rely on hue
+ *    alone to distinguish sides (UX_PRINCIPLES §4, PRD §7).
+ *  - Text/background pairings below are chosen to clear WCAG AA (4.5:1 for
+ *    normal text). Key pairings verified (light / dark):
+ *      light: --color-text on --color-bg               17.99:1
+ *      light: --color-text-muted on --color-bg           7.19:1
+ *      light: --color-text on --color-bg-subtle         16.49:1
+ *      light: --color-on-accent on --color-accent         5.00:1
+ *      light: --color-accent-text on --color-bg           5.00:1
+ *      light: --color-success-text on --color-bg          5.08:1
+ *      light: --color-danger-text on --color-bg           6.20:1
+ *      light: --color-warning-text on --color-bg          5.43:1
+ *      light: --color-info-text on --color-bg             5.19:1
+ *      light: --color-player-1 on --color-bg               5.19:1
+ *      light: --color-player-2 on --color-bg               5.50:1
+ *      dark:  --color-text on --color-bg                 15.87:1
+ *      dark:  --color-text-muted on --color-bg             8.61:1
+ *      dark:  --color-on-accent on --color-accent          7.82:1
+ *      dark:  --color-accent-text on --color-bg            7.23:1
+ *      dark:  --color-success-text on --color-bg           9.20:1
+ *      dark:  --color-danger-text on --color-bg            7.41:1
+ *      dark:  --color-warning-text on --color-bg          10.20:1
+ *      dark:  --color-info-text on --color-bg              9.59:1
+ *      dark:  --color-player-1 on --color-bg               9.87:1
+ *      dark:  --color-player-2 on --color-bg               9.98:1
+ *    `--color-border` is intentionally low-contrast (~1.4:1) — it's a
+ *    hairline/divider, not text, and is never used to convey information on
+ *    its own.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* ---------------------------------------------------------------- */
+  /* Color — neutral surface / background / text scale (light)         */
+  /* ---------------------------------------------------------------- */
+  --color-bg: #ffffff;
+  --color-bg-subtle: #f4f5f7;
+  --color-bg-inset: #eceef1;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-border: #d8dbdf;
+  --color-border-strong: #b7bcc3;
+
+  --color-text: #14171a;
+  --color-text-muted: #52585f;
+  --color-text-disabled: #9aa0a7;
+  --color-text-inverse: #ffffff;
+
+  /* Accent / brand */
+  --color-accent: #2f5fff;
+  --color-accent-hover: #2650db;
+  --color-accent-active: #1f43b8;
+  --color-accent-text: #2f5fff; /* accent used as text/link on --color-bg */
+  --color-on-accent: #ffffff; /* text/icons placed on top of --color-accent */
+
+  /* Semantic */
+  --color-success: #1a7f37;
+  --color-success-bg: #e7f6ea;
+  --color-success-text: #1a7f37;
+  --color-danger: #c0152f;
+  --color-danger-bg: #fbe9ea;
+  --color-danger-text: #c0152f;
+  --color-warning: #9a5b00;
+  --color-warning-bg: #fdf2df;
+  --color-warning-text: #9a5b00;
+  --color-info: #0969da;
+  --color-info-bg: #e7f1fd;
+  --color-info-text: #0969da;
+
+  /* Focus ring — always visible, never the only affordance */
+  --color-focus-ring: #2f5fff;
+
+  /* Overlay/scrim — behind modals and other blocking surfaces, over page
+     content. Always a dark tint (regardless of theme) so it reads as
+     "the page behind is dimmed," not a surface color. */
+  --color-overlay: rgba(20, 23, 26, 0.5);
+
+  /* Player sides — colorblind-safe (Okabe–Ito blue / vermillion). Pair with
+     shape/pattern at the component layer; never hue alone. */
+  --color-player-1: #0072b2; /* e.g. "X" / circle-marker side */
+  --color-player-2: #b34700; /* e.g. "O" / cross-marker side */
+  --color-player-1-bg: #e3f1fa;
+  --color-player-2-bg: #fbeadf;
+
+  /* ---------------------------------------------------------------- */
+  /* Typography                                                        */
+  /* ---------------------------------------------------------------- */
+  --font-family-base:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-family-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --font-size-100: 0.75rem; /* 12px — captions, labels */
+  --font-size-200: 0.875rem; /* 14px — secondary text */
+  --font-size-300: 1rem; /* 16px — body */
+  --font-size-400: 1.125rem; /* 18px — emphasized body */
+  --font-size-500: 1.5rem; /* 24px — small headings */
+  --font-size-600: 2rem; /* 32px — headings */
+  --font-size-700: 2.5rem; /* 40px — hero / display */
+
+  --line-height-tight: 1.2;
+  --line-height-base: 1.5;
+  --line-height-loose: 1.7;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  /* ---------------------------------------------------------------- */
+  /* Spacing (4px base scale)                                          */
+  /* ---------------------------------------------------------------- */
+  --space-0: 0px;
+  --space-1: 0.25rem; /* 4px */
+  --space-2: 0.5rem; /* 8px */
+  --space-3: 0.75rem; /* 12px */
+  --space-4: 1rem; /* 16px */
+  --space-5: 1.25rem; /* 20px */
+  --space-6: 1.5rem; /* 24px */
+  --space-8: 2rem; /* 32px */
+  --space-10: 2.5rem; /* 40px */
+  --space-12: 3rem; /* 48px */
+  --space-16: 4rem; /* 64px */
+
+  /* Minimum interactive target (UX_PRINCIPLES §4, §7: touch targets ≥ 44px) */
+  --size-touch-target: 2.75rem; /* 44px */
+
+  /* ---------------------------------------------------------------- */
+  /* Radius / border / elevation                                      */
+  /* ---------------------------------------------------------------- */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-full: 999px;
+
+  --border-width-thin: 1px;
+  --border-width-thick: 2px;
+
+  --shadow-sm: 0 1px 2px rgba(20, 23, 26, 0.06);
+  --shadow-md: 0 4px 12px rgba(20, 23, 26, 0.1);
+  --shadow-lg: 0 12px 32px rgba(20, 23, 26, 0.16);
+
+  /* ---------------------------------------------------------------- */
+  /* Motion                                                            */
+  /* ---------------------------------------------------------------- */
+  --duration-instant: 0ms;
+  --duration-fast: 100ms;
+  --duration-base: 200ms;
+  --duration-slow: 400ms;
+  --duration-bot-thinking-step: 600ms; /* paced bot-vs-bot watch, UX_PRINCIPLES §3 */
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1.4);
+  --ease-linear: linear;
+
+  /* ---------------------------------------------------------------- */
+  /* Layout                                                            */
+  /* ---------------------------------------------------------------- */
+  --container-sm: 24rem;
+  --container-md: 40rem;
+  --container-lg: 64rem;
+  --container-xl: 80rem;
+
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 20;
+  --z-overlay: 30;
+  --z-modal: 40;
+  --z-toast: 50;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Dark theme — OS default (no explicit data-theme override)              */
+/* ---------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --color-bg: #14171a;
+    --color-bg-subtle: #1c2024;
+    --color-bg-inset: #22262b;
+    --color-surface: #1c2024;
+    --color-surface-raised: #22262b;
+    --color-border: #33383e;
+    --color-border-strong: #474e56;
+
+    --color-text: #eef1f4;
+    --color-text-muted: #aeb4bb;
+    --color-text-disabled: #6b7178;
+    --color-text-inverse: #14171a;
+
+    --color-accent: #7fa1ff;
+    --color-accent-hover: #9bb6ff;
+    --color-accent-active: #6a8dee;
+    --color-accent-text: #7fa1ff;
+    --color-on-accent: #0b0d10;
+
+    --color-success: #4fd17b;
+    --color-success-bg: #143122;
+    --color-success-text: #4fd17b;
+    --color-danger: #ff8080;
+    --color-danger-bg: #3a1a1c;
+    --color-danger-text: #ff8080;
+    --color-warning: #ffb454;
+    --color-warning-bg: #3a2a10;
+    --color-warning-text: #ffb454;
+    --color-info: #7cc4ff;
+    --color-info-bg: #10283a;
+    --color-info-text: #7cc4ff;
+
+    --color-focus-ring: #7fa1ff;
+
+    /* Darker/more opaque than light-theme: the page behind is already dark,
+       so the scrim needs more weight to read as "dimmed" against it. */
+    --color-overlay: rgba(0, 0, 0, 0.6);
+
+    --color-player-1: #7fc7ff;
+    --color-player-2: #ffb066;
+    --color-player-1-bg: #10283a;
+    --color-player-2-bg: #3a2a10;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Dark theme — explicit override via <html data-theme="dark">            */
+/* ---------------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg: #14171a;
+  --color-bg-subtle: #1c2024;
+  --color-bg-inset: #22262b;
+  --color-surface: #1c2024;
+  --color-surface-raised: #22262b;
+  --color-border: #33383e;
+  --color-border-strong: #474e56;
+
+  --color-text: #eef1f4;
+  --color-text-muted: #aeb4bb;
+  --color-text-disabled: #6b7178;
+  --color-text-inverse: #14171a;
+
+  --color-accent: #7fa1ff;
+  --color-accent-hover: #9bb6ff;
+  --color-accent-active: #6a8dee;
+  --color-accent-text: #7fa1ff;
+  --color-on-accent: #0b0d10;
+
+  --color-success: #4fd17b;
+  --color-success-bg: #143122;
+  --color-success-text: #4fd17b;
+  --color-danger: #ff8080;
+  --color-danger-bg: #3a1a1c;
+  --color-danger-text: #ff8080;
+  --color-warning: #ffb454;
+  --color-warning-bg: #3a2a10;
+  --color-warning-text: #ffb454;
+  --color-info: #7cc4ff;
+  --color-info-bg: #10283a;
+  --color-info-text: #7cc4ff;
+
+  --color-focus-ring: #7fa1ff;
+
+  --color-overlay: rgba(0, 0, 0, 0.6);
+
+  --color-player-1: #7fc7ff;
+  --color-player-2: #ffb066;
+  --color-player-1-bg: #10283a;
+  --color-player-2-bg: #3a2a10;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Light theme — explicit override via <html data-theme="light">          */
+/* (values match :root; present so an explicit choice always wins over    */
+/* OS preference, and so the cascade is easy to reason about.)            */
+/* ---------------------------------------------------------------------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --color-bg: #ffffff;
+  --color-bg-subtle: #f4f5f7;
+  --color-bg-inset: #eceef1;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-border: #d8dbdf;
+  --color-border-strong: #b7bcc3;
+
+  --color-text: #14171a;
+  --color-text-muted: #52585f;
+  --color-text-disabled: #9aa0a7;
+  --color-text-inverse: #ffffff;
+
+  --color-accent: #2f5fff;
+  --color-accent-hover: #2650db;
+  --color-accent-active: #1f43b8;
+  --color-accent-text: #2f5fff;
+  --color-on-accent: #ffffff;
+
+  --color-success: #1a7f37;
+  --color-success-bg: #e7f6ea;
+  --color-success-text: #1a7f37;
+  --color-danger: #c0152f;
+  --color-danger-bg: #fbe9ea;
+  --color-danger-text: #c0152f;
+  --color-warning: #9a5b00;
+  --color-warning-bg: #fdf2df;
+  --color-warning-text: #9a5b00;
+  --color-info: #0969da;
+  --color-info-bg: #e7f1fd;
+  --color-info-text: #0969da;
+
+  --color-focus-ring: #2f5fff;
+
+  --color-overlay: rgba(20, 23, 26, 0.5);
+
+  --color-player-1: #0072b2;
+  --color-player-2: #b34700;
+  --color-player-1-bg: #e3f1fa;
+  --color-player-2-bg: #fbeadf;
+
+  --shadow-sm: 0 1px 2px rgba(20, 23, 26, 0.06);
+  --shadow-md: 0 4px 12px rgba(20, 23, 26, 0.1);
+  --shadow-lg: 0 12px 32px rgba(20, 23, 26, 0.16);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Reduced motion — global kill switch.                                    */
+/*                                                                          */
+/* Components should still READ --duration- and --ease- tokens rather than  */
+/* hard-coding transition/animation values, but this rule is the safety     */
+/* net: it neutralizes all transitions/animations at the token level for    */
+/* anything that forgets to check `prefers-reduced-motion` itself.          */
+/* ---------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant: 0ms;
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+    --duration-bot-thinking-step: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

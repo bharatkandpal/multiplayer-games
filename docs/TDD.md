@@ -20,17 +20,17 @@ power AI mode, multiplayer mode, and tests without duplication.
 
 ## 2. Technology Choices
 
-| Layer              | Choice                               | Rationale                                                 |
-| ------------------ | ------------------------------------ | --------------------------------------------------------- |
-| Language           | TypeScript (front + back)            | One language, shared engine + types across client/server. |
-| Frontend           | React + Vite                         | Fast dev, component model fits board UI.                  |
-| Styling            | CSS Modules / Tailwind (TBD)         | Small surface; either is fine.                            |
-| Realtime transport | Socket.IO                            | Rooms, reconnection, fallbacks out of the box.            |
-| Backend            | Node.js + Express (HTTP) + Socket.IO | Same runtime as engine; simple.                           |
-| Ephemeral state    | Redis                                | Room/game state, TTL expiry, horizontal scale later.      |
-| Persistent store   | Postgres (Phase 3+)                  | Accounts/stats when we add them. Not in v1.               |
-| Monorepo tooling   | pnpm workspaces (or npm)             | Share `packages/engine` between apps.                     |
-| Tests              | Vitest + Playwright                  | Unit for engine/AI, e2e for flows.                        |
+| Layer              | Choice                                                 | Rationale                                                                                                                                       |
+| ------------------ | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language           | TypeScript (front + back)                              | One language, shared engine + types across client/server.                                                                                       |
+| Frontend           | React + Vite                                           | Fast dev, component model fits board UI.                                                                                                        |
+| Styling            | CSS Modules + CSS-variable tokens (decided 2026-08-25) | Zero-runtime, Vite-native, scoped; tokens as CSS custom properties themed via `data-theme` (light/dark). Best fit for a bespoke UX-centric kit. |
+| Realtime transport | Socket.IO                                              | Rooms, reconnection, fallbacks out of the box.                                                                                                  |
+| Backend            | Node.js + Express (HTTP) + Socket.IO                   | Same runtime as engine; simple.                                                                                                                 |
+| Ephemeral state    | Redis                                                  | Room/game state, TTL expiry, horizontal scale later.                                                                                            |
+| Persistent store   | Postgres (Phase 3+)                                    | Accounts/stats when we add them. Not in v1.                                                                                                     |
+| Monorepo tooling   | pnpm workspaces (or npm)                               | Share `packages/engine` between apps.                                                                                                           |
+| Tests              | Vitest + Playwright                                    | Unit for engine/AI, e2e for flows.                                                                                                              |
 
 > **Decision status: ACCEPTED** — see [ADR 0001](adr/0001-tech-stack.md). TypeScript
 > both ends was chosen on technical merit + long-term platform strategy (not stack

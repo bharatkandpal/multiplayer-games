@@ -1,0 +1,46 @@
+.gallery {
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
+  border-top: var(--border-width-thin) solid var(--color-border);
+}
+
+.heading {
+  font-size: var(--font-size-500);
+  font-weight: var(--font-weight-bold);
+  margin: 0 0 var(--space-4);
+}
+
+.group {
+  margin-bottom: var(--space-6);
+}
+
+.groupHeading {
+  font-size: var(--font-size-300);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.toastSlot {
+  margin-top: var(--space-3);
+  max-width: var(--container-sm);
+}
+
+.modalBody {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-muted);
+}
+
+.skeletonGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: var(--container-sm);
+}

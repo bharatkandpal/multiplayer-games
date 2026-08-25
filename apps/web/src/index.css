@@ -1,10 +1,16 @@
 /*
- * Minimal, styling-agnostic reset/base.
+ * Global reset/base.
  *
- * This is intentionally NOT a design system: no color/type/spacing tokens or
- * component styles live here. That work is tracked separately (MPG-029-b/c).
- * The `data-theme` attribute on <html> (see index.html) is the hook the token
- * system will use to switch light/dark; it is left unset ("system") for now.
+ * Design tokens (color, type, spacing, motion, …) live in ./styles/tokens.css
+ * and are imported before this file (see main.tsx) so every variable used
+ * below — and by every component built on top of this (MPG-029-c) — is
+ * available globally. This file stays intentionally small: a reset plus the
+ * couple of base rules (body background/text, focus visibility) that apply
+ * to the whole document.
+ *
+ * `data-theme` on <html> (see index.html) is the hook tokens.css uses to
+ * switch light/dark; see src/lib/theme.ts for the helper/hook that reads and
+ * sets it.
  */
 
 *,
@@ -21,10 +27,21 @@ body,
 
 body {
   margin: 0;
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-300);
+  line-height: var(--line-height-base);
+  /* Smooth theme (light/dark) switches without implying motion elsewhere;
+     duration collapses to 0 under prefers-reduced-motion via tokens.css. */
+  transition:
+    background-color var(--duration-base) var(--ease-standard),
+    color var(--duration-base) var(--ease-standard);
+}
+
+/* Visible focus everywhere (UX_PRINCIPLES §4/§8) — components may layer a
+   more specific ring, but nothing should ever suppress focus outlines. */
+:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
 }

@@ -1,0 +1,35 @@
+/*
+ * Indeterminate spinner. Decorative only — the surface that shows it
+ * (e.g. Button `loading`) is responsible for the accessible label
+ * (`aria-busy` + visible/SR text), per UX_PRINCIPLES §2 ("never a bare
+ * spinner with no context").
+ */
+.spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--radius-full);
+  animation: spin var(--duration-slow) var(--ease-linear) infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Reduced motion: tokens.css already zeroes --duration-slow globally, but
+   pin the animation to a static ring here too so intent is unambiguous. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    border-right-color: currentColor;
+    opacity: 0.6;
+  }
+}

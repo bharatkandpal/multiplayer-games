@@ -1,0 +1,90 @@
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: var(--container-sm);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: var(--border-width-thin) solid var(--color-border);
+  background-color: var(--color-surface-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-md);
+  animation: enter var(--duration-base) var(--ease-emphasized);
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+
+/* A left accent bar (shape, not just color) marks the variant. */
+.neutral {
+  border-left: var(--space-1) solid var(--color-border-strong);
+}
+
+.success {
+  border-left: var(--space-1) solid var(--color-success);
+}
+
+.danger {
+  border-left: var(--space-1) solid var(--color-danger);
+}
+
+.warning {
+  border-left: var(--space-1) solid var(--color-warning);
+}
+
+.info {
+  border-left: var(--space-1) solid var(--color-info);
+}
+
+.icon {
+  flex-shrink: 0;
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-base);
+}
+
+.body {
+  flex: 1;
+  font-size: var(--font-size-200);
+  line-height: var(--line-height-base);
+}
+
+.dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: var(--size-touch-target);
+  min-height: var(--size-touch-target);
+  margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-300);
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.dismiss:hover {
+  background-color: var(--color-bg-subtle);
+}
+
+.dismiss:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}

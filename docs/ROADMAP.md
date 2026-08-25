@@ -30,8 +30,8 @@ Phased so we always have something playable. Each phase ends with a demoable mil
 - [x] Generic minimax + alpha-beta; per-game heuristics (each module's `evaluate`); center-first ordering. _(MPG-007)_ — stateless difficulty `pickMove` is MPG-008.
 - [x] Difficulty policy (Easy/Medium/Hard) + AI strength tests. _(MPG-008)_
 - [ ] **Seat model** (human/bot per seat, per-seat difficulty) — POC 2 seats, no hardcoded 2.
-- [ ] **Design system / UI kit first** (tokens + core components: Button, Board, Cell,
-      Toast, Modal, StatusBadge, Skeleton) so every screen inherits the UX bar.
+- [x] **Design system / UI kit first** (tokens + core components: Button, Toast, Modal,
+      StatusBadge, Skeleton) so every screen inherits the UX bar. _(MPG-029; Board/Cell = MPG-009)_
 - [ ] Optimistic-UI + state-driven component helpers (loading/empty/error/success built in).
 - [ ] Seat-config UI on the setup screen (assign each seat human or bot + level).
 - [ ] React board components + Home/Setup/Result screens (all required states, a11y, motion).

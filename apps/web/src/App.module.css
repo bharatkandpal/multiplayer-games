@@ -1,0 +1,94 @@
+/*
+ * Tiny demo styling for App, built entirely from tokens (../styles/tokens.css)
+ * to prove the token layer works end-to-end. The real component library
+ * (Button, etc.) lands in MPG-029-c — this is intentionally minimal.
+ */
+
+.main {
+  max-width: var(--container-md);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+  font-family: var(--font-family-base);
+}
+
+.heading {
+  font-size: var(--font-size-600);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  margin: 0 0 var(--space-4);
+}
+
+.themeToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--size-touch-target);
+  min-width: var(--size-touch-target);
+  padding: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-4);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.themeToggle:hover {
+  background-color: var(--color-bg-subtle);
+}
+
+.themeToggle:active {
+  background-color: var(--color-bg-inset);
+}
+
+.gameList {
+  padding-left: var(--space-6);
+  color: var(--color-text-muted);
+}
+
+.playerSwatches {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.playerSwatch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Player sides are distinguished by shape as well as color — never rely on
+   hue alone (UX_PRINCIPLES §4, PRD §7). */
+.playerSwatchMark {
+  display: inline-block;
+  width: var(--space-4);
+  height: var(--space-4);
+}
+
+.player1 {
+  background-color: var(--color-player-1-bg);
+  color: var(--color-player-1);
+}
+
+.player1 .playerSwatchMark {
+  border-radius: var(--radius-full);
+  border: var(--border-width-thick) solid currentColor;
+}
+
+.player2 {
+  background-color: var(--color-player-2-bg);
+  color: var(--color-player-2);
+}
+
+.player2 .playerSwatchMark {
+  border: var(--border-width-thick) solid currentColor;
+  transform: rotate(45deg);
+}
