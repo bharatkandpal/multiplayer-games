@@ -2,7 +2,13 @@ import type { ReactNode } from "react";
 import type { GameModule, Player, Result } from "@mpg/engine";
 import { Button, Modal, Skeleton, StatusBadge, Toast, VisuallyHidden } from "../components/ui";
 import type { StatusBadgeStatus } from "../components/ui";
-import { type AppliedMove, type SeatsConfig, describeSeat, useLocalPlayController } from "../game";
+import {
+  type AppliedMove,
+  type SeatsConfig,
+  type WatchSpeed,
+  describeSeat,
+  useLocalPlayController,
+} from "../game";
 import styles from "./GamePlayScreen.module.css";
 
 export interface BoardRenderProps<S, M> {
@@ -47,10 +53,21 @@ export function GamePlayScreen<S, M>({
   describeMove,
   onExit,
 }: GamePlayScreenProps<S, M>): React.JSX.Element {
-  const { session, isHumanTurn, thinkingSeat, play, clearError, rematch } = useLocalPlayController(
-    game,
-    seats,
-  );
+  const {
+    session,
+    isHumanTurn,
+    thinkingSeat,
+    isAllBots,
+    watchSpeed,
+    setWatchSpeed,
+    isPaused,
+    setPaused,
+    canStep,
+    step,
+    play,
+    clearError,
+    rematch,
+  } = useLocalPlayController(game, seats);
 
   const turnSeatIndex = seatIndexOf(session.turn);
   const turnSeatName = describeSeat(seats, turnSeatIndex);
@@ -98,6 +115,40 @@ export function GamePlayScreen<S, M>({
         <StatusBadge status={badgeStatus}>{badgeText}</StatusBadge>
         {thinkingSeat !== null ? <Skeleton variant="text" width="6rem" /> : null}
       </div>
+
+      {isAllBots && !isGameOver ? (
+        <fieldset className={styles.watchControls} aria-label="Watch controls">
+          <div className={styles.watchGroup} role="group" aria-label="Playback speed">
+            <span className={styles.watchLabel} aria-hidden="true">
+              Speed
+            </span>
+            {(["1x", "2x", "instant"] as const).map((speed: WatchSpeed) => (
+              <Button
+                key={speed}
+                variant={watchSpeed === speed ? "primary" : "ghost"}
+                size="sm"
+                aria-pressed={watchSpeed === speed}
+                onClick={() => setWatchSpeed(speed)}
+              >
+                {speed === "instant" ? "Instant" : speed}
+              </Button>
+            ))}
+          </div>
+          <div className={styles.watchGroup}>
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-pressed={isPaused}
+              onClick={() => setPaused(!isPaused)}
+            >
+              {isPaused ? "Resume" : "Pause"}
+            </Button>
+            <Button variant="ghost" size="sm" disabled={!canStep} onClick={step}>
+              Step
+            </Button>
+          </div>
+        </fieldset>
+      ) : null}
 
       {session.status.type === "error" ? (
         <div className={styles.toastSlot}>

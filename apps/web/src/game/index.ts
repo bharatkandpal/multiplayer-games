@@ -22,5 +22,5 @@ export {
 
 export { getBotThinkingDelayMs } from "./motion";
 
-export type { LocalPlayController } from "./useLocalPlayController";
+export type { LocalPlayController, WatchSpeed } from "./useLocalPlayController";
 export { useLocalPlayController } from "./useLocalPlayController";

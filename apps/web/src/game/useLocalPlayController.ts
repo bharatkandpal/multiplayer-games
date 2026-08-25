@@ -8,13 +8,33 @@
 // computed with `pickMove` after a short, paced delay and applied the same way a
 // human move would be (`applyLocalMove`), so both paths are reconciled identically.
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Difficulty, GameModule, Player } from "@mpg/engine";
 import { pickMove } from "@mpg/engine";
 import { useGameSession } from "./useGameSession";
 import type { GameSessionState } from "./gameSession";
 import type { SeatsConfig } from "./seatConfig";
 import { getBotThinkingDelayMs } from "./motion";
+
+/**
+ * Bot-vs-bot watch pacing (UX_PRINCIPLES §3: paced watch WITH a way to speed up
+ * or step). "1x" is the default paced delay (`--duration-bot-thinking-step`),
+ * "2x" halves it, and "instant" removes it entirely (moves land back-to-back).
+ * `prefers-reduced-motion` already zeroes the underlying token, so any speed
+ * multiplied by that stays 0 — the kill switch is never overridden.
+ */
+export type WatchSpeed = "1x" | "2x" | "instant";
+
+const WATCH_SPEED_FACTOR: Record<WatchSpeed, number> = {
+  "1x": 1,
+  "2x": 0.5,
+  instant: 0,
+};
+
+interface PendingBotMove<S> {
+  readonly state: S;
+  readonly difficulty: Difficulty;
+}
 
 export interface LocalPlayController<S, M> {
   readonly session: GameSessionState<S, M>;
@@ -23,6 +43,20 @@ export interface LocalPlayController<S, M> {
   readonly isHumanTurn: boolean;
   /** The seat (1-based) currently "thinking", or `null` if no bot is computing a move. */
   readonly thinkingSeat: Player | null;
+  /** True when every seat is a bot — the "watch" case the speed/step controls are for. */
+  readonly isAllBots: boolean;
+  /** Current watch-pacing multiplier. Only meaningful (and only surfaced in the UI) when `isAllBots`. */
+  readonly watchSpeed: WatchSpeed;
+  /** Change the watch-pacing multiplier. */
+  setWatchSpeed: (speed: WatchSpeed) => void;
+  /** Whether automatic bot pacing is paused (moves only land via `step`). */
+  readonly isPaused: boolean;
+  /** Pause/resume automatic bot pacing. Takes effect from the next scheduled move. */
+  setPaused: (paused: boolean) => void;
+  /** True when a bot move is queued and ready to be advanced via `step`. */
+  readonly canStep: boolean;
+  /** Immediately applies the currently-queued bot move (cancelling any pending delay). No-op if none is queued. */
+  step: () => void;
   /**
    * Submit a move as the current human player. A no-op (does nothing, no error) if
    * it isn't a human's turn — callers should also disable the relevant control via
@@ -47,6 +81,8 @@ export function useLocalPlayController<S, M>(
 ): LocalPlayController<S, M> {
   const { session, start, applyLocalMove, setThinking, clearError, reset } = useGameSession(game);
 
+  const isAllBots = seats.every((seat) => seat.kind === "bot");
+
   // Dedupe guard: `session.state` only changes reference when a move is actually
   // applied (start/set_thinking/clear_error swap `status` but keep the same `state`
   // object) — see gameSession.ts. Tracking "have we already scheduled a bot move for
@@ -58,10 +94,46 @@ export function useLocalPlayController<S, M>(
   const rngRef = useRef(rng);
   rngRef.current = rng;
 
+  // Watch-mode pacing controls (bot-vs-bot only). Read via refs inside the
+  // scheduling effect below so changing them doesn't need to be a dependency
+  // that re-triggers scheduling for the *current* move — a speed/pause change
+  // takes effect starting with the next bot move, which reads intuitively
+  // ("I hit pause and the next move waits") without fighting the dedupe guard.
+  const [watchSpeed, setWatchSpeed] = useState<WatchSpeed>("1x");
+  const [isPaused, setPaused] = useState(false);
+  const watchSpeedRef = useRef(watchSpeed);
+  watchSpeedRef.current = watchSpeed;
+  const pausedRef = useRef(isPaused);
+  pausedRef.current = isPaused;
+
+  // The bot move queued for the current turn, if any — set as soon as a bot's
+  // turn is recognized (whether or not it's paused), so `step` can apply it
+  // immediately regardless of whether an automatic timeout is also pending.
+  const pendingBotRef = useRef<PendingBotMove<S> | null>(null);
+  const [canStep, setCanStep] = useState(false);
+
   // Move a freshly-created session into "playing" once, on mount.
   useEffect(() => {
     start();
   }, [start]);
+
+  // Start (or restart, on resume) the paced countdown for whatever bot move is
+  // currently queued in `pendingBotRef`. No-op if nothing is queued or a timer is
+  // already running. Reads speed via ref so a mid-countdown speed change applies to
+  // the *next* move, not this one (see the ref comment above).
+  const scheduleDelayedMove = useCallback(() => {
+    if (!pendingBotRef.current || timeoutRef.current !== undefined) return;
+    const pending = pendingBotRef.current;
+    const baseDelay = getBotThinkingDelayMs();
+    const delay = baseDelay * WATCH_SPEED_FACTOR[watchSpeedRef.current];
+    timeoutRef.current = window.setTimeout(() => {
+      timeoutRef.current = undefined;
+      pendingBotRef.current = null;
+      setCanStep(false);
+      const move = pickMove(game, pending.state, pending.difficulty, rngRef.current);
+      applyLocalMove(move);
+    }, delay);
+  }, [game, applyLocalMove]);
 
   useEffect(() => {
     if (session.status.type !== "playing") return;
@@ -77,14 +149,39 @@ export function useLocalPlayController<S, M>(
     const turnPlayer = session.turn;
 
     setThinking(turnPlayer);
+    pendingBotRef.current = { state: turnState, difficulty };
+    setCanStep(true);
 
-    const delay = getBotThinkingDelayMs();
-    timeoutRef.current = window.setTimeout(() => {
+    if (pausedRef.current) return; // paused — wait for `step()` or resume
+    scheduleDelayedMove();
+  }, [session, seats, game, setThinking, scheduleDelayedMove]);
+
+  // Pause/resume the *in-flight* countdown too (not just future moves): hitting
+  // Pause halts the current timer while leaving the move queued (so Step or Resume
+  // can still apply it); Resume restarts the countdown for that queued move.
+  useEffect(() => {
+    if (isPaused) {
+      if (timeoutRef.current !== undefined) {
+        window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = undefined;
+      }
+    } else {
+      scheduleDelayedMove();
+    }
+  }, [isPaused, scheduleDelayedMove]);
+
+  const step = useCallback(() => {
+    const pending = pendingBotRef.current;
+    if (!pending) return;
+    if (timeoutRef.current !== undefined) {
+      window.clearTimeout(timeoutRef.current);
       timeoutRef.current = undefined;
-      const move = pickMove(game, turnState, difficulty, rngRef.current);
-      applyLocalMove(move);
-    }, delay);
-  }, [session, seats, game, setThinking, applyLocalMove]);
+    }
+    pendingBotRef.current = null;
+    setCanStep(false);
+    const move = pickMove(game, pending.state, pending.difficulty, rngRef.current);
+    applyLocalMove(move);
+  }, [game, applyLocalMove]);
 
   // Clear any pending bot-move timer whenever the underlying game position changes
   // (a move landed) or the component unmounts — belt-and-braces against dangling
@@ -124,5 +221,20 @@ export function useLocalPlayController<S, M>(
     start();
   }, [reset, start]);
 
-  return { session, seats, isHumanTurn, thinkingSeat, play, clearError, rematch };
+  return {
+    session,
+    seats,
+    isHumanTurn,
+    thinkingSeat,
+    isAllBots,
+    watchSpeed,
+    setWatchSpeed,
+    isPaused,
+    setPaused,
+    canStep,
+    step,
+    play,
+    clearError,
+    rematch,
+  };
 }

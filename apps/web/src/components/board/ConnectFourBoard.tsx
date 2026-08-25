@@ -87,7 +87,10 @@ export function ConnectFourBoard({
       aria-label="Connect Four board"
       aria-disabled={disabled}
     >
-      <div className={styles.grid} style={{ gridTemplateColumns: `repeat(${columnCount}, 1fr)` }}>
+      <div
+        className={styles.grid}
+        style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
+      >
         {Array.from({ length: columnCount }, (_, column) => {
           const full = isColumnFull(column);
           const lastMoveRow = lastMove?.move.column === column ? topFilledRow(state, column) : null;

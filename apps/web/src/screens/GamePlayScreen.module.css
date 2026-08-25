@@ -4,6 +4,15 @@
   padding: var(--space-6) var(--space-4);
 }
 
+/* Narrow viewports (down to 320px): trade some inline padding for board width
+   so a 7-column Connect Four board never needs to clip/overflow. */
+@media (max-width: 420px) {
+  .main {
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+  }
+}
+
 .topBar {
   display: flex;
   align-items: center;
@@ -29,6 +38,28 @@
 .toastSlot {
   margin-bottom: var(--space-4);
   max-width: var(--container-sm);
+}
+
+/* Bot-vs-bot watch controls (UX_PRINCIPLES §3): speed up / step a paced watch. */
+.watchControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-6);
+  padding: 0;
+  border: none;
+}
+
+.watchGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.watchLabel {
+  font-size: var(--font-size-200);
+  color: var(--color-text-muted);
 }
 
 .boardWrap {

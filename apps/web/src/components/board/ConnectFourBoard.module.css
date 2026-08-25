@@ -12,17 +12,39 @@
   background-color: var(--color-accent);
 }
 
+/* Below ~390px the full gap+padding budget doesn't leave room for 7 shrinkable
+   columns without clipping; tighten both so tracks (and discs, which are sized
+   from the cell via aspect-ratio) scale down smoothly instead of overflowing. */
+@media (max-width: 420px) {
+  .grid {
+    gap: 2px;
+    padding: var(--space-1);
+  }
+}
+
 .column {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  min-width: var(--size-touch-target);
+  /* Grid items default to `min-width: auto`, which floors shrinkage at content
+     size and defeats `minmax(0, 1fr)` tracks — allow the column to shrink
+     freely. The drop-zone target stays comfortably >= 44px on the axis that
+     matters for this layout: each column is 6 cells tall, so its *height*
+     (the full-height touch target) is always far above 44px even as width
+     shrinks on narrow viewports. */
+  min-width: 0;
   padding: 0;
   border: none;
   background: transparent;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (max-width: 420px) {
+  .column {
+    gap: 2px;
+  }
 }
 
 .column:hover:not(:disabled) {
