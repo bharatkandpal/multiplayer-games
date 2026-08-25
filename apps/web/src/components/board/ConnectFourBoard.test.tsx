@@ -100,12 +100,11 @@ describe("ConnectFourBoard", () => {
   });
 
   it("highlights the four winning discs when a winningLine is supplied", () => {
-    const board = emptyState().board;
     // Horizontal win for player 1 along the bottom row (row 0), columns 0-3.
-    board[0][0] = 1;
-    board[1][0] = 1;
-    board[2][0] = 1;
-    board[3][0] = 1;
+    // Built functionally (no in-place mutation of the readonly row cells).
+    const board = emptyState().board.map((col, column) =>
+      col.map((cell, row) => (row === 0 && column <= 3 ? 1 : cell)),
+    );
     const { container } = render(
       <ConnectFourBoard
         state={{ board }}
