@@ -1,5 +1,13 @@
 // @mpg/engine — pure, shared game engine (rules + minimax).
-// Real GameModule interface, registry, and games land in MPG-003 / MPG-005 / MPG-006.
-// This stub exists only to establish the workspace and package boundary (MPG-001).
+// Public surface. Concrete games (connect4, tictactoe) land in MPG-005 / MPG-006 and
+// self-register via registerGame(); the generic minimax AI lands in MPG-007.
 
 export const ENGINE_VERSION = "0.0.0";
+
+export type { Player, GameId, Difficulty, GameStatus, Result, GameModule } from "./types";
+
+export { IllegalMoveError } from "./errors";
+export type { IllegalMoveReason } from "./errors";
+
+export { registerGame, getGame, hasGame, listGames, clearRegistry } from "./registry";
+export type { AnyGameModule } from "./registry";

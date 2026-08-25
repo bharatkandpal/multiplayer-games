@@ -26,6 +26,16 @@ export default tseslint.config(
     files: ["**/*.{ts,tsx}"],
     rules: {
       "no-undef": "off",
+      // Allow intentionally-unused identifiers when prefixed with `_`
+      // (e.g. interface params a given implementation doesn't need).
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
     },
   },
   // Keep ESLint out of formatting's lane; Prettier owns style.
