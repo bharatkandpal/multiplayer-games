@@ -26,3 +26,6 @@ test-results/
 # Logs
 *.log
 npm-debug.log*
+
+# Task board — local-only Kanban (see task-board skill); not tracked in git
+tasks/
