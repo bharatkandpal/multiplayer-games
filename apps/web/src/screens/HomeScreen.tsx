@@ -82,12 +82,6 @@ export function HomeScreen({
                     <GameThumbnail gameId={id} />
                   </span>
                   <span className={styles.gameTitle}>{entry?.title ?? id}</span>
-                  {/* Visible dev/debug id, but not part of the accessible name
-                      (that's the title alone) — redundant for screen-reader
-                      users and would otherwise make the name noisy. */}
-                  <span className={styles.gameId} aria-hidden="true">
-                    {id}
-                  </span>
                 </button>
               </li>
             );

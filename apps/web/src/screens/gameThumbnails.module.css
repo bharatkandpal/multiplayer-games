@@ -2,17 +2,24 @@
   display: block;
   width: 100%;
   height: auto;
-  max-width: 6.5rem;
+  max-width: 9rem;
   margin: 0 auto;
 }
 
+/* Board line-art: needs real separation from the thumbnail tile background
+   (--color-surface, set in HomeScreen.module.css .gameThumbnail) in both
+   themes — --color-border-strong measured too low (~1.75:1 / ~1.94:1), so
+   use the higher-contrast muted-text token instead (~7:1+ against surface
+   in both themes). */
 .grid {
-  stroke: var(--color-border-strong);
+  stroke: var(--color-text-muted);
 }
 
 .slot {
-  fill: var(--color-bg-subtle);
-  stroke: var(--color-border-strong);
+  /* A step off the tile background so empty "holes" read as holes even
+     before stroke contrast is considered. */
+  fill: var(--color-bg-inset);
+  stroke: var(--color-text-muted);
   stroke-width: 2;
 }
 

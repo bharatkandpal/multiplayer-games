@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { GameId } from "@mpg/engine";
 import styles from "./gameThumbnails.module.css";
 
@@ -85,6 +86,10 @@ function ConnectFourThumbnail(): React.JSX.Element {
 }
 
 function TicTacToeMoveThumbnail(): React.JSX.Element {
+  // Scoped so a second render of this thumbnail on the same page (e.g. a
+  // future gallery/kit view) can't collide on the marker id.
+  const arrowheadId = useId();
+
   return (
     <svg
       className={styles.svg}
@@ -122,11 +127,11 @@ function TicTacToeMoveThumbnail(): React.JSX.Element {
         strokeWidth="2.5"
         strokeDasharray="3 3"
         strokeLinecap="round"
-        markerEnd="url(#mpg-thumb-arrowhead)"
+        markerEnd={`url(#${arrowheadId})`}
       />
       <defs>
         <marker
-          id="mpg-thumb-arrowhead"
+          id={arrowheadId}
           markerWidth="6"
           markerHeight="6"
           refX="3"

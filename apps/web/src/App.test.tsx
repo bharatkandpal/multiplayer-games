@@ -18,8 +18,8 @@ describe("App", () => {
 
     expect(screen.getByText("Engine version:")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Available games" })).toBeInTheDocument();
-    expect(screen.getByText("tictactoe")).toBeInTheDocument();
-    expect(screen.getByText("connect4")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tic-Tac-Toe" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect Four" })).toBeInTheDocument();
   });
 
   describe("MPG-050: opponent-switch on game-over (full Home -> Setup -> Play flow)", () => {

@@ -79,21 +79,15 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 3 / 2;
   padding: var(--space-2);
   border-radius: var(--radius-md);
-  background-color: var(--color-bg-subtle);
+  background-color: var(--color-surface);
 }
 
 .gameTitle {
   font-size: var(--font-size-400);
   font-weight: var(--font-weight-bold);
-}
-
-.gameId {
-  color: var(--color-text-disabled);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-100);
 }
 
 .empty {

@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { HomeScreen } from "./HomeScreen";
 
 describe("HomeScreen", () => {
-  it("lists the given games with title, thumbnail, and id", () => {
+  it("lists the given games with title and thumbnail", () => {
     render(
       <HomeScreen
         games={["tictactoe", "connect4", "tictactoe-move"]}
@@ -16,12 +16,9 @@ describe("HomeScreen", () => {
     expect(screen.getByRole("list", { name: "Available games" })).toBeInTheDocument();
     expect(screen.getByText("Tic-Tac-Toe")).toBeInTheDocument();
     expect(screen.getByText("Connect Four")).toBeInTheDocument();
-    expect(screen.getByText("tictactoe")).toBeInTheDocument();
-    expect(screen.getByText("connect4")).toBeInTheDocument();
 
     // The new move-mode variant (MPG-045-d) is catalogued and shows up too.
     expect(screen.getByText("Move-Mode Tic-Tac-Toe")).toBeInTheDocument();
-    expect(screen.getByText("tictactoe-move")).toBeInTheDocument();
   });
 
   it("shows a thumbnail per card, and the card's accessible name is just the title (MPG-052)", () => {
@@ -46,6 +43,20 @@ describe("HomeScreen", () => {
     expect(screen.getByRole("button", { name: "Tic-Tac-Toe" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connect Four" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Move-Mode Tic-Tac-Toe" })).toBeInTheDocument();
+  });
+
+  it("no longer shows the raw engine game id under the title (MPG-052)", () => {
+    render(
+      <HomeScreen
+        games={["tictactoe", "connect4", "tictactoe-move"]}
+        onSelectGame={vi.fn()}
+        onShowGallery={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("tictactoe")).not.toBeInTheDocument();
+    expect(screen.queryByText("connect4")).not.toBeInTheDocument();
+    expect(screen.queryByText("tictactoe-move")).not.toBeInTheDocument();
   });
 
   it("no longer shows the game description on Home (it moved to Setup, MPG-052)", () => {
