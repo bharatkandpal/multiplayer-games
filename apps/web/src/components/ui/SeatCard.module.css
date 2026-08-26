@@ -38,34 +38,36 @@
   }
 }
 
-.swatch {
+/* Avatar chip: emoji (🤖 / 👤) on a ring tinted with the seat's player color,
+   matching that seat's pieces on the board. Player identity is also carried by
+   the "Player N" text, so hue alone is never the sole distinction. */
+.avatar {
   flex: none;
-  width: var(--space-6);
-  height: var(--space-6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-touch-target);
+  height: var(--size-touch-target);
   border-radius: var(--radius-full);
-  border: var(--border-width-thin) solid rgba(0, 0, 0, 0.2);
+  border: var(--border-width-thick) solid var(--color-border);
+  font-size: var(--font-size-400);
+  line-height: 1;
 }
 
-/* Shape/pattern-distinct, matching the discs/marks used on the boards —
-   never color alone (UX_PRINCIPLES §4). */
-.swatch1 {
-  background-color: var(--color-player-1);
+.avatar1 {
+  border-color: var(--color-player-1);
+  background-color: var(--color-player-1-bg);
 }
 
-.swatch2 {
-  border-radius: var(--radius-sm);
-  background-image: repeating-linear-gradient(
-    45deg,
-    var(--color-player-2) 0 4px,
-    var(--color-bg) 4px 8px
-  );
+.avatar2 {
+  border-color: var(--color-player-2);
+  background-color: var(--color-player-2-bg);
 }
 
 .info {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  gap: 2px;
 }
 
 .name {
@@ -75,15 +77,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.kindLabel {
-  align-self: flex-start;
-  font-size: var(--font-size-100);
-  font-weight: var(--font-weight-regular);
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
 }
 
 .thinking {

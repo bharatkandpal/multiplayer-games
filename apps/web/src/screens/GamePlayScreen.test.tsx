@@ -144,7 +144,7 @@ describe("GamePlayScreen — human vs. bot", () => {
     // A subtle, decorative "thinking" indicator lives on the active seat's
     // SeatCard (not a content-loading Skeleton, and not duplicated on the
     // status badge too) while the bot computes its move.
-    const seatCard = screen.getByText("Hard bot (Player 2)").closest("div");
+    const seatCard = screen.getByText("Player 2").closest("div");
     expect(seatCard?.querySelector('[class*="thinkingDots"]')).not.toBeNull();
 
     await advanceBotStep();

@@ -4,11 +4,9 @@ import styles from "./SeatCard.module.css";
 export type SeatCardKind = "human" | "bot";
 
 export interface SeatCardProps {
-  /** 0-based seat index — drives the color/pattern mapping (see below). */
+  /** 0-based seat index — drives both the "Player N" label and the color mapping. */
   seatIndex: number;
-  /** Display-ready seat name, e.g. from `describeSeat(seats, seatIndex)`. */
-  name: string;
-  /** Whether this seat is a human or a bot — shown as a short label, never color-only. */
+  /** Whether this seat is a human or a bot — shown as an avatar emoji (🤖 / 👤). */
   kind: SeatCardKind;
   /** True when it's currently this seat's turn — the primary turn-ownership signal. */
   active: boolean;
@@ -22,23 +20,23 @@ export interface SeatCardProps {
 }
 
 /**
- * Persistent "who is playing" indicator (MPG-042): one card per seat, color-
- * coded to match that seat's piece color on the board (`--color-player-{n}`),
- * with a human/bot label and a highlighted "active" state that is the
- * canonical whose-turn signal (folds in the bot "thinking" affordance rather
- * than duplicating it elsewhere). Only two player color tokens exist today;
- * seats beyond 2 cycle through them (`seatIndex % 2`) rather than assuming
- * exactly two seats ever exist.
+ * Persistent "who is playing" indicator (MPG-042/047): one card per seat,
+ * labelled simply "Player N" with a color-coded avatar — 🤖 for a bot, 👤 for
+ * a human — tinted to match that seat's piece color on the board
+ * (`--color-player-{n}`). The "Player N" text is itself the non-color-only
+ * distinction between seats (UX_PRINCIPLES §4), so the avatar hue is free to
+ * carry identity. The "active" state is the canonical whose-turn signal and
+ * folds in the bot "thinking" affordance. Only two player color tokens exist
+ * today; seats beyond 2 cycle through them (`seatIndex % 2`).
  */
 export function SeatCard({
   seatIndex,
-  name,
   kind,
   active,
   thinking = false,
   className,
 }: SeatCardProps): React.JSX.Element {
-  const swatchSlot = (seatIndex % 2) + 1; // 1 or 2 — cycles for future >2-seat games.
+  const colorSlot = (seatIndex % 2) + 1; // 1 or 2 — cycles for future >2-seat games.
 
   return (
     <div
@@ -46,14 +44,14 @@ export function SeatCard({
       data-seat-index={seatIndex}
     >
       <span
-        className={cx(styles.swatch, swatchSlot === 1 ? styles.swatch1 : styles.swatch2)}
-        aria-hidden="true"
-      />
+        className={cx(styles.avatar, colorSlot === 1 ? styles.avatar1 : styles.avatar2)}
+        role="img"
+        aria-label={kind === "bot" ? "Bot" : "Human"}
+      >
+        {kind === "bot" ? "🤖" : "👤"}
+      </span>
       <span className={styles.info}>
-        <span className={styles.name}>{name}</span>
-        <span className={cx(styles.kindLabel, kind === "bot" ? styles.kindBot : styles.kindHuman)}>
-          {kind === "bot" ? "Bot" : "Human"}
-        </span>
+        <span className={styles.name}>Player {seatIndex + 1}</span>
       </span>
       {active && thinking ? (
         <span className={styles.thinking} aria-hidden="true">

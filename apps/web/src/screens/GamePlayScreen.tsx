@@ -2,6 +2,7 @@ import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { GameModule, Player, Result } from "@mpg/engine";
 import { Button, SeatCard, StatusBadge, Toast, VisuallyHidden } from "../components/ui";
 import type { StatusBadgeStatus } from "../components/ui";
+import { cx } from "../components/ui/cx";
 import {
   type AppliedMove,
   type SeatsConfig,
@@ -71,29 +72,57 @@ function resultTone(result: Result, seats: SeatsConfig): ResultTone {
 /** A CSS custom property bag, for the per-particle confetti variables below. */
 type ConfettiVars = CSSProperties & Record<`--${string}`, string | number>;
 
-const CONFETTI_COUNT = 32;
+const CONFETTI_COUNT = 60;
 
 /**
- * A one-shot confetti burst over the board (MPG-046, tone === "celebrate").
- * Pure CSS: each particle is a plain `<span>` positioned/timed by inline CSS
- * custom properties derived deterministically from its index (no Math.random
- * — stable across re-renders/tests, still visually varied). Decorative only
- * (`aria-hidden`); the outcome itself is still announced via the live region.
+ * A one-shot confetti burst (MPG-046/047, tone === "celebrate"). Full-viewport
+ * (see `.confettiLayer` in the CSS), and runs a couple of seconds longer than
+ * the original board-scoped burst. Pure CSS: each particle is a plain `<span>`
+ * positioned/timed by inline CSS custom properties derived deterministically
+ * from its index (no Math.random — stable across re-renders/tests, still
+ * visually varied). Decorative only (`aria-hidden`); the outcome itself is
+ * announced via the live region.
  */
 function ConfettiBurst(): React.JSX.Element {
   return (
     <div className={styles.confettiLayer} aria-hidden="true">
       {Array.from({ length: CONFETTI_COUNT }, (_, i) => {
         const vars: ConfettiVars = {
-          "--x": `${(i * 41) % 100}%`,
+          "--x": `${(i * 37) % 100}%`,
           "--hue": (i * 137) % 360,
-          "--delay": `${(i % 8) * 45}ms`,
-          "--duration": `${900 + (i % 5) * 140}ms`,
-          "--drift": `${((i * 53) % 60) - 30}px`,
-          "--rotate": `${(i * 97) % 360}deg`,
+          "--delay": `${(i % 12) * 80}ms`,
+          "--duration": `${2800 + (i % 6) * 260}ms`,
+          "--drift": `${((i * 53) % 160) - 80}px`,
+          "--rotate": `${(i % 4 === 0 ? -1 : 1) * (360 + ((i * 53) % 360))}deg`,
         };
         return <span key={i} className={styles.confettiPiece} style={vars} />;
       })}
+    </div>
+  );
+}
+
+/**
+ * Cracked-glass "defeat" overlay (MPG-047, tone === "subdued") — an inline SVG
+ * of jagged fracture lines that snap in over the board (with a brief board
+ * shake, applied on `.boardWrap`); the bot's winning line is recolored red by
+ * the board itself. Replaces the earlier water/emoji treatment. Decorative
+ * only (`aria-hidden`); reduced-motion draws the cracks instantly, no shake.
+ */
+function CrackedGlass(): React.JSX.Element {
+  return (
+    <div className={styles.loseCracks} aria-hidden="true">
+      <svg className={styles.crackSvg} viewBox="0 0 100 100" preserveAspectRatio="none">
+        <g className={styles.crackGroup}>
+          <polyline points="50,48 41,29 45,10" />
+          <polyline points="50,48 69,39 90,42" />
+          <polyline points="50,48 57,71 51,93" />
+          <polyline points="50,48 29,58 7,63" />
+          <polyline points="41,29 22,20" />
+          <polyline points="69,39 76,19" />
+          <polyline points="57,71 78,79" />
+          <polyline points="29,58 20,80" />
+        </g>
+      </svg>
     </div>
   );
 }
@@ -185,7 +214,6 @@ export function GamePlayScreen<S, M, L = unknown>({
     <SeatCard
       key={indexInSeats}
       seatIndex={indexInSeats}
-      name={describeSeat(seats, indexInSeats)}
       kind={seat.kind}
       active={!isGameOver && turnSeatIndex === indexInSeats}
       thinking={thinkingSeatIndex === indexInSeats}
@@ -252,7 +280,9 @@ export function GamePlayScreen<S, M, L = unknown>({
         {seats.map((seat, i) => renderSeatCard(seat, i))}
       </div>
 
-      <div className={styles.boardWrap}>
+      <div
+        className={cx(styles.boardWrap, isGameOver && tone === "subdued" && styles.boardShake)}
+      >
         {renderBoard({
           state: session.state,
           onMove: play,
@@ -262,23 +292,11 @@ export function GamePlayScreen<S, M, L = unknown>({
           winningLineTone: tone === "subdued" ? "loss" : "win",
         })}
 
-        {/* MPG-046: tone-specific decoration over the board, entirely
+        {/* MPG-046/047: tone-specific decoration over the board, entirely
             aria-hidden — the outcome itself is carried by the live region
             below, not by these effects. */}
-        {isGameOver && tone === "celebrate" ? (
-          <>
-            <div className={styles.winFlash} aria-hidden="true" />
-            <ConfettiBurst />
-          </>
-        ) : null}
-        {isGameOver && tone === "subdued" ? (
-          <>
-            <div className={styles.loseWater} aria-hidden="true" />
-            <span className={styles.loseEmoji} aria-hidden="true">
-              😢
-            </span>
-          </>
-        ) : null}
+        {isGameOver && tone === "celebrate" ? <div className={styles.winFlash} aria-hidden="true" /> : null}
+        {isGameOver && tone === "subdued" ? <CrackedGlass /> : null}
       </div>
 
       <div aria-live="polite" role="status">
@@ -303,6 +321,10 @@ export function GamePlayScreen<S, M, L = unknown>({
           </Button>
         </div>
       ) : null}
+
+      {/* MPG-047: full-viewport confetti on a win — rendered at the top level
+          so its fixed positioning isn't trapped by a transformed ancestor. */}
+      {isGameOver && tone === "celebrate" ? <ConfettiBurst /> : null}
     </div>
   );
 }
