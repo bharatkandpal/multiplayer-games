@@ -71,6 +71,15 @@ describe("SeatCard", () => {
     expect(container.querySelector('[class*="crown"]')).toHaveAttribute("aria-hidden", "true");
   });
 
+  it("raises the winning card's stacking context (class 'winner') so its crown can render above the full-viewport confetti", () => {
+    const { container: notWinner } = render(<SeatCard seatIndex={0} kind="human" active={false} />);
+    expect(notWinner.querySelector('[class*="winner"]')).toBeNull();
+
+    const { container } = render(<SeatCard seatIndex={0} kind="human" active={false} winner />);
+    const card = container.querySelector('[class*="card"]');
+    expect(card?.className).toMatch(/winner/);
+  });
+
   it("shows no crown/'Winner' text when winner is false (default)", () => {
     const { container } = render(<SeatCard seatIndex={0} kind="human" active={false} />);
     expect(container.querySelector('[class*="crown"]')).toBeNull();

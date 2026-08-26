@@ -57,21 +57,41 @@
 
 /* Winner seat (MPG-051): a distinct border (not color-only — paired with the
    crown badge + a non-visual "Winner" text) so the winning seat reads clearly
-   even in every mode, independent of the celebrate/subdued tone. */
+   even in every mode, independent of the celebrate/subdued tone.
+   `position: relative` + a z-index above the full-viewport confetti layer
+   (GamePlayScreen.module.css `.confettiLayer`, z-index 50) is deliberate —
+   with no visible result-text banner, the crown IS the at-a-glance
+   "who won" signal, so it must never be occluded by the celebration burst
+   raining over the seat row. Only the winning card is lifted (not the whole
+   row), so the confetti still reads as covering the board/other seats. */
 .winner {
+  position: relative;
+  z-index: 60;
   border-color: var(--color-warning);
 }
 
-/* Crown badge: a small corner affordance on the avatar, not the sole
-   indicator of the outcome (paired with a VisuallyHidden "Winner" string —
-   see SeatCard.tsx). Purely decorative (aria-hidden). */
+/* Crown badge: a solid, high-contrast circular badge (not just a bare glyph)
+   so it stays legible at a glance during a full-screen confetti burst — not
+   the sole indicator of the outcome (paired with a VisuallyHidden "Winner"
+   string, see SeatCard.tsx). Purely decorative (aria-hidden). Nudged only
+   slightly outside the avatar (not flush with the card's top edge) so a
+   future wrapped multi-row seat layout (row gap: --space-3, 12px) has
+   breathing room and the badge won't crowd the card above it. */
 .crown {
   position: absolute;
-  top: -0.5rem;
-  right: -0.35rem;
-  font-size: var(--font-size-200);
+  top: -0.3rem;
+  right: -0.3rem;
+  width: 1.375rem;
+  height: 1.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  border: var(--border-width-thick) solid var(--color-surface);
+  background-color: var(--color-warning);
+  font-size: 0.85rem;
   line-height: 1;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   animation: crown-pop 260ms var(--ease-standard) both;
 }
 
