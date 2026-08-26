@@ -1,6 +1,6 @@
 # ADR 0002 — Real-time arcade games alongside turn-based games
 
-**Status:** Proposed
+**Status:** Accepted (2026-08-26)
 **Date:** 2026-08-26
 **Deciders:** Bharat (lead)
 **Decision lens:** Keep two game families coherent without contorting either abstraction

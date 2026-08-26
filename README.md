@@ -77,4 +77,4 @@ multiplayer-games/
 | [docs/API_SPEC.md](docs/API_SPEC.md)                       | REST + WebSocket contract                                |
 | [docs/ROADMAP.md](docs/ROADMAP.md)                         | Milestones & phased delivery                             |
 | [docs/adr/0001-tech-stack.md](docs/adr/0001-tech-stack.md) | ADR: core tech stack decision (TypeScript both ends)     |
-| [docs/adr/0002-realtime-games.md](docs/adr/0002-realtime-games.md) | ADR (Proposed): real-time arcade games alongside turn-based (`RealtimeModule`) |
+| [docs/adr/0002-realtime-games.md](docs/adr/0002-realtime-games.md) | ADR (Accepted): real-time arcade games alongside turn-based (`RealtimeModule`) |
