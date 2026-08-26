@@ -1,6 +1,6 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TicTacToeRoute } from "./games";
 import type { SeatsConfig } from "../game";
@@ -26,7 +26,7 @@ function expectInert(cell: HTMLElement): void {
 }
 
 describe("GamePlayScreen — local play-through (via TicTacToeRoute)", () => {
-  it("plays a full human-vs-human game: alternating turns, win detection, result screen, rematch", async () => {
+  it("plays a full human-vs-human game: alternating turns, win detection, inline result, rematch", async () => {
     const user = userEvent.setup();
     const seats: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
     render(<TicTacToeRoute seats={seats} onExit={vi.fn()} />);
@@ -44,62 +44,27 @@ describe("GamePlayScreen — local play-through (via TicTacToeRoute)", () => {
     await user.click(screen.getByRole("gridcell", { name: "Row 2, column 2, empty" }));
     await user.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
 
-    const dialog = await screen.findByRole("dialog", { name: "Player 1 wins!" });
-    expect(within(dialog).getByText("Nice game! Ready for a rematch?")).toBeInTheDocument();
+    // No dialog — the result is shown inline, board fully visible underneath,
+    // no dismiss step required. Human-vs-human is a neutral "X wins!" outcome,
+    // never framed as anyone individually "losing".
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(await screen.findByText("Player 1 wins!", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByText("Good game! Ready for a rematch?")).toBeInTheDocument();
 
-    // Board is disabled/inert behind the modal once the game is over.
+    // Board is still visible (and inert) once the game is over.
+    expect(screen.getByRole("gridcell", { name: "Row 1, column 1, X" })).toBeInTheDocument();
     expectInert(screen.getByRole("gridcell", { name: "Row 3, column 1, empty" }));
 
-    await user.click(within(dialog).getByRole("button", { name: "Rematch" }));
+    // The Rematch button is the primary next action — inline, and focused
+    // automatically so keyboard/AT users land right on it.
+    const rematchButton = screen.getByRole("button", { name: "Rematch" });
+    expect(rematchButton).toHaveFocus();
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(rematchButton);
+
+    expect(screen.queryByText("Player 1 wins!")).not.toBeInTheDocument();
     expect(screen.getByText("Player 1's turn")).toBeInTheDocument();
     expect(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" })).toBeInTheDocument();
-  });
-
-  it("Esc dismisses the result modal to reveal the (inert) final board, without exiting to Home", async () => {
-    const user = userEvent.setup();
-    const onExit = vi.fn();
-    const seats: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
-    render(<TicTacToeRoute seats={seats} onExit={onExit} />);
-
-    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" }));
-    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 1, empty" }));
-    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 2, empty" }));
-    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 2, empty" }));
-    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
-
-    await screen.findByRole("dialog", { name: "Player 1 wins!" });
-
-    await user.keyboard("{Escape}");
-
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(onExit).not.toHaveBeenCalled();
-    // The finished board is still visible underneath, and stays inert.
-    expect(screen.getByRole("gridcell", { name: "Row 1, column 1, X" })).toBeInTheDocument();
-    expectInert(screen.getByRole("gridcell", { name: "Row 3, column 1, empty" }));
-  });
-
-  it("backdrop click dismisses the result modal to reveal the board, without exiting to Home", async () => {
-    const onExit = vi.fn();
-    const seats: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
-    render(<TicTacToeRoute seats={seats} onExit={onExit} />);
-
-    fireEvent.click(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" }));
-    fireEvent.click(screen.getByRole("gridcell", { name: "Row 2, column 1, empty" }));
-    fireEvent.click(screen.getByRole("gridcell", { name: "Row 1, column 2, empty" }));
-    fireEvent.click(screen.getByRole("gridcell", { name: "Row 2, column 2, empty" }));
-    fireEvent.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
-
-    const dialog = await screen.findByRole("dialog", { name: "Player 1 wins!" });
-    const backdrop = dialog.parentElement as HTMLElement;
-
-    fireEvent.mouseDown(backdrop, { target: backdrop, currentTarget: backdrop });
-
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(onExit).not.toHaveBeenCalled();
-    expect(screen.getByRole("gridcell", { name: "Row 1, column 1, X" })).toBeInTheDocument();
-    expectInert(screen.getByRole("gridcell", { name: "Row 3, column 1, empty" }));
   });
 
   it("rejects an out-of-turn/illegal click without changing the board, then recovers", async () => {
@@ -115,6 +80,17 @@ describe("GamePlayScreen — local play-through (via TicTacToeRoute)", () => {
     // an occupied cell simply can't be re-clicked (no flicker, no crash).
     expectInert(cell);
     expect(screen.getByText("Player 2's turn")).toBeInTheDocument();
+  });
+
+  it("Home (top bar) exits immediately, at any point in the game — including after it's over", async () => {
+    const user = userEvent.setup();
+    const onExit = vi.fn();
+    const seats: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
+    render(<TicTacToeRoute seats={seats} onExit={onExit} />);
+
+    const homeButton = screen.getByRole("button", { name: "Home" });
+    await user.click(homeButton);
+    expect(onExit).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -154,6 +130,29 @@ describe("GamePlayScreen — human vs. bot", () => {
     const oCells = screen.getAllByRole("gridcell").filter((el) => el.getAttribute("aria-label")?.endsWith(", O"));
     expect(oCells).toHaveLength(1);
   });
+
+  it("frames a solo human's loss to the bot as subdued (not celebratory), inline, with Rematch focused", async () => {
+    const seats: SeatsConfig = [{ kind: "human" }, { kind: "bot", difficulty: "hard" }];
+    render(<TicTacToeRoute seats={seats} onExit={vi.fn()} />);
+
+    // A deterministic forced loss against the (never-blundering) hard bot:
+    // X: 0 (Row1,Col1), 8 (Row3,Col3), 2 (Row1,Col3) — O (hard, optimal): 4, 1, 7
+    // — O completes the middle column (1, 4, 7).
+    fireEvent.click(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" }));
+    await advanceBotStep();
+    fireEvent.click(screen.getByRole("gridcell", { name: "Row 3, column 3, empty" }));
+    await advanceBotStep();
+    fireEvent.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
+    await advanceBotStep();
+
+    expect(screen.getByText("Hard bot (Player 2) wins!", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByText("Good effort — want to try again?")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    const rematchButton = screen.getByRole("button", { name: "Rematch" });
+    expect(rematchButton).toBeInTheDocument();
+    expect(rematchButton).toHaveFocus();
+  });
 });
 
 describe("GamePlayScreen — bot vs. bot (watch mode)", () => {
@@ -173,12 +172,16 @@ describe("GamePlayScreen — bot vs. bot (watch mode)", () => {
     render(<TicTacToeRoute seats={seats} onExit={vi.fn()} />);
 
     // Tic-Tac-Toe has at most 9 plies; give it a comfortably larger step budget.
-    for (let i = 0; i < 12 && screen.queryByRole("dialog") === null; i++) {
+    for (let i = 0; i < 12 && screen.queryByRole("button", { name: "Rematch" }) === null; i++) {
       await advanceBotStep();
     }
 
-    const dialog = screen.getByRole("dialog", { name: "It's a draw!" });
-    expect(within(dialog).getByText("Good game — nobody blinked.")).toBeInTheDocument();
+    // Bot-vs-bot has no privileged local human — a draw reads the same
+    // neutral way it would for any other configuration, shown inline.
+    expect(screen.getByText("It's a draw!", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByText("Good game — nobody blinked.")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rematch" })).toHaveFocus();
   });
 
   it("shows watch controls only for all-bot games, not human games", () => {

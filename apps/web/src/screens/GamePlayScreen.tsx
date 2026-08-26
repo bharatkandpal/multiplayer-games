@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { GameModule, Player, Result } from "@mpg/engine";
-import { Button, Modal, SeatCard, StatusBadge, Toast, VisuallyHidden } from "../components/ui";
+import { Button, SeatCard, StatusBadge, Toast, VisuallyHidden } from "../components/ui";
 import type { StatusBadgeStatus } from "../components/ui";
+import { cx } from "../components/ui/cx";
 import {
   type AppliedMove,
   type SeatsConfig,
@@ -42,6 +43,33 @@ function resultHeadline(result: Result, seats: SeatsConfig): string {
 }
 
 /**
+ * The emotional register of the terminal state (MPG-044). "Lose" framing is
+ * reserved for the one configuration where it's unambiguous: a single local
+ * human seat that did not win. Everything else — human-vs-human on a shared
+ * device, or an all-bot watch — reads as a neutral "X wins!" outcome (no one
+ * local player "lost" it), never a somber "you lost".
+ */
+type ResultTone = "celebrate" | "subdued" | "neutral";
+
+function resultTone(result: Result, seats: SeatsConfig): ResultTone {
+  if (result.status !== "win") return "neutral"; // draw
+  const humanSeatIndices = seats.reduce<number[]>((acc, seat, index) => {
+    if (seat.kind === "human") acc.push(index);
+    return acc;
+  }, []);
+  if (humanSeatIndices.length !== 1) return "neutral";
+  const [soleHumanIndex] = humanSeatIndices;
+  return seatIndexOf(result.winner) === soleHumanIndex ? "celebrate" : "subdued";
+}
+
+function resultMessage(tone: ResultTone, result: Result): string {
+  if (result.status === "draw") return "Good game — nobody blinked.";
+  if (tone === "celebrate") return "Nice game! Ready for a rematch?";
+  if (tone === "subdued") return "Good effort — want to try again?";
+  return "Good game! Ready for a rematch?";
+}
+
+/**
  * Generic game screen (MPG-009/MPG-010): renders the board, the turn/"thinking"
  * indicator, move-rejection feedback, and the win/lose/draw result — driven by
  * `useLocalPlayController`, which owns all bot-turn orchestration and pacing.
@@ -71,11 +99,6 @@ export function GamePlayScreen<S, M, L = unknown>({
     clearError,
     rematch,
   } = useLocalPlayController(game, seats);
-
-  // The result modal can be dismissed (Esc / backdrop / ×) to reveal the
-  // final board without leaving the game — only the explicit Rematch /
-  // "Back to home" buttons below navigate away from the terminal state.
-  const [resultDismissed, setResultDismissed] = useState(false);
 
   const turnSeatIndex = seatIndexOf(session.turn);
   const turnSeatName = describeSeat(seats, turnSeatIndex);
@@ -113,6 +136,17 @@ export function GamePlayScreen<S, M, L = unknown>({
   // route re-supplies its concrete `L`, so this cast is safe and localized here.
   const winningLine = session.result.status === "win" ? (session.result.line as L) : null;
 
+  const tone = resultTone(session.result, seats);
+
+  // MPG-044: the result banner is inline (no modal to dismiss before the
+  // board is visible), so on game-over move focus straight to Rematch — the
+  // one obvious next action — rather than leaving focus stranded on the
+  // last-clicked (now-disabled) board cell.
+  const rematchButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (isGameOver) rematchButtonRef.current?.focus();
+  }, [isGameOver]);
+
   // MPG-042: one SeatCard per seat, split above/below the board — the primary
   // "whose turn" signal (folds in the bot "thinking" affordance, see below,
   // rather than duplicating it on the status badge too). First half of seats
@@ -138,7 +172,7 @@ export function GamePlayScreen<S, M, L = unknown>({
     <div className={styles.main}>
       <div className={styles.topBar}>
         <Button variant="ghost" size="sm" onClick={onExit}>
-          ← Back to games
+          Home
         </Button>
         <h1 className={styles.heading}>{gameTitle}</h1>
       </div>
@@ -214,40 +248,31 @@ export function GamePlayScreen<S, M, L = unknown>({
       </div>
 
       {/*
-        MPG-036: Esc / backdrop-click / × only dismiss this modal — they
-        reveal the finished board underneath rather than exiting to Home.
-        The board is already disabled once the game is over (boardDisabled
-        above), so revealing it can't accept further moves. The only ways
-        to navigate off the terminal state are the explicit Rematch and
-        "Back to home" buttons.
+        MPG-044: the terminal state is inline, not a modal — the finished
+        board (with its winning-line highlight) stays visible the instant the
+        game ends, no dismiss step required. Tone (celebrate / subdued /
+        neutral) is purely a CSS treatment; the copy and structure are the
+        same for every outcome, and reduced-motion users get the identical
+        end state with no animation (see the .module.css).
       */}
-      <Modal
-        isOpen={isGameOver && !resultDismissed}
-        title={resultHeadline(session.result, seats)}
-        onClose={() => setResultDismissed(true)}
-      >
-        <div className={styles.resultBody}>
-          <p className={styles.resultMessage}>
-            {session.result.status === "draw"
-              ? "Good game — nobody blinked."
-              : "Nice game! Ready for a rematch?"}
-          </p>
+      {isGameOver ? (
+        <div
+          className={cx(
+            styles.resultBanner,
+            tone === "celebrate" && styles.resultCelebrate,
+            tone === "subdued" && styles.resultSubdued,
+            tone === "neutral" && styles.resultNeutral,
+          )}
+        >
+          <p className={styles.resultHeadline}>{resultHeadline(session.result, seats)}</p>
+          <p className={styles.resultMessage}>{resultMessage(tone, session.result)}</p>
           <div className={styles.resultActions}>
-            <Button
-              variant="primary"
-              onClick={() => {
-                setResultDismissed(false);
-                rematch();
-              }}
-            >
+            <Button ref={rematchButtonRef} variant="primary" onClick={rematch}>
               Rematch
-            </Button>
-            <Button variant="secondary" onClick={onExit}>
-              Back to home
             </Button>
           </div>
         </div>
-      </Modal>
+      ) : null}
     </div>
   );
 }

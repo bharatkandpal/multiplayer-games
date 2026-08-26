@@ -79,10 +79,27 @@
   margin-bottom: var(--space-6);
 }
 
-.resultBody {
+/* Inline terminal state (MPG-044): replaces the old result modal so the
+   finished board (with its winning-line highlight) is visible the instant
+   the game ends, with no dismiss step. Tone is a pure CSS treatment on top
+   of the same structure/copy for every outcome. */
+.resultBanner {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+  padding: var(--space-5) var(--space-4);
+  margin-bottom: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.resultHeadline {
+  margin: 0;
+  font-size: var(--font-size-500);
+  font-weight: var(--font-weight-bold);
 }
 
 .resultMessage {
@@ -93,4 +110,68 @@
 .resultActions {
   display: flex;
   gap: var(--space-3);
+}
+
+/* WIN, sole local human: celebratory — a little more lift/scale on entry. */
+.resultCelebrate {
+  border-color: var(--color-success);
+  background: var(--color-success-bg);
+  animation: resultCelebrateIn var(--duration-slow) var(--ease-emphasized);
+}
+
+.resultCelebrate .resultHeadline {
+  color: var(--color-success-text);
+}
+
+@keyframes resultCelebrateIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.03) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* LOSE, sole local human: distinct, subdued — a plain fade, no bounce. */
+.resultSubdued {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface);
+  animation: resultFadeIn var(--duration-base) var(--ease-standard);
+}
+
+/* Draw, or a win with no single privileged local human (human-vs-human /
+   all-bot watch): neutral "X wins!" — informational, not celebratory. */
+.resultNeutral {
+  border-color: var(--color-info);
+  background: var(--color-info-bg);
+  animation: resultFadeIn var(--duration-base) var(--ease-standard);
+}
+
+.resultNeutral .resultHeadline {
+  color: var(--color-info-text);
+}
+
+@keyframes resultFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resultCelebrate,
+  .resultSubdued,
+  .resultNeutral {
+    animation: none;
+  }
 }
