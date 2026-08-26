@@ -19,11 +19,41 @@ vi.mock("./HomeScreen", async (importOriginal) => {
   };
 });
 
-describe("SetupScreen — N-seat-generic (MPG-024)", () => {
-  it("renders one seat editor per the game's playerCount (3), each independently configurable", async () => {
+describe("SetupScreen — N-seat-generic (MPG-024/MPG-049)", () => {
+  it("Play vs Bot preset derives the correct seat count (1 human + 2 bots) for a 3-seat game", async () => {
     const user = userEvent.setup();
     const onStart = vi.fn();
     render(<SetupScreen gameId="tictactoe" onStart={onStart} onBack={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /Play vs Bot/ }));
+
+    expect(onStart).toHaveBeenCalledExactlyOnceWith([
+      { kind: "human" },
+      { kind: "bot", difficulty: "medium" },
+      { kind: "bot", difficulty: "medium" },
+    ]);
+  });
+
+  it("Play a friend preset derives the correct seat count (3 humans) for a 3-seat game", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    render(<SetupScreen gameId="tictactoe" onStart={onStart} onBack={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /Play a friend/ }));
+
+    expect(onStart).toHaveBeenCalledExactlyOnceWith([
+      { kind: "human" },
+      { kind: "human" },
+      { kind: "human" },
+    ]);
+  });
+
+  it("Customize renders one seat editor per the game's playerCount (3), each independently configurable", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    render(<SetupScreen gameId="tictactoe" onStart={onStart} onBack={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Customize seats" }));
 
     expect(screen.getByRole("radiogroup", { name: "Player 1 type" })).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "Player 2 type" })).toBeInTheDocument();

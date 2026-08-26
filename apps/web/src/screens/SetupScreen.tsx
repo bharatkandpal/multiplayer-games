@@ -88,18 +88,34 @@ function SeatEditor({ index, seat, onChange }: SeatEditorProps): React.JSX.Eleme
   );
 }
 
+/** Preset: one human seat, every other seat a medium bot. */
+function vsBotSeats(playerCount: number): SeatsConfig {
+  return Array.from({ length: playerCount }, (_, index) =>
+    index === 0 ? { kind: "human" } : { kind: "bot", difficulty: DEFAULT_DIFFICULTY },
+  );
+}
+
+/** Preset: every seat human (local pass-and-play). */
+function vsFriendSeats(playerCount: number): SeatsConfig {
+  return Array.from({ length: playerCount }, () => ({ kind: "human" }));
+}
+
 /**
- * Seat-configuration screen (MPG-009/MPG-024): renders one seat editor per
- * player the selected game supports (`GameModule.playerCount` — never a
- * hardcoded two), each independently Human or Bot(+level). Supports
- * human-vs-bot, local human-vs-human, mixed bot levels, and all-bot "watch"
- * games, for any seat count.
+ * Seat-configuration screen (MPG-009/MPG-024/MPG-049). Leads with two
+ * one-tap presets ("Play vs Bot" / "Play a friend") that start the game
+ * immediately for the common cases, so most players never touch a control
+ * beyond picking one of the two. The full per-seat editor (Human/Bot +
+ * difficulty, any seat count) is still reachable behind a "Customize"
+ * disclosure for mixed bot levels, local human-vs-human with 3+ seats, or
+ * all-bot "watch" games.
  */
 export function SetupScreen({ gameId, onStart, onBack }: SetupScreenProps): React.JSX.Element {
   const catalogEntry = GAME_CATALOG[gameId];
   const playerCount = catalogEntry?.playerCount ?? 2;
   const [seats, setSeats] = useState<SeatsConfig>(() => createDefaultSeats(playerCount));
+  const [customizeOpen, setCustomizeOpen] = useState(false);
   const title = catalogEntry?.title ?? gameId;
+  const customizeId = useId();
 
   return (
     <div className={styles.main}>
@@ -110,21 +126,68 @@ export function SetupScreen({ gameId, onStart, onBack }: SetupScreenProps): Reac
       </div>
       <h1 className={styles.heading}>Set up {title}</h1>
 
-      <div className={styles.seats}>
-        {seats.map((seat, index) => (
-          <SeatEditor
-            key={index}
-            index={index}
-            seat={seat}
-            onChange={(nextSeat) => setSeats((prev) => updateSeat(prev, index, nextSeat))}
-          />
-        ))}
+      <div className={styles.quickStart}>
+        <button
+          type="button"
+          className={styles.quickOption}
+          onClick={() => onStart(vsBotSeats(playerCount))}
+        >
+          <span className={styles.quickIcon} aria-hidden="true">
+            🤖
+          </span>
+          <span className={styles.quickLabel}>Play vs Bot</span>
+          <span className={styles.quickHint}>You vs a medium bot — starts right away</span>
+        </button>
+        <button
+          type="button"
+          className={styles.quickOption}
+          onClick={() => onStart(vsFriendSeats(playerCount))}
+        >
+          <span className={styles.quickIcon} aria-hidden="true">
+            👥
+          </span>
+          <span className={styles.quickLabel}>Play a friend</span>
+          <span className={styles.quickHint}>Everyone&apos;s human, take turns on this device</span>
+        </button>
       </div>
 
-      <div className={styles.actions}>
-        <Button variant="primary" size="lg" onClick={() => onStart(seats)}>
-          Start game
-        </Button>
+      <div className={styles.customizeSection}>
+        <button
+          type="button"
+          className={styles.customizeToggle}
+          aria-expanded={customizeOpen}
+          aria-controls={customizeId}
+          onClick={() => setCustomizeOpen((open) => !open)}
+        >
+          <span className={styles.customizeChevron} data-open={customizeOpen} aria-hidden="true">
+            ▸
+          </span>
+          Customize seats
+        </button>
+
+        <div
+          id={customizeId}
+          className={styles.customizeBody}
+          data-open={customizeOpen}
+          hidden={!customizeOpen}
+        >
+          <div className={styles.seats}>
+            {seats.map((seat, index) => (
+              <SeatEditor
+                key={index}
+                index={index}
+                seat={seat}
+                onChange={(nextSeat) => setSeats((prev) => updateSeat(prev, index, nextSeat))}
+              />
+            ))}
+          </div>
+
+          <div className={styles.actions}>
+            <Button variant="primary" size="lg" onClick={() => onStart(seats)}>
+              Start game
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
