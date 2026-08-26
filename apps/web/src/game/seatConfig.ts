@@ -59,6 +59,16 @@ export function presetSeats(preset: OpponentPreset, playerCount = 2): SeatsConfi
     : Array.from({ length: playerCount }, () => ({ kind: "human" as const }));
 }
 
+/**
+ * Compares two seat configs by shape only — same length, same `kind` at each
+ * index — ignoring bot difficulty (MPG-050: used to decide whether an
+ * opponent preset would just recreate the current game, e.g. "Play vs Bot"
+ * offered again on an already human-vs-bot game).
+ */
+export function sameSeatKinds(a: SeatsConfig, b: SeatsConfig): boolean {
+  return a.length === b.length && a.every((seat, i) => seat.kind === b[i]?.kind);
+}
+
 export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   easy: "Easy",
   medium: "Medium",

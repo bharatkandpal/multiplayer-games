@@ -206,12 +206,12 @@ describe("GamePlayScreen — play again vs a different opponent (MPG-050)", () =
     await user.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
 
     expect(screen.getByRole("button", { name: "Rematch" })).toBeInTheDocument();
-    expect(screen.queryByRole("group", { name: "Start a new game" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "or play again vs…" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Play vs Bot/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Play a friend/ })).not.toBeInTheDocument();
   });
 
-  it("offers 'Play vs Bot' / 'Play a friend' presets on game over, alongside a still-focused Rematch", async () => {
+  it("after a human-vs-human game, offers only 'Play vs Bot' (the 'Play a friend' preset already matches the current seats)", async () => {
     const user = userEvent.setup();
     const onPlayAgain = vi.fn();
     const seats: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
@@ -227,22 +227,49 @@ describe("GamePlayScreen — play again vs a different opponent (MPG-050)", () =
     const rematchButton = screen.getByRole("button", { name: "Rematch" });
     expect(rematchButton).toHaveFocus();
 
-    const group = screen.getByRole("group", { name: "Start a new game" });
+    // The group's accessible name comes from the visible caption (aria-labelledby).
+    const group = screen.getByRole("group", { name: "or play again vs…" });
     expect(group).toBeInTheDocument();
 
+    expect(screen.queryByRole("button", { name: /Play a friend/ })).not.toBeInTheDocument();
     const vsBotButton = screen.getByRole("button", { name: /Play vs Bot/ });
-    const vsFriendButton = screen.getByRole("button", { name: /Play a friend/ });
-
-    await user.click(vsFriendButton);
-    expect(onPlayAgain).toHaveBeenCalledTimes(1);
-    expect(onPlayAgain).toHaveBeenLastCalledWith([{ kind: "human" }, { kind: "human" }]);
 
     await user.click(vsBotButton);
-    expect(onPlayAgain).toHaveBeenCalledTimes(2);
+    expect(onPlayAgain).toHaveBeenCalledTimes(1);
     expect(onPlayAgain).toHaveBeenLastCalledWith([
       { kind: "human" },
       { kind: "bot", difficulty: "medium" },
     ]);
+  });
+
+  it("after a human-vs-bot game, offers only 'Play a friend' (the 'Play vs Bot' preset already matches the current seats)", async () => {
+    vi.useFakeTimers();
+    const onPlayAgain = vi.fn();
+    const seats: SeatsConfig = [{ kind: "human" }, { kind: "bot", difficulty: "hard" }];
+    render(<TicTacToeRoute seats={seats} onExit={vi.fn()} onPlayAgain={onPlayAgain} />);
+
+    // Deterministic forced loss (same sequence as the tone test above).
+    fireEvent.click(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" }));
+    await advanceBotStep();
+    fireEvent.click(screen.getByRole("gridcell", { name: "Row 3, column 3, empty" }));
+    await advanceBotStep();
+    fireEvent.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
+    await advanceBotStep();
+
+    const rematchButton = screen.getByRole("button", { name: "Rematch" });
+    expect(rematchButton).toHaveFocus();
+
+    const group = screen.getByRole("group", { name: "or play again vs…" });
+    expect(group).toBeInTheDocument();
+
+    expect(screen.queryByRole("button", { name: /Play vs Bot/ })).not.toBeInTheDocument();
+    const vsFriendButton = screen.getByRole("button", { name: /Play a friend/ });
+
+    fireEvent.click(vsFriendButton);
+    expect(onPlayAgain).toHaveBeenCalledTimes(1);
+    expect(onPlayAgain).toHaveBeenLastCalledWith([{ kind: "human" }, { kind: "human" }]);
+
+    vi.useRealTimers();
   });
 });
 

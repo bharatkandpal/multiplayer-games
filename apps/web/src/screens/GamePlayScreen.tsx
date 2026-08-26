@@ -1,17 +1,30 @@
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from "react";
 import type { DrawReason, GameModule, Player, Result } from "@mpg/engine";
 import { Button, SeatCard, StatusBadge, Toast, VisuallyHidden } from "../components/ui";
 import type { StatusBadgeStatus } from "../components/ui";
 import { cx } from "../components/ui/cx";
 import {
   type AppliedMove,
+  type OpponentPreset,
   type SeatsConfig,
   type WatchSpeed,
   describeSeat,
   presetSeats,
+  sameSeatKinds,
   useLocalPlayController,
 } from "../game";
 import styles from "./GamePlayScreen.module.css";
+
+/**
+ * MPG-050: labels/emoji for the two opponent presets offered on game-over,
+ * shared with the filtering logic below (only offer a preset that would
+ * actually change the current seat kinds — no point re-offering "Play vs
+ * Bot" on a game that's already human-vs-bot).
+ */
+const PLAY_AGAIN_PRESET_COPY: Record<OpponentPreset, { icon: string; label: string }> = {
+  bot: { icon: "🤖", label: "Play vs Bot" },
+  human: { icon: "👥", label: "Play a friend" },
+};
 
 export interface BoardRenderProps<S, M, L = unknown> {
   state: S;
@@ -220,6 +233,17 @@ export function GamePlayScreen<S, M, L = unknown>({
 
   const tone = resultTone(session.result, seats);
 
+  // MPG-050: only offer a "play again vs…" preset when it would actually
+  // change the current opponent type — e.g. a game that's already
+  // human-vs-bot doesn't need a near-duplicate "Play vs Bot" next to
+  // Rematch, just "Play a friend". Difficulty is deliberately irrelevant to
+  // this check (`sameSeatKinds`) — swapping bot levels isn't a different
+  // "opponent type" for this purpose.
+  const playAgainPresets: readonly OpponentPreset[] = (["bot", "human"] as const).filter(
+    (preset) => !sameSeatKinds(presetSeats(preset, seats.length), seats),
+  );
+  const playAgainHeadingId = useId();
+
   // MPG-044: the result banner is inline (no modal to dismiss before the
   // board is visible), so on game-over move focus straight to Rematch — the
   // one obvious next action — rather than leaving focus stranded on the
@@ -344,24 +368,25 @@ export function GamePlayScreen<S, M, L = unknown>({
             Rematch
           </Button>
 
-          {onPlayAgain ? (
-            <div className={styles.playAgainGroup} role="group" aria-label="Start a new game">
-              <span className={styles.playAgainLabel}>or play again vs…</span>
+          {onPlayAgain && playAgainPresets.length > 0 ? (
+            <div className={styles.playAgainGroup} role="group" aria-labelledby={playAgainHeadingId}>
+              <span id={playAgainHeadingId} className={styles.playAgainLabel}>
+                or play again vs…
+              </span>
               <div className={styles.playAgainButtons}>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => onPlayAgain(presetSeats("bot", seats.length))}
-                >
-                  <span aria-hidden="true">🤖</span> Play vs Bot
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => onPlayAgain(presetSeats("human", seats.length))}
-                >
-                  <span aria-hidden="true">👥</span> Play a friend
-                </Button>
+                {playAgainPresets.map((preset) => {
+                  const { icon, label } = PLAY_AGAIN_PRESET_COPY[preset];
+                  return (
+                    <Button
+                      key={preset}
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => onPlayAgain(presetSeats(preset, seats.length))}
+                    >
+                      <span aria-hidden="true">{icon}</span> {label}
+                    </Button>
+                  );
+                })}
               </div>
             </div>
           ) : null}

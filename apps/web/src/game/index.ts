@@ -25,6 +25,7 @@ export {
   createDefaultSeats,
   describeSeat,
   presetSeats,
+  sameSeatKinds,
 } from "./seatConfig";
 
 export { getBotThinkingDelayMs } from "./motion";
