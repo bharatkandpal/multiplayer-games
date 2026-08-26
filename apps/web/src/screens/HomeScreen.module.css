@@ -74,15 +74,20 @@
   outline-offset: 2px;
 }
 
+.gameThumbnail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-subtle);
+}
+
 .gameTitle {
   font-size: var(--font-size-400);
   font-weight: var(--font-weight-bold);
-}
-
-.gameDescription {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-200);
-  margin: 0;
 }
 
 .gameId {

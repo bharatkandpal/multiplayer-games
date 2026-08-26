@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HomeScreen } from "./HomeScreen";
 
 describe("HomeScreen", () => {
-  it("lists the given games with title, description, and id", () => {
+  it("lists the given games with title, thumbnail, and id", () => {
     render(
       <HomeScreen
         games={["tictactoe", "connect4", "tictactoe-move"]}
@@ -22,6 +22,47 @@ describe("HomeScreen", () => {
     // The new move-mode variant (MPG-045-d) is catalogued and shows up too.
     expect(screen.getByText("Move-Mode Tic-Tac-Toe")).toBeInTheDocument();
     expect(screen.getByText("tictactoe-move")).toBeInTheDocument();
+  });
+
+  it("shows a thumbnail per card, and the card's accessible name is just the title (MPG-052)", () => {
+    render(
+      <HomeScreen
+        games={["tictactoe", "connect4", "tictactoe-move"]}
+        onSelectGame={vi.fn()}
+        onShowGallery={vi.fn()}
+      />,
+    );
+
+    const list = screen.getByRole("list", { name: "Available games" });
+    const cards = within(list).getAllByRole("button");
+    expect(cards).toHaveLength(3);
+    for (const card of cards) {
+      const svg = card.querySelector("svg");
+      expect(svg).not.toBeNull();
+      expect(svg).toHaveAttribute("aria-hidden", "true");
+      expect(svg).toHaveAttribute("focusable", "false");
+    }
+
+    expect(screen.getByRole("button", { name: "Tic-Tac-Toe" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect Four" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Move-Mode Tic-Tac-Toe" })).toBeInTheDocument();
+  });
+
+  it("no longer shows the game description on Home (it moved to Setup, MPG-052)", () => {
+    render(
+      <HomeScreen
+        games={["tictactoe", "connect4", "tictactoe-move"]}
+        onSelectGame={vi.fn()}
+        onShowGallery={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.queryByText("Classic 3x3. Quick games, easy to teach a bot to play well."),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Drop discs, connect four in a row. 7 columns, 6 rows."),
+    ).not.toBeInTheDocument();
   });
 
   it("shows an empty-state message and no list when there are no games", () => {

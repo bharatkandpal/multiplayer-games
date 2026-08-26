@@ -1,0 +1,35 @@
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 6.5rem;
+  margin: 0 auto;
+}
+
+.grid {
+  stroke: var(--color-border-strong);
+}
+
+.slot {
+  fill: var(--color-bg-subtle);
+  stroke: var(--color-border-strong);
+  stroke-width: 2;
+}
+
+.markPlayer1 {
+  stroke: var(--color-player-1);
+  fill: var(--color-player-1);
+}
+
+.markPlayer2 {
+  stroke: var(--color-player-2);
+  fill: var(--color-player-2);
+}
+
+.moveArrow {
+  stroke: var(--color-text-muted);
+}
+
+.moveArrowHead {
+  fill: var(--color-text-muted);
+}

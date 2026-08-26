@@ -13,6 +13,14 @@ describe("SetupScreen", () => {
     expect(screen.getByRole("heading", { name: "Set up Tic-Tac-Toe" })).toBeInTheDocument();
   });
 
+  it("shows the game's description under the heading (MPG-052)", () => {
+    render(<SetupScreen gameId="tictactoe" onStart={vi.fn()} onBack={vi.fn()} />);
+
+    expect(
+      screen.getByText("Classic 3x3. Quick games, easy to teach a bot to play well."),
+    ).toBeInTheDocument();
+  });
+
   it("Play vs Bot starts immediately with human vs. medium bot", async () => {
     const user = userEvent.setup();
     const onStart = vi.fn();

@@ -11,6 +11,12 @@
 .heading {
   font-size: var(--font-size-600);
   font-weight: var(--font-weight-bold);
+  margin: 0 0 var(--space-2);
+}
+
+.description {
+  color: var(--color-text-muted);
+  max-width: 34rem;
   margin: 0 0 var(--space-6);
 }
 

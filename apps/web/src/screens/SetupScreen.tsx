@@ -114,6 +114,9 @@ export function SetupScreen({ gameId, onStart, onBack }: SetupScreenProps): Reac
         </Button>
       </div>
       <h1 className={styles.heading}>Set up {title}</h1>
+      {catalogEntry?.description ? (
+        <p className={styles.description}>{catalogEntry.description}</p>
+      ) : null}
 
       <div className={styles.quickStart}>
         <Button

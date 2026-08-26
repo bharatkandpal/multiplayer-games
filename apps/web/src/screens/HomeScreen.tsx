@@ -1,6 +1,7 @@
 import { ENGINE_VERSION, connectFour, ticTacToe, ticTacToeMove } from "@mpg/engine";
 import type { GameId } from "@mpg/engine";
 import { Button } from "../components/ui";
+import { GameThumbnail } from "./gameThumbnails";
 import styles from "./HomeScreen.module.css";
 
 export interface GameCatalogEntry {
@@ -77,9 +78,16 @@ export function HomeScreen({
             return (
               <li key={id}>
                 <button type="button" className={styles.gameCard} onClick={() => onSelectGame(id)}>
+                  <span className={styles.gameThumbnail}>
+                    <GameThumbnail gameId={id} />
+                  </span>
                   <span className={styles.gameTitle}>{entry?.title ?? id}</span>
-                  <p className={styles.gameDescription}>{entry?.description ?? "Play now."}</p>
-                  <span className={styles.gameId}>{id}</span>
+                  {/* Visible dev/debug id, but not part of the accessible name
+                      (that's the title alone) — redundant for screen-reader
+                      users and would otherwise make the name noisy. */}
+                  <span className={styles.gameId} aria-hidden="true">
+                    {id}
+                  </span>
                 </button>
               </li>
             );
