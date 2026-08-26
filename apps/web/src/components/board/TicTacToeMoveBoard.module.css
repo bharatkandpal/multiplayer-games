@@ -1,0 +1,165 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+/* Visible phase/step prompt ("N pieces left to place" / "Select a piece to
+   move" / "Choose where to move it"). A screen-reader-only live region
+   mirrors this text so assistive tech hears it without a second, competing
+   announcement racing the parent screen's move/result live region. */
+.prompt {
+  margin: 0;
+  text-align: center;
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+
+.board {
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 22rem;
+  margin: 0 auto;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  min-height: var(--size-touch-target);
+  min-width: var(--size-touch-target);
+  padding: var(--space-2);
+  border: var(--border-width-thick) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.cell:hover:not([aria-disabled="true"]) {
+  background-color: var(--color-bg-subtle);
+}
+
+.cell:active:not([aria-disabled="true"]) {
+  transform: scale(0.96);
+}
+
+.cell:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.cell[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.lastMove {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent) inset;
+}
+
+/* Step 1 of the move-phase two-step flow: the mover's own piece currently
+   picked up, awaiting a destination. Dashed ring — distinct shape, not just a
+   color swap — from the solid `.winning` ring and the `.validTarget` dots. */
+.selected {
+  border-color: var(--color-accent);
+  border-style: dashed;
+  box-shadow: 0 0 0 3px var(--color-accent) inset;
+}
+
+/* Step 2 of the move-phase two-step flow: empty cells the selected piece may
+   relocate to. A dotted inset marker (shape, not color-only) so it reads
+   distinctly even without color vision. */
+.validTarget::after {
+  content: "";
+  width: 30%;
+  height: 30%;
+  border-radius: var(--radius-full);
+  border: var(--border-width-thick) dotted var(--color-accent);
+}
+
+.winning {
+  border-color: var(--color-success);
+  background-color: var(--color-success-bg);
+  box-shadow: 0 0 0 3px var(--color-success) inset;
+  animation: winPulse var(--duration-slow) var(--ease-emphasized);
+}
+
+@keyframes winPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .winning {
+    animation: none;
+  }
+}
+
+.winningLoss {
+  border-color: var(--color-danger);
+  background-color: var(--color-danger-bg);
+  box-shadow: 0 0 0 3px var(--color-danger) inset;
+  animation: winPulse var(--duration-slow) var(--ease-emphasized);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .winningLoss {
+    animation: none;
+  }
+}
+
+.mark {
+  width: 60%;
+  height: 60%;
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  animation: pop var(--duration-base) var(--ease-emphasized);
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark {
+    animation: none;
+  }
+}
+
+.markX {
+  stroke: var(--color-player-1);
+}
+
+.markO {
+  stroke: var(--color-player-2);
+}
