@@ -2,9 +2,22 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { Result } from "@mpg/engine";
 import { TicTacToeRoute } from "./games";
+import { resultTone } from "./GamePlayScreen";
 import type { SeatsConfig } from "../game";
 import boardStyles from "../components/board/TicTacToeBoard.module.css";
+
+/** Finds the SeatCard for "Player N" and returns its root element. */
+function seatCardFor(playerNumber: number): HTMLElement {
+  const card = screen.getByText(`Player ${playerNumber}`).closest("div");
+  if (!card) throw new Error(`SeatCard for Player ${playerNumber} not found`);
+  return card;
+}
+
+function hasCrown(card: HTMLElement): boolean {
+  return card.querySelector('[class*="crown"]') !== null;
+}
 
 const BOT_THINKING_STEP_MS = 600; // fallback in ../game/motion.ts (no CSS var in jsdom)
 
@@ -369,5 +382,163 @@ describe("GamePlayScreen — bot vs. bot (watch mode)", () => {
       fireEvent.click(screen.getByRole("button", { name: "Step" }));
     });
     expect(emptyCells()).toBe(7);
+  });
+});
+
+describe("GamePlayScreen — winner crown + tone matrix (MPG-051)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("(a) human-vs-human win: celebrate (confetti, winFlash), crown on the winner only, no defeat FX", async () => {
+    vi.useRealTimers();
+    const user = userEvent.setup();
+    const seats: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
+    const { container } = render(<TicTacToeRoute seats={seats} onExit={vi.fn()} />);
+
+    // X: 0, 1, 2 (top row) — O: 3, 4 — X wins.
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 1, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 2, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 2, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Player 1 wins!");
+
+    expect(container.querySelector('[class*="confettiLayer"]')).not.toBeNull();
+    expect(container.querySelector('[class*="winFlash"]')).not.toBeNull();
+    expect(container.querySelector('[class*="loseCracks"]')).toBeNull();
+
+    expect(hasCrown(seatCardFor(1))).toBe(true);
+    expect(hasCrown(seatCardFor(2))).toBe(false);
+  });
+
+  it("(b) sole human vs. bot, human wins: celebrate + crown on the human, no defeat FX", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0); // forces the "easy" bot to always blunder to the lowest-index empty cell.
+    const seats: SeatsConfig = [{ kind: "human" }, { kind: "bot", difficulty: "easy" }];
+    const { container } = render(<TicTacToeRoute seats={seats} onExit={vi.fn()} />);
+
+    // X (human) plays 4, 2, 6 — the bot, forced to always take the lowest
+    // remaining empty cell, never touches 2/4/6: X completes the anti-diagonal.
+    fireEvent.click(screen.getByRole("gridcell", { name: "Row 2, column 2, empty" })); // 4
+    await advanceBotStep(); // bot -> 0
+    fireEvent.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" })); // 2
+    await advanceBotStep(); // bot -> 1
+    fireEvent.click(screen.getByRole("gridcell", { name: "Row 3, column 1, empty" })); // 6 -> X wins (2,4,6)
+
+    expect(screen.getByRole("status")).toHaveTextContent("You wins!");
+
+    expect(container.querySelector('[class*="confettiLayer"]')).not.toBeNull();
+    expect(container.querySelector('[class*="loseCracks"]')).toBeNull();
+    expect(hasCrown(seatCardFor(1))).toBe(true); // the human
+    expect(hasCrown(seatCardFor(2))).toBe(false); // the bot
+  });
+
+  it("(c) sole human vs. bot, human loses: subdued (cracked glass, red line), crown STILL on the winning bot, no confetti", async () => {
+    const seats: SeatsConfig = [{ kind: "human" }, { kind: "bot", difficulty: "hard" }];
+    const { container } = render(<TicTacToeRoute seats={seats} onExit={vi.fn()} />);
+
+    // Deterministic forced loss against the (never-blundering) hard bot — same
+    // sequence used elsewhere in this file.
+    fireEvent.click(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" }));
+    await advanceBotStep();
+    fireEvent.click(screen.getByRole("gridcell", { name: "Row 3, column 3, empty" }));
+    await advanceBotStep();
+    fireEvent.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
+    await advanceBotStep();
+
+    expect(screen.getByRole("status")).toHaveTextContent("Hard bot (Player 2) wins!");
+
+    expect(container.querySelector('[class*="loseCracks"]')).not.toBeNull();
+    expect(container.querySelector('[class*="confettiLayer"]')).toBeNull();
+    expect(container.querySelector('[class*="winFlash"]')).toBeNull();
+
+    // The winning bot still gets its crown even though this is the "subdued" defeat case.
+    expect(hasCrown(seatCardFor(2))).toBe(true); // the bot, winner
+    expect(hasCrown(seatCardFor(1))).toBe(false); // the human, lost
+  });
+
+  it("(d) all-bot watch, a bot wins: celebrate + crown on the winning bot", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0); // forces both "easy" bots to fill cells in strict index order.
+    const seats: SeatsConfig = [
+      { kind: "bot", difficulty: "easy" },
+      { kind: "bot", difficulty: "easy" },
+    ];
+    const { container } = render(<TicTacToeRoute seats={seats} onExit={vi.fn()} />);
+
+    // Both bots always take the lowest remaining empty cell -> cells fill in
+    // strict order 0,1,2,3,4,5,6 -> Player 1 (X, odd move count) ends up with
+    // {0,2,4,6}, completing the anti-diagonal (2,4,6) on its 4th move.
+    for (let i = 0; i < 7 && screen.queryByRole("button", { name: "Rematch" }) === null; i++) {
+      await advanceBotStep();
+    }
+
+    expect(screen.getByRole("status")).toHaveTextContent("Easy bot (Player 1) wins!");
+
+    expect(container.querySelector('[class*="confettiLayer"]')).not.toBeNull();
+    expect(container.querySelector('[class*="loseCracks"]')).toBeNull();
+    expect(hasCrown(seatCardFor(1))).toBe(true);
+    expect(hasCrown(seatCardFor(2))).toBe(false);
+  });
+
+  it("(e) draw: neutral, no crown on either seat", async () => {
+    const seats: SeatsConfig = [
+      { kind: "bot", difficulty: "hard" },
+      { kind: "bot", difficulty: "hard" },
+    ];
+    const { container } = render(<TicTacToeRoute seats={seats} onExit={vi.fn()} />);
+
+    for (let i = 0; i < 12 && screen.queryByRole("button", { name: "Rematch" }) === null; i++) {
+      await advanceBotStep();
+    }
+
+    expect(screen.getByRole("status")).toHaveTextContent("Draw — the board is full.");
+    expect(container.querySelector('[class*="confettiLayer"]')).toBeNull();
+    expect(container.querySelector('[class*="loseCracks"]')).toBeNull();
+    expect(hasCrown(seatCardFor(1))).toBe(false);
+    expect(hasCrown(seatCardFor(2))).toBe(false);
+  });
+});
+
+describe("resultTone (MPG-051)", () => {
+  const seatsHvH: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
+  const seatsSoloHumanVsBot: SeatsConfig = [{ kind: "human" }, { kind: "bot", difficulty: "hard" }];
+  const seatsAllBots: SeatsConfig = [
+    { kind: "bot", difficulty: "hard" },
+    { kind: "bot", difficulty: "hard" },
+  ];
+  const winP1: Result = { status: "win", winner: 1, line: undefined as never };
+  const winP2: Result = { status: "win", winner: 2, line: undefined as never };
+  const draw: Result = { status: "draw" };
+
+  it("a draw is always neutral, regardless of viewer perspective", () => {
+    expect(resultTone(draw, seatsHvH)).toBe("neutral");
+    expect(resultTone(draw, seatsHvH, 0)).toBe("neutral");
+    expect(resultTone(draw, seatsHvH, 1)).toBe("neutral");
+  });
+
+  it("local (viewerSeat = null): HvH and all-bot-watch wins are celebratory", () => {
+    expect(resultTone(winP1, seatsHvH)).toBe("celebrate");
+    expect(resultTone(winP2, seatsHvH)).toBe("celebrate");
+    expect(resultTone(winP1, seatsAllBots)).toBe("celebrate");
+    expect(resultTone(winP2, seatsAllBots)).toBe("celebrate");
+  });
+
+  it("local (viewerSeat = null): a sole human losing to a bot is the one subdued case", () => {
+    expect(resultTone(winP2, seatsSoloHumanVsBot)).toBe("subdued"); // bot (seat 1) wins
+    expect(resultTone(winP1, seatsSoloHumanVsBot)).toBe("celebrate"); // human (seat 0) wins
+  });
+
+  it("remote (viewerSeat set): celebrate iff the viewer's own seat won, regardless of seat kinds", () => {
+    // Not wired to any call site yet (Phase 2) — this exercises the branch directly.
+    expect(resultTone(winP1, seatsHvH, 0)).toBe("celebrate"); // viewer is seat 0 (winner)
+    expect(resultTone(winP1, seatsHvH, 1)).toBe("subdued"); // viewer is seat 1 (loser)
+    expect(resultTone(winP2, seatsHvH, 1)).toBe("celebrate");
+    expect(resultTone(winP2, seatsHvH, 0)).toBe("subdued");
   });
 });

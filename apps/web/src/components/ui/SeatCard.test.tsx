@@ -60,4 +60,29 @@ describe("SeatCard", () => {
     const { container } = render(<SeatCard seatIndex={1} kind="bot" active={false} thinking />);
     expect(container.querySelector('[class*="thinkingDots"]')).toBeNull();
   });
+
+  it("shows a crown badge with an accessible 'Winner' name when winner is true", () => {
+    const { container } = render(<SeatCard seatIndex={0} kind="human" active={false} winner />);
+    expect(container.querySelector('[class*="crown"]')).not.toBeNull();
+    // The crown emoji itself is decorative; the accessible name comes from a
+    // separate non-visual "Winner" string so it doesn't fight the aria-live
+    // result announcement elsewhere.
+    expect(screen.getByText("Winner")).toBeInTheDocument();
+    expect(container.querySelector('[class*="crown"]')).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("shows no crown/'Winner' text when winner is false (default)", () => {
+    const { container } = render(<SeatCard seatIndex={0} kind="human" active={false} />);
+    expect(container.querySelector('[class*="crown"]')).toBeNull();
+    expect(screen.queryByText("Winner")).not.toBeInTheDocument();
+  });
+
+  it("keeps the winner crown alongside the active/thinking states without disturbing them", () => {
+    const { container } = render(
+      <SeatCard seatIndex={1} kind="bot" active thinking winner={false} />,
+    );
+    expect(container.querySelector('[class*="active"]')).not.toBeNull();
+    expect(container.querySelector('[class*="thinkingDots"]')).not.toBeNull();
+    expect(container.querySelector('[class*="crown"]')).toBeNull();
+  });
 });

@@ -86,23 +86,52 @@ function resultHeadline(result: Result, seats: SeatsConfig): string {
 }
 
 /**
- * The emotional register of the terminal state (MPG-044). "Lose" framing is
- * reserved for the one configuration where it's unambiguous: a single local
- * human seat that did not win. Everything else — human-vs-human on a shared
- * device, or an all-bot watch — reads as a neutral "X wins!" outcome (no one
- * local player "lost" it), never a somber "you lost".
+ * The emotional register of the terminal state (MPG-044/051). A draw is
+ * always "neutral". For a win, the tone depends on perspective:
+ *
+ * - **Local (shared-screen) play** — `viewerSeat` is `null`, the default and
+ *   the only mode wired up today. There's no single "viewer": every seat is
+ *   visible on one shared device, so wins are celebratory by default (a win
+ *   is a win — human-vs-human, all-bot watch, or a human beating a bot).
+ *   "Lose" framing is reserved for the one configuration where it's
+ *   unambiguous: a single local human seat that did NOT win — that reads as
+ *   a somber "subdued" defeat rather than a neutral/celebratory "X wins!".
+ * - **Remote (networked 1v1) play** — `viewerSeat` identifies which seat
+ *   *this* client is playing. Every remote client has its own unambiguous
+ *   stake in the outcome, so the tone is simply "celebrate" if `viewerSeat`
+ *   won and "subdued" otherwise. This branch is NOT wired to any call site
+ *   yet (no remote/networked mode exists in the client today) — it exists so
+ *   the eventual remote integration (Phase 2) doesn't have to touch this
+ *   function, and so it's covered by unit tests now.
+ *
+ * Note the crown (who *won*, rendered on `SeatCard`) is independent of tone —
+ * it's computed separately in the render below and shown for every win,
+ * regardless of tone.
  */
 type ResultTone = "celebrate" | "subdued" | "neutral";
 
-function resultTone(result: Result, seats: SeatsConfig): ResultTone {
-  if (result.status !== "win") return "neutral"; // draw
+export function resultTone(
+  result: Result,
+  seats: SeatsConfig,
+  viewerSeat: number | null = null,
+): ResultTone {
+  if (result.status !== "win") return "neutral"; // draw / in_progress
+
+  if (viewerSeat !== null) {
+    // Remote perspective (Phase 2, not yet wired): this client's own seat won or lost.
+    return seatIndexOf(result.winner) === viewerSeat ? "celebrate" : "subdued";
+  }
+
+  // Local shared-screen perspective.
   const humanSeatIndices = seats.reduce<number[]>((acc, seat, index) => {
     if (seat.kind === "human") acc.push(index);
     return acc;
   }, []);
-  if (humanSeatIndices.length !== 1) return "neutral";
-  const [soleHumanIndex] = humanSeatIndices;
-  return seatIndexOf(result.winner) === soleHumanIndex ? "celebrate" : "subdued";
+  if (humanSeatIndices.length === 1) {
+    const [soleHumanIndex] = humanSeatIndices;
+    if (seatIndexOf(result.winner) !== soleHumanIndex) return "subdued";
+  }
+  return "celebrate";
 }
 
 /** A CSS custom property bag, for the per-particle confetti variables below. */
@@ -258,6 +287,11 @@ export function GamePlayScreen<S, M, L = unknown>({
   // see below, rather than duplicating it on the status badge too).
   const thinkingSeatIndex = thinkingSeat !== null ? seatIndexOf(thinkingSeat) : null;
 
+  // MPG-051: the crown marks who won, independent of tone/celebration — shown
+  // for every win, in every mode (including the "subdued" defeat case, where
+  // the winning bot still gets its crown). No crown on a draw.
+  const winnerSeatIndex = session.result.status === "win" ? seatIndexOf(session.result.winner) : null;
+
   const renderSeatCard = (seat: (typeof seats)[number], indexInSeats: number): ReactNode => (
     <SeatCard
       key={indexInSeats}
@@ -265,6 +299,7 @@ export function GamePlayScreen<S, M, L = unknown>({
       kind={seat.kind}
       active={!isGameOver && turnSeatIndex === indexInSeats}
       thinking={thinkingSeatIndex === indexInSeats}
+      winner={winnerSeatIndex === indexInSeats}
     />
   );
 

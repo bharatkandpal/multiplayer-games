@@ -1,4 +1,5 @@
 import { cx } from "./cx";
+import { VisuallyHidden } from "./VisuallyHidden";
 import styles from "./SeatCard.module.css";
 
 export type SeatCardKind = "human" | "bot";
@@ -16,6 +17,12 @@ export interface SeatCardProps {
    * card instead of a separate/duplicate indicator elsewhere.
    */
   thinking?: boolean;
+  /**
+   * True when this seat won the game (MPG-051). Independent of tone — shown
+   * on the winning seat in every mode, including the "subdued" defeat case
+   * (the winning bot still gets its crown). Renders a persistent 👑 badge.
+   */
+  winner?: boolean;
   className?: string | undefined;
 }
 
@@ -34,13 +41,14 @@ export function SeatCard({
   kind,
   active,
   thinking = false,
+  winner = false,
   className,
 }: SeatCardProps): React.JSX.Element {
   const colorSlot = (seatIndex % 2) + 1; // 1 or 2 — cycles for future >2-seat games.
 
   return (
     <div
-      className={cx(styles.card, active && styles.active, className)}
+      className={cx(styles.card, active && styles.active, winner && styles.winner, className)}
       data-seat-index={seatIndex}
     >
       <span
@@ -49,10 +57,24 @@ export function SeatCard({
         aria-label={kind === "bot" ? "Bot" : "Human"}
       >
         {kind === "bot" ? "🤖" : "👤"}
+        {winner ? (
+          <span className={styles.crown} aria-hidden="true">
+            👑
+          </span>
+        ) : null}
       </span>
       <span className={styles.info}>
         <span className={styles.name}>Player {seatIndex + 1}</span>
       </span>
+      {/*
+        MPG-051: the crown emoji above is purely decorative (aria-hidden) — it
+        pairs with this persistent, non-live "Winner" text so the outcome is
+        distinguishable non-visually too, without re-announcing anything (the
+        aria-live region separately announces "Player N wins!" once, on
+        game-over; this is static content encountered on navigating to the
+        seat, not an announcement).
+      */}
+      {winner ? <VisuallyHidden>Winner</VisuallyHidden> : null}
       {active && thinking ? (
         <span className={styles.thinking} aria-hidden="true">
           <span className={styles.thinkingText}>Thinking</span>
