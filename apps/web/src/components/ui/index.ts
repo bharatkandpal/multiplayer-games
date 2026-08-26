@@ -4,6 +4,9 @@ export type { ButtonProps, ButtonVariant, ButtonSize } from "./Button";
 export { StatusBadge } from "./StatusBadge";
 export type { StatusBadgeProps, StatusBadgeStatus } from "./StatusBadge";
 
+export { SeatCard } from "./SeatCard";
+export type { SeatCardProps, SeatCardKind } from "./SeatCard";
+
 export { Toast } from "./Toast";
 export type { ToastProps, ToastVariant } from "./Toast";
 

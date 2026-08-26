@@ -63,6 +63,19 @@
 }
 
 .boardWrap {
+  margin-bottom: var(--space-4);
+}
+
+/* Seat presence cards (MPG-042), one row above and one below the board. */
+.seatRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.seatRow:last-of-type {
   margin-bottom: var(--space-6);
 }
 

@@ -4,12 +4,25 @@
   margin: 0 auto;
 }
 
+/* Raised board panel: a soft outer shadow plus a subtle top highlight/bottom
+   shade on the frame itself so the board reads as a physical object sitting
+   above the page, not a flat color fill. */
 .grid {
   display: grid;
   gap: var(--space-1);
   padding: var(--space-2);
   border-radius: var(--radius-lg);
   background-color: var(--color-accent);
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0) 12%,
+    rgba(0, 0, 0, 0) 88%,
+    rgba(0, 0, 0, 0.12) 100%
+  );
+  box-shadow:
+    var(--shadow-lg),
+    0 1px 0 rgba(255, 255, 255, 0.08) inset;
 }
 
 /* Below ~390px the full gap+padding budget doesn't leave room for 7 shrinkable
@@ -61,24 +74,71 @@
 }
 
 .cell {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   aspect-ratio: 1 / 1;
 }
 
+/* The empty slot itself: an inset "hole" so unfilled cells read as punched
+   into the board rather than flat rectangles of the frame color. Sits behind
+   the disc (z-index default stacking, disc painted after in DOM order) so a
+   dropped disc still reads as sitting inside the hole, with a thin rim
+   visible around it. */
+.cell::before {
+  content: "";
+  position: absolute;
+  inset: 6%;
+  border-radius: var(--radius-full);
+  background-color: var(--color-bg);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.35),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.08);
+}
+
 .disc {
+  position: relative;
   width: 82%;
   height: 82%;
   border-radius: var(--radius-full);
-  border: var(--border-width-thin) solid rgba(0, 0, 0, 0.2);
-  animation: drop var(--duration-base) var(--ease-emphasized);
+  border: var(--border-width-thin) solid rgba(0, 0, 0, 0.25);
+  /* Soft gloss (top-left highlight) + drop shadow so discs read as physical,
+     slightly-domed pieces rather than flat color fills. */
+  background-blend-mode: normal;
+  box-shadow:
+    0 2px 3px rgba(0, 0, 0, 0.35),
+    0 1px 0 rgba(255, 255, 255, 0.15) inset;
+  animation: drop var(--duration-slow) var(--ease-emphasized);
+}
+
+/* Gloss highlight overlay, layered on top of the disc's own fill (solid or
+   striped) so both sides keep their non-color-only pattern underneath. */
+.disc::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: radial-gradient(
+    circle at 32% 28%,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.12) 30%,
+    rgba(255, 255, 255, 0) 55%
+  );
+  pointer-events: none;
 }
 
 @keyframes drop {
   from {
-    transform: translateY(-120%);
+    transform: translateY(-480%);
     opacity: 0;
+  }
+  70% {
+    transform: translateY(6%);
+    opacity: 1;
+  }
+  85% {
+    transform: translateY(-2%);
   }
   to {
     transform: translateY(0);
@@ -106,7 +166,33 @@
 }
 
 .lastMove {
-  box-shadow: 0 0 0 3px var(--color-accent-text);
+  box-shadow:
+    0 0 0 3px var(--color-accent-text),
+    0 2px 3px rgba(0, 0, 0, 0.35);
+  /* The most recently-dropped disc gets an extra little "impact" squash right
+     as it lands, on top of the base fall (MPG-043) — makes the drop feel
+     weighted rather than just a straight-line slide. */
+  animation:
+    drop var(--duration-slow) var(--ease-emphasized),
+    landImpact var(--duration-fast) var(--ease-standard) var(--duration-slow) both;
+}
+
+@keyframes landImpact {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.08, 0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lastMove {
+    animation: none;
+  }
 }
 
 /* Winning line (MPG-035): success ring + glow on the 4 winning discs. The discs

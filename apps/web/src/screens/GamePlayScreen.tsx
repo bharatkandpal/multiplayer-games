@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { GameModule, Player, Result } from "@mpg/engine";
-import { Button, Modal, StatusBadge, Toast, VisuallyHidden } from "../components/ui";
+import { Button, Modal, SeatCard, StatusBadge, Toast, VisuallyHidden } from "../components/ui";
 import type { StatusBadgeStatus } from "../components/ui";
 import {
   type AppliedMove,
@@ -113,6 +113,27 @@ export function GamePlayScreen<S, M, L = unknown>({
   // route re-supplies its concrete `L`, so this cast is safe and localized here.
   const winningLine = session.result.status === "win" ? (session.result.line as L) : null;
 
+  // MPG-042: one SeatCard per seat, split above/below the board — the primary
+  // "whose turn" signal (folds in the bot "thinking" affordance, see below,
+  // rather than duplicating it on the status badge too). First half of seats
+  // above, the rest below; works for the current 2-seat games and degrades
+  // sensibly if a future game has more seats.
+  const aboveCount = Math.ceil(seats.length / 2);
+  const seatsAbove = seats.slice(0, aboveCount);
+  const seatsBelow = seats.slice(aboveCount);
+  const thinkingSeatIndex = thinkingSeat !== null ? seatIndexOf(thinkingSeat) : null;
+
+  const renderSeatCard = (seat: (typeof seats)[number], indexInSeats: number): ReactNode => (
+    <SeatCard
+      key={indexInSeats}
+      seatIndex={indexInSeats}
+      name={describeSeat(seats, indexInSeats)}
+      kind={seat.kind}
+      active={!isGameOver && turnSeatIndex === indexInSeats}
+      thinking={thinkingSeatIndex === indexInSeats}
+    />
+  );
+
   return (
     <div className={styles.main}>
       <div className={styles.topBar}>
@@ -123,9 +144,7 @@ export function GamePlayScreen<S, M, L = unknown>({
       </div>
 
       <div className={styles.statusRow}>
-        <StatusBadge status={badgeStatus} busy={thinkingSeat !== null}>
-          {badgeText}
-        </StatusBadge>
+        <StatusBadge status={badgeStatus}>{badgeText}</StatusBadge>
       </div>
 
       {isAllBots && !isGameOver ? (
@@ -170,6 +189,10 @@ export function GamePlayScreen<S, M, L = unknown>({
         </div>
       ) : null}
 
+      <div className={styles.seatRow}>
+        {seatsAbove.map((seat, i) => renderSeatCard(seat, i))}
+      </div>
+
       <div className={styles.boardWrap}>
         {renderBoard({
           state: session.state,
@@ -179,6 +202,12 @@ export function GamePlayScreen<S, M, L = unknown>({
           winningLine,
         })}
       </div>
+
+      {seatsBelow.length > 0 ? (
+        <div className={styles.seatRow}>
+          {seatsBelow.map((seat, i) => renderSeatCard(seat, aboveCount + i))}
+        </div>
+      ) : null}
 
       <div aria-live="polite" role="status">
         <VisuallyHidden>{announcement}</VisuallyHidden>
