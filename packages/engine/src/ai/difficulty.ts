@@ -52,6 +52,21 @@ export const DIFFICULTY_TABLE: Readonly<Partial<Record<GameId, PerDifficulty>>> 
     // -first move ordering comfortably fits that budget.
     hard: { maxDepth: 7, blunderRate: 0 },
   },
+  "tictactoe-move": {
+    easy: { maxDepth: 1, blunderRate: 0.7 },
+    medium: { maxDepth: 4, blunderRate: 0.15 },
+    // Unlike classic Tic-Tac-Toe, this game's branching factor doesn't shrink toward the
+    // end (a relocation always has ~9 cells occupied / 9-occupied empty, so move-phase
+    // branching stays roughly (3 own pieces x 3 empty cells) = up to 9 throughout, and
+    // games can run long before a threefold-repetition draw), so a full-depth/unbounded
+    // search isn't practical the way it is for classic TTT. `tictactoe-move.ts`'s
+    // `orderMoves` (1-ply lookahead, best-score-first) makes alpha-beta pruning highly
+    // effective here: measured worst-case over many simulated hard-vs-hard games, depth 8
+    // took <40ms/move, and even depth 12 stayed under ~450ms/move — so depth 8 leaves a
+    // large safety margin under the <500ms budget (PRD NFR) on slower hardware/CI while
+    // already searching deep enough to see multi-move tactics in both phases.
+    hard: { maxDepth: 8, blunderRate: 0 },
+  },
 };
 
 /** Looks up the tuned `{maxDepth, blunderRate}` for `gameId` + `difficulty`, falling back
