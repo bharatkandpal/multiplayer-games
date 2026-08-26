@@ -11,13 +11,20 @@ export { useGameSession } from "./useGameSession";
 
 export { describeIllegalMoveError, describeIllegalMoveReason } from "./errorMessages";
 
-export type { BotSeatConfig, HumanSeatConfig, SeatConfig, SeatsConfig } from "./seatConfig";
+export type {
+  BotSeatConfig,
+  HumanSeatConfig,
+  OpponentPreset,
+  SeatConfig,
+  SeatsConfig,
+} from "./seatConfig";
 export {
   DEFAULT_DIFFICULTY,
   DIFFICULTIES,
   DIFFICULTY_LABEL,
   createDefaultSeats,
   describeSeat,
+  presetSeats,
 } from "./seatConfig";
 
 export { getBotThinkingDelayMs } from "./motion";

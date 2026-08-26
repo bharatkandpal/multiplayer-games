@@ -193,6 +193,59 @@ describe("GamePlayScreen — human vs. bot", () => {
   });
 });
 
+describe("GamePlayScreen — play again vs a different opponent (MPG-050)", () => {
+  it("does not render the play-again-vs group when onPlayAgain is not provided", async () => {
+    const user = userEvent.setup();
+    const seats: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
+    render(<TicTacToeRoute seats={seats} onExit={vi.fn()} />);
+
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 1, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 2, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 2, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
+
+    expect(screen.getByRole("button", { name: "Rematch" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Start a new game" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Play vs Bot/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Play a friend/ })).not.toBeInTheDocument();
+  });
+
+  it("offers 'Play vs Bot' / 'Play a friend' presets on game over, alongside a still-focused Rematch", async () => {
+    const user = userEvent.setup();
+    const onPlayAgain = vi.fn();
+    const seats: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
+    render(<TicTacToeRoute seats={seats} onExit={vi.fn()} onPlayAgain={onPlayAgain} />);
+
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 1, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 2, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 2, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
+
+    // Rematch is still the primary, auto-focused action.
+    const rematchButton = screen.getByRole("button", { name: "Rematch" });
+    expect(rematchButton).toHaveFocus();
+
+    const group = screen.getByRole("group", { name: "Start a new game" });
+    expect(group).toBeInTheDocument();
+
+    const vsBotButton = screen.getByRole("button", { name: /Play vs Bot/ });
+    const vsFriendButton = screen.getByRole("button", { name: /Play a friend/ });
+
+    await user.click(vsFriendButton);
+    expect(onPlayAgain).toHaveBeenCalledTimes(1);
+    expect(onPlayAgain).toHaveBeenLastCalledWith([{ kind: "human" }, { kind: "human" }]);
+
+    await user.click(vsBotButton);
+    expect(onPlayAgain).toHaveBeenCalledTimes(2);
+    expect(onPlayAgain).toHaveBeenLastCalledWith([
+      { kind: "human" },
+      { kind: "bot", difficulty: "medium" },
+    ]);
+  });
+});
+
 describe("GamePlayScreen — bot vs. bot (watch mode)", () => {
   beforeEach(() => {
     vi.useFakeTimers();

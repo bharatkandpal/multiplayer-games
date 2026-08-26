@@ -41,6 +41,24 @@ export function createDefaultSeats(seatCount = 2): SeatsConfig {
   );
 }
 
+/**
+ * The two one-tap opponent presets offered on both the Setup screen and the
+ * game-over "play again" actions (MPG-049/MPG-050) — kept as a single source
+ * of truth so the two surfaces can't drift out of sync.
+ */
+export type OpponentPreset = "bot" | "human";
+
+/**
+ * Build a fresh seats config for one of the two quick-start presets:
+ * "bot" — seat 1 human, every other seat a medium bot (same as
+ * `createDefaultSeats`); "human" — every seat human (local pass-and-play).
+ */
+export function presetSeats(preset: OpponentPreset, playerCount = 2): SeatsConfig {
+  return preset === "bot"
+    ? createDefaultSeats(playerCount)
+    : Array.from({ length: playerCount }, () => ({ kind: "human" as const }));
+}
+
 export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   easy: "Easy",
   medium: "Medium",

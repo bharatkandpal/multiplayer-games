@@ -45,9 +45,10 @@ function GameRoute({
   gameId,
   seats,
   onExit,
+  onPlayAgain,
 }: { gameId: GameId } & GameRouteProps): React.JSX.Element {
   const Route = GAME_ROUTES[gameId] ?? ConnectFourRoute;
-  return <Route seats={seats} onExit={onExit} />;
+  return <Route seats={seats} onExit={onExit} {...(onPlayAgain ? { onPlayAgain } : {})} />;
 }
 
 /**
@@ -59,6 +60,12 @@ export default function App(): React.JSX.Element {
   const games = useMemo(() => listGames(), []);
   const { theme, resolvedTheme, cycleTheme } = useTheme();
   const [route, setRoute] = useState<Route>({ screen: "home" });
+  // MPG-050: `useLocalPlayController` only (re-)initializes its session on
+  // mount, so starting a genuinely fresh game (different opponents, not a
+  // same-seats Rematch) needs the whole play screen to remount rather than
+  // just receiving new `seats` props. Bumped every time a fresh game starts
+  // and folded into the route's React `key` below.
+  const [playNonce, setPlayNonce] = useState(0);
 
   return (
     <main className={styles.main}>
@@ -89,9 +96,14 @@ export default function App(): React.JSX.Element {
 
       {route.screen === "play" ? (
         <GameRoute
+          key={playNonce}
           gameId={route.gameId}
           seats={route.seats}
           onExit={() => setRoute({ screen: "home" })}
+          onPlayAgain={(seats) => {
+            setPlayNonce((n) => n + 1);
+            setRoute({ screen: "play", gameId: route.gameId, seats });
+          }}
         />
       ) : null}
 

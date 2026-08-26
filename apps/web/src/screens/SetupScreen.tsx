@@ -6,6 +6,7 @@ import {
   DIFFICULTY_LABEL,
   DEFAULT_DIFFICULTY,
   createDefaultSeats,
+  presetSeats,
   type SeatConfig,
   type SeatsConfig,
 } from "../game";
@@ -88,11 +89,6 @@ function SeatEditor({ index, seat, onChange }: SeatEditorProps): React.JSX.Eleme
   );
 }
 
-/** Preset: every seat human (local pass-and-play). */
-function vsFriendSeats(playerCount: number): SeatsConfig {
-  return Array.from({ length: playerCount }, () => ({ kind: "human" }));
-}
-
 /**
  * Seat-configuration screen (MPG-009/MPG-024/MPG-049). Leads with two
  * one-tap presets ("Play vs Bot" / "Play a friend") that start the game
@@ -123,7 +119,7 @@ export function SetupScreen({ gameId, onStart, onBack }: SetupScreenProps): Reac
         <Button
           variant="primary"
           className={styles.quickOption}
-          onClick={() => onStart(createDefaultSeats(playerCount))}
+          onClick={() => onStart(presetSeats("bot", playerCount))}
         >
           <span className={styles.quickContent}>
             <span className={styles.quickIcon} aria-hidden="true">
@@ -136,7 +132,7 @@ export function SetupScreen({ gameId, onStart, onBack }: SetupScreenProps): Reac
         <Button
           variant="primary"
           className={styles.quickOption}
-          onClick={() => onStart(vsFriendSeats(playerCount))}
+          onClick={() => onStart(presetSeats("human", playerCount))}
         >
           <span className={styles.quickContent}>
             <span className={styles.quickIcon} aria-hidden="true">

@@ -84,7 +84,8 @@
    one clear next action, below the board. */
 .resultActions {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   gap: var(--space-3);
   margin-bottom: var(--space-6);
 }
@@ -94,6 +95,27 @@
   margin-right: var(--space-2);
   font-size: 1.1em;
   line-height: 1;
+}
+
+/* MPG-050: secondary "play again vs a different opponent" group — visually
+   subordinate to the primary Rematch action above it. */
+.playAgainGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.playAgainLabel {
+  font-size: var(--font-size-200);
+  color: var(--color-text-muted);
+}
+
+.playAgainButtons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
 }
 
 /* ------------------------------------------------------------------ */

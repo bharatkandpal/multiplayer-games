@@ -13,6 +13,7 @@ import { GAME_CATALOG } from "./HomeScreen";
 export interface GameRouteProps {
   seats: SeatsConfig;
   onExit: () => void;
+  onPlayAgain?: (seats: SeatsConfig) => void;
 }
 
 function describeTicTacToeMove(move: { cell: number }, player: Player): string {
@@ -22,7 +23,7 @@ function describeTicTacToeMove(move: { cell: number }, player: Player): string {
   return `${mark} placed at row ${row}, column ${col}`;
 }
 
-export function TicTacToeRoute({ seats, onExit }: GameRouteProps): React.JSX.Element {
+export function TicTacToeRoute({ seats, onExit, onPlayAgain }: GameRouteProps): React.JSX.Element {
   return (
     <GamePlayScreen
       game={ticTacToe}
@@ -30,6 +31,7 @@ export function TicTacToeRoute({ seats, onExit }: GameRouteProps): React.JSX.Ele
       seats={seats}
       describeMove={describeTicTacToeMove}
       onExit={onExit}
+      {...(onPlayAgain ? { onPlayAgain } : {})}
       renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <TicTacToeBoard
           state={state}
@@ -58,7 +60,11 @@ function describeTicTacToeMoveMove(move: TicTacToeMoveMove, player: Player): str
   return `${mark} moved from row ${fromRow}, column ${fromCol} to row ${toRow}, column ${toCol}`;
 }
 
-export function TicTacToeMoveRoute({ seats, onExit }: GameRouteProps): React.JSX.Element {
+export function TicTacToeMoveRoute({
+  seats,
+  onExit,
+  onPlayAgain,
+}: GameRouteProps): React.JSX.Element {
   return (
     <GamePlayScreen
       game={ticTacToeMove}
@@ -66,6 +72,7 @@ export function TicTacToeMoveRoute({ seats, onExit }: GameRouteProps): React.JSX
       seats={seats}
       describeMove={describeTicTacToeMoveMove}
       onExit={onExit}
+      {...(onPlayAgain ? { onPlayAgain } : {})}
       renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <TicTacToeMoveBoard
           state={state}
@@ -84,7 +91,11 @@ function describeConnectFourMove(move: { column: number }, player: Player): stri
   return `Player ${player} dropped a disc in column ${move.column + 1}`;
 }
 
-export function ConnectFourRoute({ seats, onExit }: GameRouteProps): React.JSX.Element {
+export function ConnectFourRoute({
+  seats,
+  onExit,
+  onPlayAgain,
+}: GameRouteProps): React.JSX.Element {
   return (
     <GamePlayScreen
       game={connectFour}
@@ -92,6 +103,7 @@ export function ConnectFourRoute({ seats, onExit }: GameRouteProps): React.JSX.E
       seats={seats}
       describeMove={describeConnectFourMove}
       onExit={onExit}
+      {...(onPlayAgain ? { onPlayAgain } : {})}
       renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <ConnectFourBoard
           state={state}

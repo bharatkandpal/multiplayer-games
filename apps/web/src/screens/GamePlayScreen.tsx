@@ -8,6 +8,7 @@ import {
   type SeatsConfig,
   type WatchSpeed,
   describeSeat,
+  presetSeats,
   useLocalPlayController,
 } from "../game";
 import styles from "./GamePlayScreen.module.css";
@@ -36,6 +37,15 @@ export interface GamePlayScreenProps<S, M, L = unknown> {
   /** Plain-language description of one move, for the screen-reader live region. */
   describeMove: (move: M, player: Player) => string;
   onExit: () => void;
+  /**
+   * MPG-050: start a brand-new game against a different opponent preset
+   * (rather than a same-opponent Rematch). When provided, the game-over
+   * actions show a secondary "Play again vs…" group alongside Rematch. The
+   * caller is responsible for actually restarting the session — typically by
+   * remounting the play screen with the new seats (the local-play controller
+   * only re-initializes on mount).
+   */
+  onPlayAgain?: (seats: SeatsConfig) => void;
 }
 
 /** Players are 1-based (`Player`); seats are 0-based array indices — works for any seat count. */
@@ -154,6 +164,7 @@ export function GamePlayScreen<S, M, L = unknown>({
   renderBoard,
   describeMove,
   onExit,
+  onPlayAgain,
 }: GamePlayScreenProps<S, M, L>): React.JSX.Element {
   const {
     session,
@@ -332,6 +343,28 @@ export function GamePlayScreen<S, M, L = unknown>({
             </span>
             Rematch
           </Button>
+
+          {onPlayAgain ? (
+            <div className={styles.playAgainGroup} role="group" aria-label="Start a new game">
+              <span className={styles.playAgainLabel}>or play again vs…</span>
+              <div className={styles.playAgainButtons}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => onPlayAgain(presetSeats("bot", seats.length))}
+                >
+                  <span aria-hidden="true">🤖</span> Play vs Bot
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => onPlayAgain(presetSeats("human", seats.length))}
+                >
+                  <span aria-hidden="true">👥</span> Play a friend
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
