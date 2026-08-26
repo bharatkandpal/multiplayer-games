@@ -2,9 +2,9 @@ import { useId, useState } from "react";
 import type { Difficulty, GameId } from "@mpg/engine";
 import { Button } from "../components/ui";
 import {
-  DEFAULT_DIFFICULTY,
   DIFFICULTIES,
   DIFFICULTY_LABEL,
+  DEFAULT_DIFFICULTY,
   createDefaultSeats,
   type SeatConfig,
   type SeatsConfig,
@@ -88,13 +88,6 @@ function SeatEditor({ index, seat, onChange }: SeatEditorProps): React.JSX.Eleme
   );
 }
 
-/** Preset: one human seat, every other seat a medium bot. */
-function vsBotSeats(playerCount: number): SeatsConfig {
-  return Array.from({ length: playerCount }, (_, index) =>
-    index === 0 ? { kind: "human" } : { kind: "bot", difficulty: DEFAULT_DIFFICULTY },
-  );
-}
-
 /** Preset: every seat human (local pass-and-play). */
 function vsFriendSeats(playerCount: number): SeatsConfig {
   return Array.from({ length: playerCount }, () => ({ kind: "human" }));
@@ -127,33 +120,38 @@ export function SetupScreen({ gameId, onStart, onBack }: SetupScreenProps): Reac
       <h1 className={styles.heading}>Set up {title}</h1>
 
       <div className={styles.quickStart}>
-        <button
-          type="button"
+        <Button
+          variant="primary"
           className={styles.quickOption}
-          onClick={() => onStart(vsBotSeats(playerCount))}
+          onClick={() => onStart(createDefaultSeats(playerCount))}
         >
-          <span className={styles.quickIcon} aria-hidden="true">
-            🤖
+          <span className={styles.quickContent}>
+            <span className={styles.quickIcon} aria-hidden="true">
+              🤖
+            </span>
+            <span className={styles.quickLabel}>Play vs Bot</span>
+            <span className={styles.quickHint}>You vs a medium bot — starts right away</span>
           </span>
-          <span className={styles.quickLabel}>Play vs Bot</span>
-          <span className={styles.quickHint}>You vs a medium bot — starts right away</span>
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="primary"
           className={styles.quickOption}
           onClick={() => onStart(vsFriendSeats(playerCount))}
         >
-          <span className={styles.quickIcon} aria-hidden="true">
-            👥
+          <span className={styles.quickContent}>
+            <span className={styles.quickIcon} aria-hidden="true">
+              👥
+            </span>
+            <span className={styles.quickLabel}>Play a friend</span>
+            <span className={styles.quickHint}>Everyone&apos;s human, take turns on this device</span>
           </span>
-          <span className={styles.quickLabel}>Play a friend</span>
-          <span className={styles.quickHint}>Everyone&apos;s human, take turns on this device</span>
-        </button>
+        </Button>
       </div>
 
       <div className={styles.customizeSection}>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           className={styles.customizeToggle}
           aria-expanded={customizeOpen}
           aria-controls={customizeId}
@@ -163,7 +161,7 @@ export function SetupScreen({ gameId, onStart, onBack }: SetupScreenProps): Reac
             ▸
           </span>
           Customize seats
-        </button>
+        </Button>
 
         <div
           id={customizeId}

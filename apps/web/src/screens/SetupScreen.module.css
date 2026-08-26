@@ -21,32 +21,28 @@
   margin-bottom: var(--space-6);
 }
 
-.quickOption {
+/*
+ * Both quick-preset options and the Customize toggle below are composed
+ * from the shared `Button` component (not raw <button>s) so they inherit
+ * its full interaction-state set for free — hover, :active pressed
+ * feedback, focus-visible ring, disabled/loading — straight from
+ * Button.module.css (UX_PRINCIPLES §3). The rules here only adjust layout
+ * (size/shape); `.quickOption.quickOption` doubles the class selector so
+ * these overrides reliably win over Button's own base/size rules by
+ * specificity, regardless of CSS import order.
+ */
+.quickOption.quickOption {
+  min-height: 8rem;
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-lg);
+}
+
+.quickContent {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
-  min-height: 8rem;
-  padding: var(--space-5) var(--space-4);
-  border: var(--border-width-thick) solid var(--color-accent);
-  border-radius: var(--radius-lg);
-  background-color: var(--color-accent);
-  color: var(--color-on-accent);
-  font-family: inherit;
-  cursor: pointer;
   text-align: center;
-  transition:
-    transform var(--duration-fast) var(--ease-standard),
-    background-color var(--duration-fast) var(--ease-standard);
-}
-
-.quickOption:hover {
-  transform: translateY(-2px);
-}
-
-.quickOption:focus-visible {
-  outline: var(--border-width-thick) solid var(--color-focus-ring);
-  outline-offset: 3px;
 }
 
 .quickIcon {
@@ -65,43 +61,8 @@
   opacity: 0.9;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .quickOption {
-    transition: none;
-  }
-
-  .quickOption:hover {
-    transform: none;
-  }
-}
-
 .customizeSection {
   margin-bottom: var(--space-6);
-}
-
-.customizeToggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--size-touch-target);
-  padding: var(--space-2) var(--space-3);
-  border: none;
-  border-radius: var(--radius-md);
-  background: none;
-  color: var(--color-text-muted);
-  font-family: inherit;
-  font-size: var(--font-size-200);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-}
-
-.customizeToggle:hover {
-  color: var(--color-text);
-}
-
-.customizeToggle:focus-visible {
-  outline: var(--border-width-thick) solid var(--color-focus-ring);
-  outline-offset: 2px;
 }
 
 .customizeChevron {
@@ -111,12 +72,6 @@
 
 .customizeChevron[data-open="true"] {
   transform: rotate(90deg);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .customizeChevron {
-    transition: none;
-  }
 }
 
 .customizeBody {
