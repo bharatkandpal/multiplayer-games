@@ -12,6 +12,18 @@ export type { IllegalMoveReason } from "./errors";
 export { registerGame, getGame, hasGame, listGames, clearRegistry } from "./registry";
 export type { AnyGameModule } from "./registry";
 
+// Real-time arcade game family (ADR 0002) — a sibling of the turn-based surface
+// above, with its own module interface, id union, and registry.
+export type { RealtimeModule, RealtimeGameId } from "./realtime";
+export {
+  registerRealtimeGame,
+  getRealtimeGame,
+  hasRealtimeGame,
+  listRealtimeGames,
+  clearRealtimeRegistry,
+} from "./realtime-registry";
+export type { AnyRealtimeModule } from "./realtime-registry";
+
 export { ticTacToe } from "./tictactoe";
 export type { TicTacToeState, TicTacToeMove, TicTacToeLine, Cell } from "./tictactoe";
 
