@@ -1,4 +1,4 @@
-import { ENGINE_VERSION, connectFour, ticTacToe } from "@mpg/engine";
+import { ENGINE_VERSION, connectFour, ticTacToe, ticTacToeMove } from "@mpg/engine";
 import type { GameId } from "@mpg/engine";
 import { Button } from "../components/ui";
 import styles from "./HomeScreen.module.css";
@@ -26,6 +26,13 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
     title: "Connect Four",
     description: "Drop discs, connect four in a row. 7 columns, 6 rows.",
     playerCount: connectFour.playerCount,
+  },
+  "tictactoe-move": {
+    id: "tictactoe-move",
+    title: "Move-Mode Tic-Tac-Toe",
+    description:
+      "Only 3 pieces each — place them, then move one to any empty square per turn. Get three in a row to win (no draws by filling up).",
+    playerCount: ticTacToeMove.playerCount,
   },
 };
 

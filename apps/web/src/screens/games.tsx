@@ -3,9 +3,9 @@
 // purpose — all the actual orchestration lives in the shared, engine-agnostic
 // pieces (GamePlayScreen, useLocalPlayController).
 
-import { connectFour, ticTacToe } from "@mpg/engine";
-import type { Player } from "@mpg/engine";
-import { ConnectFourBoard, TicTacToeBoard } from "../components/board";
+import { connectFour, ticTacToe, ticTacToeMove } from "@mpg/engine";
+import type { Player, TicTacToeMoveMove } from "@mpg/engine";
+import { ConnectFourBoard, TicTacToeBoard, TicTacToeMoveBoard } from "../components/board";
 import type { SeatsConfig } from "../game";
 import { GamePlayScreen } from "./GamePlayScreen";
 import { GAME_CATALOG } from "./HomeScreen";
@@ -32,6 +32,42 @@ export function TicTacToeRoute({ seats, onExit }: GameRouteProps): React.JSX.Ele
       onExit={onExit}
       renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <TicTacToeBoard
+          state={state}
+          onMove={onMove}
+          disabled={disabled}
+          lastMove={lastMove}
+          winningLine={winningLine}
+          winningLineTone={winningLineTone ?? "win"}
+        />
+      )}
+    />
+  );
+}
+
+function describeTicTacToeMoveMove(move: TicTacToeMoveMove, player: Player): string {
+  const mark = player === 1 ? "X" : "O";
+  if (move.kind === "place") {
+    const row = Math.floor(move.cell / 3) + 1;
+    const col = (move.cell % 3) + 1;
+    return `${mark} placed at row ${row}, column ${col}`;
+  }
+  const fromRow = Math.floor(move.from / 3) + 1;
+  const fromCol = (move.from % 3) + 1;
+  const toRow = Math.floor(move.to / 3) + 1;
+  const toCol = (move.to % 3) + 1;
+  return `${mark} moved from row ${fromRow}, column ${fromCol} to row ${toRow}, column ${toCol}`;
+}
+
+export function TicTacToeMoveRoute({ seats, onExit }: GameRouteProps): React.JSX.Element {
+  return (
+    <GamePlayScreen
+      game={ticTacToeMove}
+      gameTitle={GAME_CATALOG["tictactoe-move"]?.title ?? "Move-Mode Tic-Tac-Toe"}
+      seats={seats}
+      describeMove={describeTicTacToeMoveMove}
+      onExit={onExit}
+      renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
+        <TicTacToeMoveBoard
           state={state}
           onMove={onMove}
           disabled={disabled}

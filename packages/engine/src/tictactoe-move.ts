@@ -212,6 +212,22 @@ function evaluate(state: TicTacToeMoveState, forPlayer: Player): number {
   return score;
 }
 
+/**
+ * Orders moves by a 1-ply lookahead (the resulting position's `evaluate` score for the
+ * mover), descending — winning/strong moves first. Unlike Connect Four's static
+ * center-first ordering, this game has no fixed "best" cell (a relocation's value depends
+ * entirely on the current board), so a cheap lookahead is used instead. This meaningfully
+ * improves alpha-beta pruning in the move phase, where the branching factor (own pieces x
+ * empty cells) doesn't shrink over time the way classic Tic-Tac-Toe's does.
+ */
+function orderMoves(state: TicTacToeMoveState, moves: TicTacToeMoveMove[]): TicTacToeMoveMove[] {
+  const mover = currentPlayer(state);
+  return moves
+    .map((move) => ({ move, score: evaluate(applyMove(state, move, mover), mover) }))
+    .sort((a, b) => b.score - a.score)
+    .map(({ move }) => move);
+}
+
 function createInitialState(): TicTacToeMoveState {
   const board = new Array<Cell>(BOARD_SIZE).fill(null);
   return { board, toMove: PLAYER_X, history: [positionKey(board, PLAYER_X)] };
@@ -228,4 +244,5 @@ export const ticTacToeMove: GameModule<TicTacToeMoveState, TicTacToeMoveMove, Ti
     getResult,
     currentPlayer,
     evaluate,
+    orderMoves,
   };
