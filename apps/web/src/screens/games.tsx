@@ -26,7 +26,7 @@ export function TicTacToeRoute({ seats, onExit }: GameRouteProps): React.JSX.Ele
   return (
     <GamePlayScreen
       game={ticTacToe}
-      gameTitle={GAME_CATALOG.tictactoe.title}
+      gameTitle={GAME_CATALOG.tictactoe?.title ?? "Tic-Tac-Toe"}
       seats={seats}
       describeMove={describeTicTacToeMove}
       onExit={onExit}
@@ -52,7 +52,7 @@ export function ConnectFourRoute({ seats, onExit }: GameRouteProps): React.JSX.E
   return (
     <GamePlayScreen
       game={connectFour}
-      gameTitle={GAME_CATALOG.connect4.title}
+      gameTitle={GAME_CATALOG.connect4?.title ?? "Connect Four"}
       seats={seats}
       describeMove={describeConnectFourMove}
       onExit={onExit}

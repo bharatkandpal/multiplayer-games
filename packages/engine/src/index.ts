@@ -15,6 +15,13 @@ export type { AnyGameModule } from "./registry";
 export { ticTacToe } from "./tictactoe";
 export type { TicTacToeState, TicTacToeMove, TicTacToeLine, Cell } from "./tictactoe";
 
+export { ticTacToeMove } from "./tictactoe-move";
+export type {
+  TicTacToeMoveState,
+  TicTacToeMoveMove,
+  TicTacToeMoveLine,
+} from "./tictactoe-move";
+
 export { connectFour } from "./connect4";
 export type {
   ConnectFourState,

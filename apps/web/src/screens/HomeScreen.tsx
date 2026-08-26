@@ -11,7 +11,10 @@ export interface GameCatalogEntry {
   readonly playerCount: number;
 }
 
-export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
+// Partial, not exhaustive: a game can exist in the engine registry before it's
+// surfaced in the UI (e.g. a new variant whose board/route land in a later task).
+// Home only shows games that have a catalog entry (see filter below).
+export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
   tictactoe: {
     id: "tictactoe",
     title: "Tic-Tac-Toe",
@@ -51,14 +54,18 @@ export function HomeScreen({
       </p>
 
       <h2 className={styles.sectionHeading}>Choose a game</h2>
-      {games.length === 0 ? (
+      {(() => {
+        // Only present games that have a catalog entry (title/description/route
+        // wiring exists). Engine-registered games not yet surfaced are hidden.
+        const shownGames = games.filter((id) => GAME_CATALOG[id]);
+        return shownGames.length === 0 ? (
         <p className={styles.empty}>
           No games are available right now. Try reloading the page — if that doesn&apos;t help, this
           is a bug, not something you did.
         </p>
       ) : (
         <ul className={styles.gameGrid} aria-label="Available games">
-          {games.map((id) => {
+          {shownGames.map((id) => {
             const entry = GAME_CATALOG[id];
             return (
               <li key={id}>
@@ -71,7 +78,8 @@ export function HomeScreen({
             );
           })}
         </ul>
-      )}
+        );
+      })()}
 
       <footer className={styles.footer}>
         <p>

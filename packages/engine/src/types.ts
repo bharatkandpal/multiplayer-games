@@ -12,7 +12,7 @@ export type Player = number;
  * Known games for the POC. This is a closed union today; when games become installable
  * npm plugins (v2 / MPG-031) this widens to an open `string` behind the registry.
  */
-export type GameId = "connect4" | "tictactoe";
+export type GameId = "connect4" | "tictactoe" | "tictactoe-move";
 
 /** Bot strength. Difficulty is a property of a seat, not a room — rooms may mix levels. */
 export type Difficulty = "easy" | "medium" | "hard";
