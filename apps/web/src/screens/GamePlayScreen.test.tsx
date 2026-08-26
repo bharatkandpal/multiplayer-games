@@ -412,7 +412,9 @@ describe("GamePlayScreen — winner crown + tone matrix (MPG-051)", () => {
 
     expect(container.querySelector('[class*="confettiLayer"]')).not.toBeNull();
     expect(container.querySelector('[class*="winFlash"]')).not.toBeNull();
-    expect(container.querySelector('[class*="loseCracks"]')).toBeNull();
+    expect(container.querySelector('[class*="loseVeil"]')).toBeNull();
+    expect(container.querySelector('[class*="ashLayer"]')).toBeNull();
+    expect(container.querySelector('[class*="drawStalemate"]')).toBeNull();
 
     expect(hasCrown(seatCardFor(1))).toBe(true);
     expect(hasCrown(seatCardFor(2))).toBe(false);
@@ -434,12 +436,13 @@ describe("GamePlayScreen — winner crown + tone matrix (MPG-051)", () => {
     expect(screen.getByRole("status")).toHaveTextContent("You wins!");
 
     expect(container.querySelector('[class*="confettiLayer"]')).not.toBeNull();
-    expect(container.querySelector('[class*="loseCracks"]')).toBeNull();
+    expect(container.querySelector('[class*="loseVeil"]')).toBeNull();
+    expect(container.querySelector('[class*="ashLayer"]')).toBeNull();
     expect(hasCrown(seatCardFor(1))).toBe(true); // the human
     expect(hasCrown(seatCardFor(2))).toBe(false); // the bot
   });
 
-  it("(c) sole human vs. bot, human loses: subdued (cracked glass, red line), crown STILL on the winning bot, no confetti", async () => {
+  it("(c) sole human vs. bot, human loses: subdued (defeat gloom + ashfall, red line), crown STILL on the winning bot, no confetti", async () => {
     const seats: SeatsConfig = [{ kind: "human" }, { kind: "bot", difficulty: "hard" }];
     const { container } = render(<TicTacToeRoute seats={seats} onExit={vi.fn()} />);
 
@@ -454,7 +457,8 @@ describe("GamePlayScreen — winner crown + tone matrix (MPG-051)", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("Hard bot (Player 2) wins!");
 
-    expect(container.querySelector('[class*="loseCracks"]')).not.toBeNull();
+    expect(container.querySelector('[class*="loseVeil"]')).not.toBeNull();
+    expect(container.querySelector('[class*="ashLayer"]')).not.toBeNull();
     expect(container.querySelector('[class*="confettiLayer"]')).toBeNull();
     expect(container.querySelector('[class*="winFlash"]')).toBeNull();
 
@@ -481,12 +485,13 @@ describe("GamePlayScreen — winner crown + tone matrix (MPG-051)", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Easy bot (Player 1) wins!");
 
     expect(container.querySelector('[class*="confettiLayer"]')).not.toBeNull();
-    expect(container.querySelector('[class*="loseCracks"]')).toBeNull();
+    expect(container.querySelector('[class*="loseVeil"]')).toBeNull();
+    expect(container.querySelector('[class*="ashLayer"]')).toBeNull();
     expect(hasCrown(seatCardFor(1))).toBe(true);
     expect(hasCrown(seatCardFor(2))).toBe(false);
   });
 
-  it("(e) draw: neutral, no crown on either seat", async () => {
+  it("(e) draw: neutral (stalemate FX, no confetti/defeat FX), no crown on either seat", async () => {
     const seats: SeatsConfig = [
       { kind: "bot", difficulty: "hard" },
       { kind: "bot", difficulty: "hard" },
@@ -498,8 +503,10 @@ describe("GamePlayScreen — winner crown + tone matrix (MPG-051)", () => {
     }
 
     expect(screen.getByRole("status")).toHaveTextContent("Draw — the board is full.");
+    expect(container.querySelector('[class*="drawStalemate"]')).not.toBeNull();
     expect(container.querySelector('[class*="confettiLayer"]')).toBeNull();
-    expect(container.querySelector('[class*="loseCracks"]')).toBeNull();
+    expect(container.querySelector('[class*="loseVeil"]')).toBeNull();
+    expect(container.querySelector('[class*="ashLayer"]')).toBeNull();
     expect(hasCrown(seatCardFor(1))).toBe(false);
     expect(hasCrown(seatCardFor(2))).toBe(false);
   });

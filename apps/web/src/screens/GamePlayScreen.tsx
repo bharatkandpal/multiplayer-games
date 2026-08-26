@@ -166,28 +166,61 @@ function ConfettiBurst(): React.JSX.Element {
   );
 }
 
+const ASH_COUNT = 30;
+
 /**
- * Cracked-glass "defeat" overlay (MPG-047, tone === "subdued") — an inline SVG
- * of jagged fracture lines that snap in over the board (with a brief board
- * shake, applied on `.boardWrap`); the bot's winning line is recolored red by
- * the board itself. Replaces the earlier water/emoji treatment. Decorative
- * only (`aria-hidden`); reduced-motion draws the cracks instantly, no shake.
+ * A slow, grey "ashfall" (tone === "subdued") — the somber mirror of the
+ * winner's confetti: desaturated flecks drift down across the whole viewport,
+ * fewer/slower/dimmer than confetti, no bright hues. Same pure-CSS,
+ * index-derived approach (no Math.random, so it's stable across
+ * re-renders/tests). Decorative only (`aria-hidden`); the outcome is announced
+ * via the live region.
  */
-function CrackedGlass(): React.JSX.Element {
+function AshFall(): React.JSX.Element {
   return (
-    <div className={styles.loseCracks} aria-hidden="true">
-      <svg className={styles.crackSvg} viewBox="0 0 100 100" preserveAspectRatio="none">
-        <g className={styles.crackGroup}>
-          <polyline points="50,48 41,29 45,10" />
-          <polyline points="50,48 69,39 90,42" />
-          <polyline points="50,48 57,71 51,93" />
-          <polyline points="50,48 29,58 7,63" />
-          <polyline points="41,29 22,20" />
-          <polyline points="69,39 76,19" />
-          <polyline points="57,71 78,79" />
-          <polyline points="29,58 20,80" />
-        </g>
-      </svg>
+    <div className={styles.ashLayer} aria-hidden="true">
+      {Array.from({ length: ASH_COUNT }, (_, i) => {
+        const vars: ConfettiVars = {
+          "--x": `${(i * 41) % 100}%`,
+          "--delay": `${(i % 10) * 140}ms`,
+          "--duration": `${4200 + (i % 5) * 360}ms`,
+          "--drift": `${((i * 29) % 60) - 30}px`,
+          "--scale": `${0.55 + ((i * 17) % 55) / 100}`,
+          "--shade": `${58 + ((i * 23) % 26)}%`,
+        };
+        return <span key={i} className={styles.ashPiece} style={vars} />;
+      })}
+    </div>
+  );
+}
+
+/**
+ * Defeat "gloom" (tone === "subdued") — replaces the earlier cracked-glass
+ * treatment, which read as a broken screen/error rather than a loss. A dark
+ * vignette closes in from the board edges (the light draining out) while the
+ * board gives one heavy downward "sink" (`.boardSink` on the wrap); the winning
+ * line is recolored red by the board itself, and grey ash (`AshFall`, rendered
+ * viewport-wide at the top level) drifts down. Decorative only (`aria-hidden`);
+ * reduced-motion settles to the final vignette instantly, no sink.
+ */
+function DefeatGloom(): React.JSX.Element {
+  return <div className={styles.loseVeil} aria-hidden="true" />;
+}
+
+/**
+ * Draw "stalemate" (tone === "neutral") — the previously-empty draw case now
+ * gets its own signal: two neutral bars slide in from opposite edges and meet
+ * dead-center, where a soft pulse blooms — two evenly-matched sides deadlocked,
+ * no winner. Symmetric by construction, so it can't read as either side
+ * prevailing. Decorative only (`aria-hidden`); reduced-motion shows the met
+ * state instantly.
+ */
+function DrawStalemate(): React.JSX.Element {
+  return (
+    <div className={styles.drawStalemate} aria-hidden="true">
+      <span className={cx(styles.drawBar, styles.drawBarLeft)} />
+      <span className={cx(styles.drawBar, styles.drawBarRight)} />
+      <span className={styles.drawSpark} />
     </div>
   );
 }
@@ -364,7 +397,7 @@ export function GamePlayScreen<S, M, L = unknown>({
       </div>
 
       <div
-        className={cx(styles.boardWrap, isGameOver && tone === "subdued" && styles.boardShake)}
+        className={cx(styles.boardWrap, isGameOver && tone === "subdued" && styles.boardSink)}
       >
         {renderBoard({
           state: session.state,
@@ -379,7 +412,8 @@ export function GamePlayScreen<S, M, L = unknown>({
             aria-hidden — the outcome itself is carried by the live region
             below, not by these effects. */}
         {isGameOver && tone === "celebrate" ? <div className={styles.winFlash} aria-hidden="true" /> : null}
-        {isGameOver && tone === "subdued" ? <CrackedGlass /> : null}
+        {isGameOver && tone === "subdued" ? <DefeatGloom /> : null}
+        {isGameOver && tone === "neutral" ? <DrawStalemate /> : null}
       </div>
 
       <div aria-live="polite" role="status">
@@ -428,9 +462,11 @@ export function GamePlayScreen<S, M, L = unknown>({
         </div>
       ) : null}
 
-      {/* MPG-047: full-viewport confetti on a win — rendered at the top level
-          so its fixed positioning isn't trapped by a transformed ancestor. */}
+      {/* Full-viewport particle layers on a terminal state — rendered at the
+          top level so their fixed positioning isn't trapped by a transformed
+          ancestor: confetti on a win, the somber ashfall on a loss. */}
       {isGameOver && tone === "celebrate" ? <ConfettiBurst /> : null}
+      {isGameOver && tone === "subdued" ? <AshFall /> : null}
     </div>
   );
 }
