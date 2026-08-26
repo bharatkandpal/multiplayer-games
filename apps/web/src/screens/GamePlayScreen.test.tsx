@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TicTacToeRoute } from "./games";
 import type { SeatsConfig } from "../game";
+import boardStyles from "../components/board/TicTacToeBoard.module.css";
 
 const BOT_THINKING_STEP_MS = 600; // fallback in ../game/motion.ts (no CSS var in jsdom)
 
@@ -46,25 +47,52 @@ describe("GamePlayScreen — local play-through (via TicTacToeRoute)", () => {
 
     // No dialog — the result is shown inline, board fully visible underneath,
     // no dismiss step required. Human-vs-human is a neutral "X wins!" outcome,
-    // never framed as anyone individually "losing".
+    // never framed as anyone individually "losing". There's no visible
+    // win/lose text banner (MPG-046) — the outcome is carried by the board
+    // treatment plus the aria-live region, asserted below.
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(await screen.findByText("Player 1 wins!", { selector: "p" })).toBeInTheDocument();
-    expect(screen.getByText("Good game! Ready for a rematch?")).toBeInTheDocument();
+    expect(screen.queryByText("Player 1 wins!", { selector: "p" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent("Player 1 wins!");
 
     // Board is still visible (and inert) once the game is over.
     expect(screen.getByRole("gridcell", { name: "Row 1, column 1, X" })).toBeInTheDocument();
     expectInert(screen.getByRole("gridcell", { name: "Row 3, column 1, empty" }));
 
-    // The Rematch button is the primary next action — inline, and focused
-    // automatically so keyboard/AT users land right on it.
+    // Neutral/win tone (never a solo local human losing) keeps the plain
+    // green winning-line highlight — never the red "loss" variant.
+    for (const name of ["Row 1, column 1, X", "Row 1, column 2, X", "Row 1, column 3, X"]) {
+      const cell = screen.getByRole("gridcell", { name });
+      expect(cell.classList.contains(boardStyles.winning!)).toBe(true);
+      expect(cell.classList.contains(boardStyles.winningLoss!)).toBe(false);
+    }
+
+    // The Rematch button is the primary next action — inline, below the
+    // board, and focused automatically so keyboard/AT users land right on it.
     const rematchButton = screen.getByRole("button", { name: "Rematch" });
     expect(rematchButton).toHaveFocus();
 
     await user.click(rematchButton);
 
-    expect(screen.queryByText("Player 1 wins!")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toHaveTextContent("Player 1 wins!");
     expect(screen.getByText("Player 1's turn")).toBeInTheDocument();
     expect(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" })).toBeInTheDocument();
+  });
+
+  it("renders all seats in a single row above the board (no below-board row)", () => {
+    const seats: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
+    const { container } = render(<TicTacToeRoute seats={seats} onExit={vi.fn()} />);
+
+    const seatRows = container.querySelectorAll('[class*="seatRow"]');
+    expect(seatRows).toHaveLength(1);
+    expect(screen.getByText("Player 1")).toBeInTheDocument();
+    expect(screen.getByText("Player 2")).toBeInTheDocument();
+
+    // The single seat row must come before the board in document order.
+    const board = screen.getByRole("grid", { name: "Tic-Tac-Toe board" });
+    const followsSeatRow = Boolean(
+      seatRows[0]!.compareDocumentPosition(board) & Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(followsSeatRow).toBe(true);
   });
 
   it("rejects an out-of-turn/illegal click without changing the board, then recovers", async () => {
@@ -145,9 +173,19 @@ describe("GamePlayScreen — human vs. bot", () => {
     fireEvent.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
     await advanceBotStep();
 
-    expect(screen.getByText("Hard bot (Player 2) wins!", { selector: "p" })).toBeInTheDocument();
-    expect(screen.getByText("Good effort — want to try again?")).toBeInTheDocument();
+    // No visible win/lose text banner — the outcome is carried by the
+    // aria-live region and the board's own (red) winning-line treatment.
+    expect(screen.queryByText("Hard bot (Player 2) wins!", { selector: "p" })).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Hard bot (Player 2) wins!");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    // The winning line (middle column: 1, 4, 7) reads red — the sole local
+    // human lost — not the normal green success highlight.
+    for (const name of ["Row 1, column 2, O", "Row 2, column 2, O", "Row 3, column 2, O"]) {
+      const cell = screen.getByRole("gridcell", { name });
+      expect(cell.classList.contains(boardStyles.winningLoss!)).toBe(true);
+      expect(cell.classList.contains(boardStyles.winning!)).toBe(false);
+    }
 
     const rematchButton = screen.getByRole("button", { name: "Rematch" });
     expect(rematchButton).toBeInTheDocument();
@@ -177,9 +215,10 @@ describe("GamePlayScreen — bot vs. bot (watch mode)", () => {
     }
 
     // Bot-vs-bot has no privileged local human — a draw reads the same
-    // neutral way it would for any other configuration, shown inline.
-    expect(screen.getByText("It's a draw!", { selector: "p" })).toBeInTheDocument();
-    expect(screen.getByText("Good game — nobody blinked.")).toBeInTheDocument();
+    // neutral way it would for any other configuration. No visible text
+    // banner; the outcome is announced via the aria-live region.
+    expect(screen.queryByText("It's a draw!", { selector: "p" })).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("It's a draw!");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rematch" })).toHaveFocus();
   });

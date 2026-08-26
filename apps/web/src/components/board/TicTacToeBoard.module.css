@@ -80,6 +80,23 @@
   }
 }
 
+/* Loss variant (MPG-046): same ring/glow shape, red/danger hue — used when
+   the sole local human loses, so the board itself carries the outcome
+   (never color-only: the ring shape is identical to `.winning`, just the
+   hue and background tint change). */
+.winningLoss {
+  border-color: var(--color-danger);
+  background-color: var(--color-danger-bg);
+  box-shadow: 0 0 0 3px var(--color-danger) inset;
+  animation: winPulse var(--duration-slow) var(--ease-emphasized);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .winningLoss {
+    animation: none;
+  }
+}
+
 .mark {
   width: 60%;
   height: 60%;

@@ -14,6 +14,13 @@ export interface TicTacToeBoardProps {
   lastMove: AppliedMove<TicTacToeMove> | null;
   /** The 3 winning cell indices once the game is won, else null — highlighted. */
   winningLine?: TicTacToeLine | null;
+  /**
+   * How the winning-line highlight should read (MPG-046): "win" (default,
+   * green/success) or "loss" (red/danger) — reserved for the one
+   * unambiguous case, a sole local human losing. Never color-only: the
+   * ring/glow shape stays identical, only the hue changes.
+   */
+  winningLineTone?: "win" | "loss";
 }
 
 const SIZE = 3;
@@ -57,6 +64,7 @@ export function TicTacToeBoard({
   disabled,
   lastMove,
   winningLine = null,
+  winningLineTone = "win",
 }: TicTacToeBoardProps): React.JSX.Element {
   const [focusIndex, setFocusIndex] = useState(0);
   const cellRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -125,7 +133,11 @@ export function TicTacToeBoard({
                 }}
                 type="button"
                 role="gridcell"
-                className={cx(styles.cell, isLastMove && styles.lastMove, isWinning && styles.winning)}
+                className={cx(
+                  styles.cell,
+                  isLastMove && styles.lastMove,
+                  isWinning && (winningLineTone === "loss" ? styles.winningLoss : styles.winning),
+                )}
                 tabIndex={index === focusIndex ? 0 : -1}
                 aria-disabled={!isActivatable}
                 aria-label={cellLabel(mark ?? null, row, col)}

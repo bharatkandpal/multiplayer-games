@@ -1,8 +1,7 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { GameModule, Player, Result } from "@mpg/engine";
 import { Button, SeatCard, StatusBadge, Toast, VisuallyHidden } from "../components/ui";
 import type { StatusBadgeStatus } from "../components/ui";
-import { cx } from "../components/ui/cx";
 import {
   type AppliedMove,
   type SeatsConfig,
@@ -19,6 +18,13 @@ export interface BoardRenderProps<S, M, L = unknown> {
   lastMove: AppliedMove<M> | null;
   /** The winning line (game-native coords) once the game is won, else null — for highlighting. */
   winningLine: L | null;
+  /**
+   * How the winning line should read (MPG-046): "win" (default) keeps the
+   * normal success/green highlight; "loss" — reserved for the one
+   * unambiguous case, a sole local human losing — recolors it red instead of
+   * relying on a separate visible headline to carry the outcome.
+   */
+  winningLineTone?: "win" | "loss";
 }
 
 export interface GamePlayScreenProps<S, M, L = unknown> {
@@ -62,11 +68,34 @@ function resultTone(result: Result, seats: SeatsConfig): ResultTone {
   return seatIndexOf(result.winner) === soleHumanIndex ? "celebrate" : "subdued";
 }
 
-function resultMessage(tone: ResultTone, result: Result): string {
-  if (result.status === "draw") return "Good game — nobody blinked.";
-  if (tone === "celebrate") return "Nice game! Ready for a rematch?";
-  if (tone === "subdued") return "Good effort — want to try again?";
-  return "Good game! Ready for a rematch?";
+/** A CSS custom property bag, for the per-particle confetti variables below. */
+type ConfettiVars = CSSProperties & Record<`--${string}`, string | number>;
+
+const CONFETTI_COUNT = 32;
+
+/**
+ * A one-shot confetti burst over the board (MPG-046, tone === "celebrate").
+ * Pure CSS: each particle is a plain `<span>` positioned/timed by inline CSS
+ * custom properties derived deterministically from its index (no Math.random
+ * — stable across re-renders/tests, still visually varied). Decorative only
+ * (`aria-hidden`); the outcome itself is still announced via the live region.
+ */
+function ConfettiBurst(): React.JSX.Element {
+  return (
+    <div className={styles.confettiLayer} aria-hidden="true">
+      {Array.from({ length: CONFETTI_COUNT }, (_, i) => {
+        const vars: ConfettiVars = {
+          "--x": `${(i * 41) % 100}%`,
+          "--hue": (i * 137) % 360,
+          "--delay": `${(i % 8) * 45}ms`,
+          "--duration": `${900 + (i % 5) * 140}ms`,
+          "--drift": `${((i * 53) % 60) - 30}px`,
+          "--rotate": `${(i * 97) % 360}deg`,
+        };
+        return <span key={i} className={styles.confettiPiece} style={vars} />;
+      })}
+    </div>
+  );
 }
 
 /**
@@ -147,14 +176,9 @@ export function GamePlayScreen<S, M, L = unknown>({
     if (isGameOver) rematchButtonRef.current?.focus();
   }, [isGameOver]);
 
-  // MPG-042: one SeatCard per seat, split above/below the board — the primary
-  // "whose turn" signal (folds in the bot "thinking" affordance, see below,
-  // rather than duplicating it on the status badge too). First half of seats
-  // above, the rest below; works for the current 2-seat games and degrades
-  // sensibly if a future game has more seats.
-  const aboveCount = Math.ceil(seats.length / 2);
-  const seatsAbove = seats.slice(0, aboveCount);
-  const seatsBelow = seats.slice(aboveCount);
+  // MPG-042/046: one SeatCard per seat, all in a single row above the board —
+  // the primary "whose turn" signal (folds in the bot "thinking" affordance,
+  // see below, rather than duplicating it on the status badge too).
   const thinkingSeatIndex = thinkingSeat !== null ? seatIndexOf(thinkingSeat) : null;
 
   const renderSeatCard = (seat: (typeof seats)[number], indexInSeats: number): ReactNode => (
@@ -223,8 +247,9 @@ export function GamePlayScreen<S, M, L = unknown>({
         </div>
       ) : null}
 
+      {/* MPG-046: all seats in a single row above the board. */}
       <div className={styles.seatRow}>
-        {seatsAbove.map((seat, i) => renderSeatCard(seat, i))}
+        {seats.map((seat, i) => renderSeatCard(seat, i))}
       </div>
 
       <div className={styles.boardWrap}>
@@ -234,43 +259,48 @@ export function GamePlayScreen<S, M, L = unknown>({
           disabled: boardDisabled,
           lastMove: session.lastMove,
           winningLine,
+          winningLineTone: tone === "subdued" ? "loss" : "win",
         })}
-      </div>
 
-      {seatsBelow.length > 0 ? (
-        <div className={styles.seatRow}>
-          {seatsBelow.map((seat, i) => renderSeatCard(seat, aboveCount + i))}
-        </div>
-      ) : null}
+        {/* MPG-046: tone-specific decoration over the board, entirely
+            aria-hidden — the outcome itself is carried by the live region
+            below, not by these effects. */}
+        {isGameOver && tone === "celebrate" ? (
+          <>
+            <div className={styles.winFlash} aria-hidden="true" />
+            <ConfettiBurst />
+          </>
+        ) : null}
+        {isGameOver && tone === "subdued" ? (
+          <>
+            <div className={styles.loseWater} aria-hidden="true" />
+            <span className={styles.loseEmoji} aria-hidden="true">
+              😢
+            </span>
+          </>
+        ) : null}
+      </div>
 
       <div aria-live="polite" role="status">
         <VisuallyHidden>{announcement}</VisuallyHidden>
       </div>
 
       {/*
-        MPG-044: the terminal state is inline, not a modal — the finished
-        board (with its winning-line highlight) stays visible the instant the
-        game ends, no dismiss step required. Tone (celebrate / subdued /
-        neutral) is purely a CSS treatment; the copy and structure are the
-        same for every outcome, and reduced-motion users get the identical
-        end state with no animation (see the .module.css).
+        MPG-044/046: the terminal state is inline, not a modal — the finished
+        board (with its winning-line highlight, and the tone-specific
+        celebration/consolation effects above) stays visible the instant the
+        game ends, no dismiss step required. The result itself has no visible
+        text banner — it's carried by the board treatment plus the aria-live
+        announcement — just a single, clearly-labelled Rematch action.
       */}
       {isGameOver ? (
-        <div
-          className={cx(
-            styles.resultBanner,
-            tone === "celebrate" && styles.resultCelebrate,
-            tone === "subdued" && styles.resultSubdued,
-            tone === "neutral" && styles.resultNeutral,
-          )}
-        >
-          <p className={styles.resultHeadline}>{resultHeadline(session.result, seats)}</p>
-          <p className={styles.resultMessage}>{resultMessage(tone, session.result)}</p>
-          <div className={styles.resultActions}>
-            <Button ref={rematchButtonRef} variant="primary" onClick={rematch}>
-              Rematch
-            </Button>
-          </div>
+        <div className={styles.resultActions}>
+          <Button ref={rematchButtonRef} variant="primary" onClick={rematch}>
+            <span className={styles.rematchIcon} aria-hidden="true">
+              ↻
+            </span>
+            Rematch
+          </Button>
         </div>
       ) : null}
     </div>

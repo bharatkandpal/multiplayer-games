@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { TicTacToeState } from "@mpg/engine";
 import { TicTacToeBoard } from "./TicTacToeBoard";
+import styles from "./TicTacToeBoard.module.css";
 
 function emptyState(): TicTacToeState {
   return { board: new Array(9).fill(null) };
@@ -126,6 +127,30 @@ describe("TicTacToeBoard", () => {
     expect(screen.getByRole("gridcell", { name: "Row 3, column 1, empty" }).className).not.toMatch(
       /winning/,
     );
+  });
+
+  it("recolors the winning line red when winningLineTone is 'loss', not the default green", () => {
+    const board = emptyState().board.slice();
+    board[0] = 1;
+    board[1] = 1;
+    board[2] = 1; // X wins the top row
+
+    render(
+      <TicTacToeBoard
+        state={{ board }}
+        onMove={vi.fn()}
+        disabled
+        lastMove={{ move: { cell: 2 }, player: 1 }}
+        winningLine={[0, 1, 2]}
+        winningLineTone="loss"
+      />,
+    );
+
+    for (const name of ["Row 1, column 1, X", "Row 1, column 2, X", "Row 1, column 3, X"]) {
+      const cell = screen.getByRole("gridcell", { name });
+      expect(cell.className).toMatch(/winningLoss/);
+      expect(cell.classList.contains(styles.winning!)).toBe(false);
+    }
   });
 
   it("supports arrow-key roving-tabindex navigation between cells", async () => {

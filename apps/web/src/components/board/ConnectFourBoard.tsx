@@ -14,6 +14,13 @@ export interface ConnectFourBoardProps {
   lastMove: AppliedMove<ConnectFourMove> | null;
   /** The 4 winning {column,row} cells once the game is won, else null — highlighted. */
   winningLine?: ConnectFourLine | null;
+  /**
+   * How the winning-line highlight should read (MPG-046): "win" (default,
+   * green/success) or "loss" (red/danger) — reserved for the one
+   * unambiguous case, a sole local human losing. Never color-only: the
+   * ring/glow shape stays identical, only the hue changes.
+   */
+  winningLineTone?: "win" | "loss";
 }
 
 /** Stable key for a {column,row} cell, for winning-line membership checks. */
@@ -48,6 +55,7 @@ export function ConnectFourBoard({
   disabled,
   lastMove,
   winningLine = null,
+  winningLineTone = "win",
 }: ConnectFourBoardProps): React.JSX.Element {
   const columnCount = state.board.length;
   const rowCount = state.board[0]?.length ?? 0;
@@ -138,7 +146,7 @@ export function ConnectFourBoard({
                           styles.disc,
                           discClassName(mark),
                           lastMoveRow === row && styles.lastMove,
-                          isWinning && styles.winning,
+                          isWinning && (winningLineTone === "loss" ? styles.winningLoss : styles.winning),
                         )}
                         aria-hidden="true"
                       />

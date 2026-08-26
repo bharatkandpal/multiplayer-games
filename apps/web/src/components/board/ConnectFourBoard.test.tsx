@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ConnectFourState } from "@mpg/engine";
 import { ConnectFourBoard } from "./ConnectFourBoard";
+import styles from "./ConnectFourBoard.module.css";
 
 const COLUMNS = 7;
 const ROWS = 6;
@@ -122,6 +123,31 @@ describe("ConnectFourBoard", () => {
 
     // Exactly the 4 winning discs carry the highlight class.
     expect(container.querySelectorAll('[class*="winning"]')).toHaveLength(4);
+  });
+
+  it("recolors the winning discs red when winningLineTone is 'loss', not the default green", () => {
+    const board = emptyState().board.map((col, column) =>
+      col.map((cell, row) => (row === 0 && column <= 3 ? 1 : cell)),
+    );
+    const { container } = render(
+      <ConnectFourBoard
+        state={{ board }}
+        onMove={vi.fn()}
+        disabled
+        lastMove={{ move: { column: 3 }, player: 1 }}
+        winningLine={[
+          { column: 0, row: 0 },
+          { column: 1, row: 0 },
+          { column: 2, row: 0 },
+          { column: 3, row: 0 },
+        ]}
+        winningLineTone="loss"
+      />,
+    );
+
+    const winningLossDiscs = Array.from(container.querySelectorAll(`.${styles.winningLoss}`));
+    expect(winningLossDiscs).toHaveLength(4);
+    expect(container.querySelectorAll(`.${styles.winning}`)).toHaveLength(0);
   });
 
   it("supports arrow-key roving-tabindex navigation between columns", async () => {

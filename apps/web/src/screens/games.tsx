@@ -30,13 +30,14 @@ export function TicTacToeRoute({ seats, onExit }: GameRouteProps): React.JSX.Ele
       seats={seats}
       describeMove={describeTicTacToeMove}
       onExit={onExit}
-      renderBoard={({ state, onMove, disabled, lastMove, winningLine }) => (
+      renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <TicTacToeBoard
           state={state}
           onMove={onMove}
           disabled={disabled}
           lastMove={lastMove}
           winningLine={winningLine}
+          winningLineTone={winningLineTone ?? "win"}
         />
       )}
     />
@@ -55,13 +56,14 @@ export function ConnectFourRoute({ seats, onExit }: GameRouteProps): React.JSX.E
       seats={seats}
       describeMove={describeConnectFourMove}
       onExit={onExit}
-      renderBoard={({ state, onMove, disabled, lastMove, winningLine }) => (
+      renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <ConnectFourBoard
           state={state}
           onMove={onMove}
           disabled={disabled}
           lastMove={lastMove}
           winningLine={winningLine}
+          winningLineTone={winningLineTone ?? "win"}
         />
       )}
     />
