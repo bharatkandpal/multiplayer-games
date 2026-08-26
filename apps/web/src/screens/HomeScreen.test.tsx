@@ -5,13 +5,23 @@ import { HomeScreen } from "./HomeScreen";
 
 describe("HomeScreen", () => {
   it("lists the given games with title, description, and id", () => {
-    render(<HomeScreen games={["tictactoe", "connect4"]} onSelectGame={vi.fn()} onShowGallery={vi.fn()} />);
+    render(
+      <HomeScreen
+        games={["tictactoe", "connect4", "tictactoe-move"]}
+        onSelectGame={vi.fn()}
+        onShowGallery={vi.fn()}
+      />,
+    );
 
     expect(screen.getByRole("list", { name: "Available games" })).toBeInTheDocument();
     expect(screen.getByText("Tic-Tac-Toe")).toBeInTheDocument();
     expect(screen.getByText("Connect Four")).toBeInTheDocument();
     expect(screen.getByText("tictactoe")).toBeInTheDocument();
     expect(screen.getByText("connect4")).toBeInTheDocument();
+
+    // The new move-mode variant (MPG-045-d) is catalogued and shows up too.
+    expect(screen.getByText("Move-Mode Tic-Tac-Toe")).toBeInTheDocument();
+    expect(screen.getByText("tictactoe-move")).toBeInTheDocument();
   });
 
   it("shows an empty-state message and no list when there are no games", () => {

@@ -8,6 +8,7 @@ import {
   ConnectFourRoute,
   HomeScreen,
   SetupScreen,
+  TicTacToeMoveRoute,
   TicTacToeRoute,
   type GameRouteProps,
 } from "./screens";
@@ -32,16 +33,21 @@ const THEME_LABEL: Record<ReturnType<typeof useTheme>["theme"], string> = {
   system: "System",
 };
 
+const GAME_ROUTES: Partial<
+  Record<GameId, (props: GameRouteProps) => React.JSX.Element>
+> = {
+  tictactoe: TicTacToeRoute,
+  "tictactoe-move": TicTacToeMoveRoute,
+  connect4: ConnectFourRoute,
+};
+
 function GameRoute({
   gameId,
   seats,
   onExit,
 }: { gameId: GameId } & GameRouteProps): React.JSX.Element {
-  return gameId === "tictactoe" ? (
-    <TicTacToeRoute seats={seats} onExit={onExit} />
-  ) : (
-    <ConnectFourRoute seats={seats} onExit={onExit} />
-  );
+  const Route = GAME_ROUTES[gameId] ?? ConnectFourRoute;
+  return <Route seats={seats} onExit={onExit} />;
 }
 
 /**
