@@ -67,7 +67,7 @@ describe("gameSessionReducer", () => {
       [0, 1, 2, 4, 3, 6, 5, 8, 7].map((cell) => ({ cell })),
     );
 
-    expect(session.result).toEqual({ status: "draw" });
+    expect(session.result).toEqual({ status: "draw", reason: "board-full" });
     expect(session.status).toEqual({ type: "game_over" });
   });
 

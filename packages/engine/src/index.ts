@@ -4,7 +4,7 @@
 
 export const ENGINE_VERSION = "0.0.0";
 
-export type { Player, GameId, Difficulty, GameStatus, Result, GameModule } from "./types";
+export type { Player, GameId, Difficulty, GameStatus, Result, GameModule, DrawReason } from "./types";
 
 export { IllegalMoveError } from "./errors";
 export type { IllegalMoveReason } from "./errors";

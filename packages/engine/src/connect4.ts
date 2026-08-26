@@ -113,7 +113,7 @@ function getResult(state: ConnectFourState): Result<ConnectFourLine> {
     return { status: "win", winner: win.winner, line: win.line };
   }
   if (countFilled(state) === COLUMNS * ROWS) {
-    return { status: "draw" };
+    return { status: "draw", reason: "board-full" };
   }
   return { status: "in_progress" };
 }

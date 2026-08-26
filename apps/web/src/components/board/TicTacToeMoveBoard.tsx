@@ -93,7 +93,7 @@ export function TicTacToeMoveBoard({
     ? `${piecesLeft} piece${piecesLeft === 1 ? "" : "s"} left to place.`
     : selected === null
       ? "Select a piece to move."
-      : "Choose where to move it.";
+      : "Choose where to move it — tap it again to cancel.";
 
   const moveTo = (nextIndex: number): void => {
     const clamped = ((nextIndex % (SIZE * SIZE)) + SIZE * SIZE) % (SIZE * SIZE);

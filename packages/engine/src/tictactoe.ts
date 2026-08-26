@@ -65,7 +65,7 @@ function getResult(state: TicTacToeState): Result<TicTacToeLine> {
     return { status: "win", winner: win.winner, line: win.line };
   }
   if (countFilled(state.board) === BOARD_SIZE) {
-    return { status: "draw" };
+    return { status: "draw", reason: "board-full" };
   }
   return { status: "in_progress" };
 }

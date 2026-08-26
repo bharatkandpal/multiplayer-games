@@ -20,15 +20,24 @@ export type Difficulty = "easy" | "medium" | "hard";
 export type GameStatus = "in_progress" | "win" | "draw";
 
 /**
+ * Why a terminal position is a draw. A small, closed, cross-game semantic vocabulary
+ * (NOT display copy): "board-full" = no empty cell remains; "repetition" = the same
+ * position (board + side to move) recurred the draw-limit number of times. The client
+ * maps each token to human copy — the engine never emits display strings.
+ */
+export type DrawReason = "board-full" | "repetition";
+
+/**
  * The outcome of a position. `winner` and `line` are present only on a win. `Line` is a
  * per-game coordinate shape (e.g. Tic-Tac-Toe's 3 board indices, Connect Four's 4
  * `{column, row}` cells) — see each game's own `*Line` type. Defaults to `unknown` so
  * `Result` remains usable where the concrete game (and thus coordinate shape) is erased.
+ * `reason` is optional so existing draw results remain valid.
  */
 export type Result<Line = unknown> =
   | { status: "in_progress" }
   | { status: "win"; winner: Player; line: Line }
-  | { status: "draw" };
+  | { status: "draw"; reason?: DrawReason };
 
 /**
  * The one interface every game implements. The platform (room manager, transport, AI

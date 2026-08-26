@@ -92,7 +92,7 @@ function getResult(state: TicTacToeMoveState): Result<TicTacToeMoveLine> {
   const key = positionKey(state.board, state.toMove);
   const occurrences = state.history.filter((k) => k === key).length;
   if (occurrences >= REPETITION_LIMIT) {
-    return { status: "draw" };
+    return { status: "draw", reason: "repetition" };
   }
   return { status: "in_progress" };
 }

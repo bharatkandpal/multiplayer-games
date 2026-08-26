@@ -254,7 +254,7 @@ describe("tictactoe-move: threefold repetition draw", () => {
 
     // Second cycle: returns to the original position for its 3rd occurrence -> draw.
     runCycle();
-    expect(ticTacToeMove.getResult(s)).toEqual({ status: "draw" });
+    expect(ticTacToeMove.getResult(s)).toEqual({ status: "draw", reason: "repetition" });
   });
 });
 

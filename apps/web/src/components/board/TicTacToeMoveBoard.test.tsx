@@ -67,7 +67,7 @@ describe("TicTacToeMoveBoard", () => {
     await user.click(ownPiece);
 
     expect(screen.getByRole("gridcell", { name: "Row 1, column 1, X, selected" })).toBeInTheDocument();
-    expect(screen.getAllByText("Choose where to move it.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Choose where to move it — tap it again to cancel.").length).toBeGreaterThan(0);
 
     const emptyTarget = screen.getByRole("gridcell", { name: "Row 3, column 1, empty" });
     expect(emptyTarget.className).toMatch(new RegExp(styles.validTarget!));
@@ -146,10 +146,61 @@ describe("TicTacToeMoveBoard", () => {
 
     const ownPiece = screen.getByRole("gridcell", { name: "Row 1, column 1, X" });
     await user.click(ownPiece);
-    expect(screen.getAllByText("Choose where to move it.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Choose where to move it — tap it again to cancel.").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, X, selected" }));
     expect(screen.getAllByText("Select a piece to move.").length).toBeGreaterThan(0);
+  });
+
+  it("move phase: pressing Escape while a piece is selected deselects it", async () => {
+    const user = userEvent.setup();
+    const onMove = vi.fn();
+    const board = emptyBoard();
+    board[0] = 1;
+    board[1] = 1;
+    board[2] = 1;
+    board[3] = 2;
+    board[4] = 2;
+    board[5] = 2;
+    render(
+      <TicTacToeMoveBoard state={stateWith(board, 1)} onMove={onMove} disabled={false} lastMove={null} />,
+    );
+
+    const ownPiece = screen.getByRole("gridcell", { name: "Row 1, column 1, X" });
+    await user.click(ownPiece);
+    expect(screen.getAllByText("Choose where to move it — tap it again to cancel.").length).toBeGreaterThan(0);
+
+    await user.keyboard("{Escape}");
+    expect(screen.getAllByText("Select a piece to move.").length).toBeGreaterThan(0);
+    expect(screen.getByRole("gridcell", { name: "Row 1, column 1, X" })).toBeInTheDocument();
+
+    // Escape only cleared selection state, no move was ever issued.
+    await user.click(screen.getByRole("gridcell", { name: "Row 3, column 1, empty" }));
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it("move phase: it is the opponent's turn (board disabled) — clicking own pieces, opponent pieces, and empty cells are all no-ops", async () => {
+    const user = userEvent.setup();
+    const onMove = vi.fn();
+    const board = emptyBoard();
+    board[0] = 1;
+    board[1] = 1;
+    board[2] = 1;
+    board[3] = 2;
+    board[4] = 2;
+    board[5] = 2;
+    // toMove is O (player 2), but from this local human's (X's) perspective the
+    // board is `disabled` because it isn't their turn.
+    render(
+      <TicTacToeMoveBoard state={stateWith(board, 2)} onMove={onMove} disabled lastMove={null} />,
+    );
+
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, X" })); // own piece
+    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 1, O" })); // opponent's piece (the mover)
+    await user.click(screen.getByRole("gridcell", { name: "Row 3, column 1, empty" })); // empty cell
+
+    expect(onMove).not.toHaveBeenCalled();
+    expect(screen.getByRole("grid")).toHaveAttribute("aria-disabled", "true");
   });
 
   it("move phase: selecting a different own piece re-selects instead of moving", async () => {
@@ -209,7 +260,7 @@ describe("TicTacToeMoveBoard", () => {
     );
 
     await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, X" }));
-    expect(screen.queryAllByText("Choose where to move it.")).toHaveLength(0);
+    expect(screen.queryAllByText("Choose where to move it — tap it again to cancel.")).toHaveLength(0);
   });
 
   it("highlights the three winning cells when a winningLine is supplied", () => {

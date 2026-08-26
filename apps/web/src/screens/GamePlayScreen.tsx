@@ -1,5 +1,5 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
-import type { GameModule, Player, Result } from "@mpg/engine";
+import type { DrawReason, GameModule, Player, Result } from "@mpg/engine";
 import { Button, SeatCard, StatusBadge, Toast, VisuallyHidden } from "../components/ui";
 import type { StatusBadgeStatus } from "../components/ui";
 import { cx } from "../components/ui/cx";
@@ -43,8 +43,21 @@ function seatIndexOf(player: Player): number {
   return player - 1;
 }
 
+/**
+ * Human copy for each semantic draw reason the engine can emit (MPG-045-e).
+ * The engine only surfaces the token (`DrawReason`); the client owns how it
+ * reads. `undefined` (no reason given) falls back to the original generic
+ * copy below.
+ */
+const DRAW_REASON_COPY: Record<DrawReason, string> = {
+  repetition: "Draw — the same position repeated three times.",
+  "board-full": "Draw — the board is full.",
+};
+
 function resultHeadline(result: Result, seats: SeatsConfig): string {
-  if (result.status === "draw") return "It's a draw!";
+  if (result.status === "draw") {
+    return result.reason ? (DRAW_REASON_COPY[result.reason] ?? "It's a draw!") : "It's a draw!";
+  }
   if (result.status === "win") return `${describeSeat(seats, seatIndexOf(result.winner))} wins!`;
   return "";
 }

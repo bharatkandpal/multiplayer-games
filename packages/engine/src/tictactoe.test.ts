@@ -66,7 +66,7 @@ describe("tictactoe: draw detection", () => {
       PLAYER_X,
       PLAYER_X,
     ]);
-    expect(ticTacToe.getResult(state)).toEqual({ status: "draw" });
+    expect(ticTacToe.getResult(state)).toEqual({ status: "draw", reason: "board-full" });
   });
 });
 

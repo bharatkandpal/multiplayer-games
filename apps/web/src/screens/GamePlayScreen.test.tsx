@@ -216,9 +216,12 @@ describe("GamePlayScreen — bot vs. bot (watch mode)", () => {
 
     // Bot-vs-bot has no privileged local human — a draw reads the same
     // neutral way it would for any other configuration. No visible text
-    // banner; the outcome is announced via the aria-live region.
-    expect(screen.queryByText("It's a draw!", { selector: "p" })).not.toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("It's a draw!");
+    // banner; the outcome (with its reason) is announced via the aria-live
+    // region. Classic Tic-Tac-Toe only draws by filling the board.
+    expect(
+      screen.queryByText("Draw — the board is full.", { selector: "p" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Draw — the board is full.");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rematch" })).toHaveFocus();
   });

@@ -31,7 +31,7 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
     id: "tictactoe-move",
     title: "Move-Mode Tic-Tac-Toe",
     description:
-      "Only 3 pieces each — place them, then move one to any empty square per turn. Get three in a row to win (no draws by filling up).",
+      "Only 3 pieces each — place them, then move one to any empty square per turn. Get three in a row to win (no draws by filling up, but repeating the same position three times is a draw).",
     playerCount: ticTacToeMove.playerCount,
   },
 };

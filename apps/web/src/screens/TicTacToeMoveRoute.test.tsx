@@ -76,6 +76,61 @@ describe("GamePlayScreen — local play-through (via TicTacToeMoveRoute)", () =>
     expect(rematchButton).toHaveFocus();
   });
 
+  it("plays out to a threefold-repetition draw via move-phase shuffling", async () => {
+    const user = userEvent.setup();
+    const seats: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
+    render(<TicTacToeMoveRoute seats={seats} onExit={vi.fn()} />);
+
+    // Placement phase — X: 0,1,7 ; O: 3,4,6 (mirrors packages/engine's
+    // threefold-repetition test — no line completed, cells 2,5,8 stay empty).
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" })); // X -> 0
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 2, empty" })); // O -> 1
+    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 1, empty" })); // X -> 3
+    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 2, empty" })); // O -> 4
+    await user.click(screen.getByRole("gridcell", { name: "Row 3, column 2, empty" })); // X -> 7
+    await user.click(screen.getByRole("gridcell", { name: "Row 3, column 1, empty" })); // O -> 6
+
+    expect(screen.getByText("Player 1's turn")).toBeInTheDocument();
+
+    // One shuffle cycle returns the position (X: 0,3,7 ; O: 1,4,6, X to move) to
+    // its 2nd occurrence; a second cycle brings it to its 3rd -> draw.
+    const runCycle = async (): Promise<void> => {
+      // X: 7 -> 8
+      await user.click(screen.getByRole("gridcell", { name: "Row 3, column 2, X" }));
+      await user.click(screen.getByRole("gridcell", { name: "Row 3, column 3, empty" }));
+      // O: 6 -> 5
+      await user.click(screen.getByRole("gridcell", { name: "Row 3, column 1, O" }));
+      await user.click(screen.getByRole("gridcell", { name: "Row 2, column 3, empty" }));
+      // X: 8 -> 7 (back)
+      await user.click(screen.getByRole("gridcell", { name: "Row 3, column 3, X" }));
+      await user.click(screen.getByRole("gridcell", { name: "Row 3, column 2, empty" }));
+      // O: 5 -> 6 (back) — position recurs
+      await user.click(screen.getByRole("gridcell", { name: "Row 2, column 3, O" }));
+      await user.click(screen.getByRole("gridcell", { name: "Row 3, column 1, empty" }));
+    };
+
+    await runCycle();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Player 1's turn")).toBeInTheDocument(); // still in progress (2nd occurrence)
+
+    await runCycle();
+
+    await waitFor(() => {
+      const statuses = screen.getAllByRole("status");
+      expect(
+        statuses.some((el) => el.textContent?.includes("repeated three times")),
+      ).toBe(true);
+    });
+
+    // Board is still visible (and inert) once the game is over — no dialog.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const inertCell = screen.getByRole("gridcell", { name: "Row 1, column 1, X" });
+    expect(inertCell.getAttribute("aria-disabled")).toBe("true");
+
+    const rematchButton = screen.getByRole("button", { name: "Rematch" });
+    expect(rematchButton).toHaveFocus();
+  });
+
   it("Home (top bar) exits immediately", async () => {
     const user = userEvent.setup();
     const onExit = vi.fn();

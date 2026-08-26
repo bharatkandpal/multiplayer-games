@@ -111,7 +111,7 @@ describe("connect4: draw detection", () => {
     const state = play(columns);
 
     expect(state.board.every((col) => col.every((cell) => cell !== null))).toBe(true);
-    expect(connectFour.getResult(state)).toEqual({ status: "draw" });
+    expect(connectFour.getResult(state)).toEqual({ status: "draw", reason: "board-full" });
   });
 });
 

@@ -84,7 +84,7 @@ interface GameModule<S = unknown, M = unknown> {
   createInitialState(): S;
   legalMoves(state: S): M[];
   applyMove(state: S, move: M, player: Player): S; // throws on illegal
-  getResult(state: S): Result; // { status: 'in_progress'|'win'|'draw', winner? }
+  getResult(state: S): Result; // { status: 'in_progress'|'win'|'draw', winner?, reason? }
   currentPlayer(state: S): Player;
   // AI support:
   evaluate(state: S, forPlayer: Player): number; // heuristic score
