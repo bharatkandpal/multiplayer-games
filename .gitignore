@@ -29,3 +29,7 @@ npm-debug.log*
 
 # Task board — local-only Kanban (see task-board skill); not tracked in git
 tasks/
+
+# Vercel CLI (project link + pulled env) — from `vercel link` / `vercel pull`.
+# `.env.local` etc. are already covered by the Env rules above.
+.vercel
