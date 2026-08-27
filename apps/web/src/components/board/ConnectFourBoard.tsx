@@ -146,7 +146,8 @@ export function ConnectFourBoard({
                           styles.disc,
                           discClassName(mark),
                           lastMoveRow === row && styles.lastMove,
-                          isWinning && (winningLineTone === "loss" ? styles.winningLoss : styles.winning),
+                          isWinning &&
+                            (winningLineTone === "loss" ? styles.winningLoss : styles.winning),
                         )}
                         aria-hidden="true"
                       />

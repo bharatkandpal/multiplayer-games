@@ -36,9 +36,7 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: /Play a friend/ })).not.toBeInTheDocument();
 
     // Straight to the realtime play surface: labelled play area + the one "Start".
-    expect(
-      screen.getByRole("application", { name: /Floppy Birds play area/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("application", { name: /Floppy Birds play area/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
 
     vi.restoreAllMocks();

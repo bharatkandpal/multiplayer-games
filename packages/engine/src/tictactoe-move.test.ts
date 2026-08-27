@@ -113,7 +113,7 @@ describe("tictactoe-move: illegal moves", () => {
     const state = play([place(0)]);
     // O's turn, O has 0 down; O attempts to relocate.
     expect(() => ticTacToeMove.applyMove(state, relocate(0, 1), PLAYER_O)).toThrow(
-      IllegalMoveError
+      IllegalMoveError,
     );
     try {
       ticTacToeMove.applyMove(state, relocate(0, 1), PLAYER_O);
@@ -127,7 +127,7 @@ describe("tictactoe-move: illegal moves", () => {
     const state = play([place(0), place(1), place(3), place(4), place(7), place(6)]);
     // X's turn, X owns 0,3,7; X tries to relocate O's cell 1.
     expect(() => ticTacToeMove.applyMove(state, relocate(1, 2), PLAYER_X)).toThrow(
-      IllegalMoveError
+      IllegalMoveError,
     );
     try {
       ticTacToeMove.applyMove(state, relocate(1, 2), PLAYER_X);
@@ -140,7 +140,7 @@ describe("tictactoe-move: illegal moves", () => {
   it("rejects relocating from an empty cell (illegal_move)", () => {
     const state = play([place(0), place(1), place(3), place(4), place(7), place(6)]);
     expect(() => ticTacToeMove.applyMove(state, relocate(2, 5), PLAYER_X)).toThrow(
-      IllegalMoveError
+      IllegalMoveError,
     );
     try {
       ticTacToeMove.applyMove(state, relocate(2, 5), PLAYER_X);
@@ -153,7 +153,7 @@ describe("tictactoe-move: illegal moves", () => {
   it("rejects relocating onto an occupied cell (illegal_move)", () => {
     const state = play([place(0), place(1), place(3), place(4), place(7), place(6)]);
     expect(() => ticTacToeMove.applyMove(state, relocate(0, 1), PLAYER_X)).toThrow(
-      IllegalMoveError
+      IllegalMoveError,
     );
     try {
       ticTacToeMove.applyMove(state, relocate(0, 1), PLAYER_X);
@@ -176,9 +176,7 @@ describe("tictactoe-move: illegal moves", () => {
 
   it.each([-1, 9, 100])("rejects an out-of-bounds place cell (%i)", (cell) => {
     const state = ticTacToeMove.createInitialState();
-    expect(() => ticTacToeMove.applyMove(state, place(cell), PLAYER_X)).toThrow(
-      IllegalMoveError
-    );
+    expect(() => ticTacToeMove.applyMove(state, place(cell), PLAYER_X)).toThrow(IllegalMoveError);
     try {
       ticTacToeMove.applyMove(state, place(cell), PLAYER_X);
       expect.unreachable();
@@ -190,7 +188,7 @@ describe("tictactoe-move: illegal moves", () => {
   it("rejects an out-of-bounds relocation `from`/`to`", () => {
     const state = play([place(0), place(1), place(3), place(4), place(7), place(6)]);
     expect(() => ticTacToeMove.applyMove(state, relocate(-1, 2), PLAYER_X)).toThrow(
-      IllegalMoveError
+      IllegalMoveError,
     );
     try {
       ticTacToeMove.applyMove(state, relocate(-1, 2), PLAYER_X);
@@ -200,7 +198,7 @@ describe("tictactoe-move: illegal moves", () => {
     }
 
     expect(() => ticTacToeMove.applyMove(state, relocate(0, 9), PLAYER_X)).toThrow(
-      IllegalMoveError
+      IllegalMoveError,
     );
     try {
       ticTacToeMove.applyMove(state, relocate(0, 9), PLAYER_X);

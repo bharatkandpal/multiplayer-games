@@ -168,7 +168,9 @@ describe("GamePlayScreen — human vs. bot", () => {
     // The bot has moved: exactly one O now on the board, and it's the human's turn again.
     // (describeSeat reads a solo human as "You" — see seatConfig.ts.)
     expect(screen.getByText("You's turn")).toBeInTheDocument();
-    const oCells = screen.getAllByRole("gridcell").filter((el) => el.getAttribute("aria-label")?.endsWith(", O"));
+    const oCells = screen
+      .getAllByRole("gridcell")
+      .filter((el) => el.getAttribute("aria-label")?.endsWith(", O"));
     expect(oCells).toHaveLength(1);
   });
 
@@ -188,7 +190,9 @@ describe("GamePlayScreen — human vs. bot", () => {
 
     // No visible win/lose text banner — the outcome is carried by the
     // aria-live region and the board's own (red) winning-line treatment.
-    expect(screen.queryByText("Hard bot (Player 2) wins!", { selector: "p" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Hard bot (Player 2) wins!", { selector: "p" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Hard bot (Player 2) wins!");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
@@ -322,10 +326,7 @@ describe("GamePlayScreen — bot vs. bot (watch mode)", () => {
   it("shows watch controls only for all-bot games, not human games", () => {
     vi.useRealTimers(); // no bot pacing needed for this static-render assertion
     const { unmount } = render(
-      <TicTacToeRoute
-        seats={[{ kind: "human" }, { kind: "human" }]}
-        onExit={vi.fn()}
-      />,
+      <TicTacToeRoute seats={[{ kind: "human" }, { kind: "human" }]} onExit={vi.fn()} />,
     );
     expect(screen.queryByRole("group", { name: "Watch controls" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Pause" })).toBeNull();
@@ -354,8 +355,9 @@ describe("GamePlayScreen — bot vs. bot (watch mode)", () => {
 
     // An open cell is labelled "…, empty" — counting them tracks moves landing.
     const emptyCells = () =>
-      screen.getAllByRole("gridcell").filter((c) => /empty$/.test(c.getAttribute("aria-label") ?? ""))
-        .length;
+      screen
+        .getAllByRole("gridcell")
+        .filter((c) => /empty$/.test(c.getAttribute("aria-label") ?? "")).length;
     expect(emptyCells()).toBe(9);
 
     // Pause before the first paced move lands.

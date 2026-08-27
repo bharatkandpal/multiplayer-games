@@ -16,7 +16,9 @@ function emptyState(): ConnectFourState {
 
 describe("ConnectFourBoard", () => {
   it("renders 7 column buttons, all enabled and labelled 'Drop a disc' on an empty board", () => {
-    render(<ConnectFourBoard state={emptyState()} onMove={vi.fn()} disabled={false} lastMove={null} />);
+    render(
+      <ConnectFourBoard state={emptyState()} onMove={vi.fn()} disabled={false} lastMove={null} />,
+    );
     const columns = screen.getAllByRole("button");
     expect(columns).toHaveLength(COLUMNS);
     const firstColumn = screen.getByRole("button", { name: "Drop a disc in column 1" });
@@ -27,7 +29,9 @@ describe("ConnectFourBoard", () => {
   it("calls onMove with the clicked column", async () => {
     const user = userEvent.setup();
     const onMove = vi.fn();
-    render(<ConnectFourBoard state={emptyState()} onMove={onMove} disabled={false} lastMove={null} />);
+    render(
+      <ConnectFourBoard state={emptyState()} onMove={onMove} disabled={false} lastMove={null} />,
+    );
 
     await user.click(screen.getByRole("button", { name: "Drop a disc in column 3" }));
     expect(onMove).toHaveBeenCalledExactlyOnceWith({ column: 2 });
@@ -152,7 +156,9 @@ describe("ConnectFourBoard", () => {
 
   it("supports arrow-key roving-tabindex navigation between columns", async () => {
     const user = userEvent.setup();
-    render(<ConnectFourBoard state={emptyState()} onMove={vi.fn()} disabled={false} lastMove={null} />);
+    render(
+      <ConnectFourBoard state={emptyState()} onMove={vi.fn()} disabled={false} lastMove={null} />,
+    );
 
     const first = screen.getByRole("button", { name: "Drop a disc in column 1" });
     first.focus();

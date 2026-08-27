@@ -95,7 +95,9 @@ describe("HomeScreen", () => {
   it("calls onShowGallery when the design-system kit link is activated", async () => {
     const user = userEvent.setup();
     const onShowGallery = vi.fn();
-    render(<HomeScreen games={["tictactoe"]} onSelectGame={vi.fn()} onShowGallery={onShowGallery} />);
+    render(
+      <HomeScreen games={["tictactoe"]} onSelectGame={vi.fn()} onShowGallery={onShowGallery} />,
+    );
 
     await user.click(screen.getByRole("button", { name: "View design-system kit" }));
     expect(onShowGallery).toHaveBeenCalledOnce();

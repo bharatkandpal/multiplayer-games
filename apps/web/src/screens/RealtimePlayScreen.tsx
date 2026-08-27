@@ -9,11 +9,7 @@ import {
 import type { RealtimeModule } from "@mpg/engine";
 import { Button, StatusBadge, VisuallyHidden } from "../components/ui";
 import { cx } from "../components/ui/cx";
-import {
-  type RealtimeLoopPhase,
-  type RunComplete,
-  useRealtimeLoop,
-} from "../game";
+import { type RealtimeLoopPhase, type RunComplete, useRealtimeLoop } from "../game";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import styles from "./RealtimePlayScreen.module.css";
 
@@ -92,7 +88,7 @@ export interface RealtimePlayScreenProps<S, I, A extends string = string> {
 const HINT_ID_PREFIX = "rt-hint";
 
 function defaultNextSeed(): number {
-  return (Date.now() & 0xffff) || 1;
+  return Date.now() & 0xffff || 1;
 }
 
 export function RealtimePlayScreen<S, I, A extends string = string>({

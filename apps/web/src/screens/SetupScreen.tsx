@@ -142,7 +142,9 @@ export function SetupScreen({ gameId, onStart, onBack }: SetupScreenProps): Reac
               👥
             </span>
             <span className={styles.quickLabel}>Play a friend</span>
-            <span className={styles.quickHint}>Everyone&apos;s human, take turns on this device</span>
+            <span className={styles.quickHint}>
+              Everyone&apos;s human, take turns on this device
+            </span>
           </span>
         </Button>
       </div>

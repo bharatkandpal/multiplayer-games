@@ -129,9 +129,7 @@ export function HomeScreen({
                 type="button"
                 className={styles.gameCard}
                 onClick={() =>
-                  item.kind === "realtime"
-                    ? onSelectRealtimeGame?.(item.id)
-                    : onSelectGame(item.id)
+                  item.kind === "realtime" ? onSelectRealtimeGame?.(item.id) : onSelectGame(item.id)
                 }
               >
                 <span className={styles.gameThumbnail}>
