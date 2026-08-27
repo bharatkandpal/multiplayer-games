@@ -32,3 +32,11 @@ export { getBotThinkingDelayMs } from "./motion";
 
 export type { LocalPlayController, WatchSpeed } from "./useLocalPlayController";
 export { useLocalPlayController } from "./useLocalPlayController";
+
+export type {
+  RealtimeLoopPhase,
+  RunComplete,
+  UseRealtimeLoopParams,
+  UseRealtimeLoopResult,
+} from "./useRealtimeLoop";
+export { useRealtimeLoop } from "./useRealtimeLoop";
