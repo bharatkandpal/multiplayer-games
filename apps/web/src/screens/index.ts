@@ -7,5 +7,13 @@ export type { SetupScreenProps } from "./SetupScreen";
 export { GamePlayScreen } from "./GamePlayScreen";
 export type { GamePlayScreenProps, BoardRenderProps } from "./GamePlayScreen";
 
+export { RealtimePlayScreen } from "./RealtimePlayScreen";
+export type {
+  RealtimePlayScreenProps,
+  RealtimeControls,
+  RealtimeSceneProps,
+  TouchAction,
+} from "./RealtimePlayScreen";
+
 export { TicTacToeRoute, TicTacToeMoveRoute, ConnectFourRoute } from "./games";
 export type { GameRouteProps } from "./games";

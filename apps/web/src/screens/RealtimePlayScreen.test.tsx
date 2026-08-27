@@ -1,0 +1,297 @@
+import { act } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import type { RealtimeModule } from "@mpg/engine";
+import { RealtimePlayScreen, type RealtimeControls } from "./RealtimePlayScreen";
+
+/**
+ * A minimal fake RealtimeModule standing in for a concrete game (the real
+ * Floppy renderer + wiring is MPG-040e). Deterministic: game-over is driven by
+ * a tick counter (independent of input), while `score` jumps by +10 on a flap
+ * vs +1 otherwise — so a flap is observable in the visible score, letting us
+ * assert keyboard↔pointer input parity precisely.
+ */
+interface FakeState {
+  readonly ticks: number;
+  readonly score: number;
+  readonly over: boolean;
+}
+interface FakeInput {
+  readonly flap: boolean;
+}
+const OVER_TICKS = 3;
+const TICK_HZ = 100; // → 10ms/tick, convenient for the controlled clock below
+
+const fakeModule: RealtimeModule<FakeState, FakeInput> = {
+  id: "floppy-birds",
+  kind: "realtime",
+  tickHz: TICK_HZ,
+  createInitialState: () => ({ ticks: 0, score: 0, over: false }),
+  tick: (state, input) => {
+    const ticks = state.ticks + 1;
+    return {
+      ticks,
+      score: state.score + (input.flap ? 10 : 1),
+      over: ticks >= OVER_TICKS,
+    };
+  },
+  getScore: (s) => s.score,
+  isGameOver: (s) => s.over,
+};
+
+const flapControls: RealtimeControls<FakeInput, "flap"> = {
+  primaryAction: "flap",
+  keyMap: { Space: "flap", ArrowUp: "flap" },
+  toInput: (pressed) => ({ flap: pressed.has("flap") }),
+  actionHint: "Tap, Space, or ↑ to flap",
+};
+
+// --- Controlled requestAnimationFrame -------------------------------------
+// The loop reschedules itself each frame; we capture the pending callback and
+// fire it with an explicit timestamp so ticks advance deterministically.
+let rafCb: FrameRequestCallback | null = null;
+let rafSeq = 0;
+
+function frame(now: number): void {
+  const cb = rafCb;
+  rafCb = null;
+  act(() => {
+    cb?.(now);
+  });
+}
+
+let clock = 0;
+/** Establishes the loop's `last` timestamp right after entering `running`. */
+function primeClock(): void {
+  clock = 1000;
+  frame(clock);
+}
+/** Advances the sim by exactly `k` fixed ticks (10ms each). */
+function advanceTicks(k: number): void {
+  clock += k * (1000 / TICK_HZ);
+  frame(clock);
+}
+
+function scoreText(container: HTMLElement): string | null {
+  return container.querySelector('[class*="scoreValue"]')?.textContent ?? null;
+}
+
+beforeEach(() => {
+  rafCb = null;
+  rafSeq = 0;
+  clock = 0;
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+    rafCb = cb;
+    return ++rafSeq;
+  });
+  vi.stubGlobal("cancelAnimationFrame", () => {
+    rafCb = null;
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+function renderScreen(overrides: Partial<Parameters<typeof RealtimePlayScreen>[0]> = {}) {
+  return render(
+    <RealtimePlayScreen<FakeState, FakeInput, "flap">
+      module={fakeModule}
+      gameTitle="Floppy Birds"
+      seed={42}
+      controls={flapControls}
+      renderScene={({ score }) => <div data-testid="scene">scene score {score}</div>}
+      onExit={vi.fn()}
+      nextSeed={() => 7}
+      {...(overrides as object)}
+    />,
+  );
+}
+
+describe("RealtimePlayScreen — four explicit states", () => {
+  it("READY: shows the hint + a single primary Start (focused), score 0, scene rendered", () => {
+    const { container } = renderScreen();
+
+    const start = screen.getByRole("button", { name: "Start" });
+    expect(start).toBeInTheDocument();
+    expect(start).toHaveFocus();
+    expect(screen.queryByRole("button", { name: "Pause" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Resume" })).not.toBeInTheDocument();
+    expect(scoreText(container)).toBe("0");
+    expect(screen.getByTestId("scene")).toBeInTheDocument();
+    // Control hint is present (once in the overlay, once as the persistent caption).
+    expect(screen.getAllByText(/to flap/i).length).toBeGreaterThan(0);
+  });
+
+  it("RUNNING: Start begins the run — overlay clears, Pause appears, focus moves to the play area", () => {
+    renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
+    expect(screen.getByRole("application", { name: "Floppy Birds play area" })).toHaveFocus();
+  });
+
+  it("PAUSED: Pause freezes the run with a single Resume (focused); Resume returns to running", () => {
+    renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    primeClock();
+
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    });
+    const resume = screen.getByRole("button", { name: "Resume" });
+    expect(resume).toHaveFocus();
+    expect(screen.getByText("Paused")).toBeInTheDocument();
+
+    // Frames while paused must not tick (score stays put).
+    advanceTicks(2);
+    // (score readout unaffected — still 0)
+    act(() => {
+      fireEvent.click(resume);
+    });
+    expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
+    expect(screen.queryByText("Paused")).not.toBeInTheDocument();
+  });
+
+  it("GAME-OVER: reaching the end shows the final score + a single Play again (focused), and fires onRunComplete once", () => {
+    const onRunComplete = vi.fn();
+    const { container } = renderScreen({ onRunComplete });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    primeClock();
+    advanceTicks(OVER_TICKS); // no flaps → +1 per tick → score 3
+
+    expect(screen.getByText("Game over")).toBeInTheDocument();
+    expect(screen.getByText(/Final score:/)).toBeInTheDocument();
+    const playAgain = screen.getByRole("button", { name: /Play again/ });
+    expect(playAgain).toHaveFocus();
+    expect(scoreText(container)).toBe("3");
+
+    expect(onRunComplete).toHaveBeenCalledTimes(1);
+    expect(onRunComplete).toHaveBeenCalledWith(
+      expect.objectContaining({ gameId: "floppy-birds", score: 3, seed: 42 }),
+    );
+    expect(onRunComplete.mock.calls[0]![0].inputLog).toHaveLength(OVER_TICKS);
+  });
+
+  it("PLAY AGAIN: restarts to a fresh READY run (score reset) using the next seed", () => {
+    const { container } = renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    primeClock();
+    advanceTicks(OVER_TICKS);
+
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: /Play again/ }));
+    });
+
+    // Back to READY: Start is offered again and the score is reset.
+    expect(screen.getByRole("button", { name: "Start" })).toHaveFocus();
+    expect(scoreText(container)).toBe("0");
+  });
+});
+
+describe("RealtimePlayScreen — input parity + a11y", () => {
+  it("keyboard (Space) and pointer (tap) produce the SAME flap input", () => {
+    // Keyboard run: one Space press before the tick → flap scores 10 (vs 1) on tick 1.
+    const keyboard = renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    primeClock();
+    fireEvent.keyDown(window, { code: "Space" });
+    advanceTicks(1);
+    const keyboardScore = scoreText(keyboard.container);
+    keyboard.unmount();
+
+    // Pointer run: one tap on the play surface before the tick → same +10.
+    const pointer = renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    primeClock();
+    fireEvent.pointerDown(screen.getByRole("application", { name: "Floppy Birds play area" }));
+    advanceTicks(1);
+    const pointerScore = scoreText(pointer.container);
+
+    expect(keyboardScore).toBe("10"); // a flap tick scores 10 (an idle tick scores 1)
+    expect(pointerScore).toBe(keyboardScore);
+  });
+
+  it("the play area is a focusable, labelled application region (keyboard reachable)", () => {
+    renderScreen();
+    const surface = screen.getByRole("application", { name: "Floppy Birds play area" });
+    expect(surface).toHaveAttribute("tabindex", "0");
+    expect(surface).toHaveAttribute("aria-describedby");
+  });
+
+  it("announces state transitions via a polite live region", () => {
+    renderScreen();
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent(/ready/i);
+
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(screen.getByRole("status")).toHaveTextContent(/Game started/i);
+  });
+});
+
+describe("RealtimePlayScreen — prefers-reduced-motion (ADR 0002 §5)", () => {
+  function stubReducedMotion(matches: boolean): void {
+    vi.stubGlobal(
+      "matchMedia",
+      (query: string) =>
+        ({
+          matches: query.includes("reduce") ? matches : false,
+          media: query,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          onchange: null,
+          dispatchEvent: vi.fn(),
+        }) as unknown as MediaQueryList,
+    );
+  }
+
+  it("passes reducedMotion:true to the renderer, keeps Pause available, and shows the score as text", () => {
+    stubReducedMotion(true);
+    const seen: boolean[] = [];
+    const { container } = render(
+      <RealtimePlayScreen<FakeState, FakeInput, "flap">
+        module={fakeModule}
+        gameTitle="Floppy Birds"
+        seed={1}
+        controls={flapControls}
+        renderScene={({ reducedMotion }) => {
+          seen.push(reducedMotion);
+          return <div data-testid="scene" />;
+        }}
+        onExit={vi.fn()}
+      />,
+    );
+
+    expect(seen.every((v) => v === true)).toBe(true);
+
+    // Pause is a first-class control under reduced motion (§5): still reachable.
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
+
+    // Score is legible as TEXT, never motion-only.
+    expect(scoreText(container)).toBe("0");
+  });
+
+  it("passes reducedMotion:false when the user has no such preference", () => {
+    stubReducedMotion(false);
+    const seen: boolean[] = [];
+    render(
+      <RealtimePlayScreen<FakeState, FakeInput, "flap">
+        module={fakeModule}
+        gameTitle="Floppy Birds"
+        seed={1}
+        controls={flapControls}
+        renderScene={({ reducedMotion }) => {
+          seen.push(reducedMotion);
+          return <div data-testid="scene" />;
+        }}
+        onExit={vi.fn()}
+      />,
+    );
+    expect(seen.some((v) => v === true)).toBe(false);
+  });
+});
