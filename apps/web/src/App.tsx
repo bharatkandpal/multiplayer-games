@@ -134,6 +134,8 @@ export default function App(): React.JSX.Element {
           <UiGallery />
         </div>
       ) : null}
+
+      <footer className={styles.footer}>Created by Bharat Kandpal</footer>
     </main>
   );
 }
