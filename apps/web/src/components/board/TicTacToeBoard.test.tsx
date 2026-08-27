@@ -11,7 +11,9 @@ function emptyState(): TicTacToeState {
 
 describe("TicTacToeBoard", () => {
   it("renders 9 grid cells, all labelled empty on a fresh board", () => {
-    render(<TicTacToeBoard state={emptyState()} onMove={vi.fn()} disabled={false} lastMove={null} />);
+    render(
+      <TicTacToeBoard state={emptyState()} onMove={vi.fn()} disabled={false} lastMove={null} />,
+    );
     expect(screen.getAllByRole("gridcell")).toHaveLength(9);
     expect(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" })).toBeInTheDocument();
   });
@@ -21,9 +23,7 @@ describe("TicTacToeBoard", () => {
     const board = state.board.slice();
     board[0] = 1;
     board[1] = 2;
-    render(
-      <TicTacToeBoard state={{ board }} onMove={vi.fn()} disabled={false} lastMove={null} />,
-    );
+    render(<TicTacToeBoard state={{ board }} onMove={vi.fn()} disabled={false} lastMove={null} />);
 
     expect(screen.getByRole("gridcell", { name: "Row 1, column 1, X" })).toBeInTheDocument();
     expect(screen.getByRole("gridcell", { name: "Row 1, column 2, O" })).toBeInTheDocument();
@@ -32,7 +32,9 @@ describe("TicTacToeBoard", () => {
   it("calls onMove with the cell index when an empty cell is clicked", async () => {
     const user = userEvent.setup();
     const onMove = vi.fn();
-    render(<TicTacToeBoard state={emptyState()} onMove={onMove} disabled={false} lastMove={null} />);
+    render(
+      <TicTacToeBoard state={emptyState()} onMove={onMove} disabled={false} lastMove={null} />,
+    );
 
     await user.click(screen.getByRole("gridcell", { name: "Row 2, column 2, empty" }));
     expect(onMove).toHaveBeenCalledExactlyOnceWith({ cell: 4 });
@@ -155,7 +157,9 @@ describe("TicTacToeBoard", () => {
 
   it("supports arrow-key roving-tabindex navigation between cells", async () => {
     const user = userEvent.setup();
-    render(<TicTacToeBoard state={emptyState()} onMove={vi.fn()} disabled={false} lastMove={null} />);
+    render(
+      <TicTacToeBoard state={emptyState()} onMove={vi.fn()} disabled={false} lastMove={null} />,
+    );
 
     const first = screen.getByRole("gridcell", { name: "Row 1, column 1, empty" });
     first.focus();

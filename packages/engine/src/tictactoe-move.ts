@@ -129,7 +129,7 @@ function isInBounds(cell: number): boolean {
 function applyMove(
   state: TicTacToeMoveState,
   move: TicTacToeMoveMove,
-  player: Player
+  player: Player,
 ): TicTacToeMoveState {
   if (getResult(state).status !== "in_progress") {
     throw new IllegalMoveError("game_over", "The game has already ended.");
@@ -144,7 +144,7 @@ function applyMove(
     if (marksDown >= PIECES_PER_PLAYER) {
       throw new IllegalMoveError(
         "illegal_move",
-        `Player ${player} already has all ${PIECES_PER_PLAYER} pieces on the board; must relocate.`
+        `Player ${player} already has all ${PIECES_PER_PLAYER} pieces on the board; must relocate.`,
       );
     }
     if (!isInBounds(move.cell)) {
@@ -159,19 +159,19 @@ function applyMove(
     if (marksDown < PIECES_PER_PLAYER) {
       throw new IllegalMoveError(
         "illegal_move",
-        `Player ${player} still has pieces to place and cannot relocate yet.`
+        `Player ${player} still has pieces to place and cannot relocate yet.`,
       );
     }
     if (!isInBounds(move.from) || !isInBounds(move.to)) {
       throw new IllegalMoveError(
         "out_of_bounds",
-        `Cell ${!isInBounds(move.from) ? move.from : move.to} is out of bounds.`
+        `Cell ${!isInBounds(move.from) ? move.from : move.to} is out of bounds.`,
       );
     }
     if (state.board[move.from] !== player) {
       throw new IllegalMoveError(
         "illegal_move",
-        `Cell ${move.from} is not one of player ${player}'s pieces.`
+        `Cell ${move.from} is not one of player ${player}'s pieces.`,
       );
     }
     if (state.board[move.to] !== null) {
@@ -234,15 +234,14 @@ function createInitialState(): TicTacToeMoveState {
 }
 
 /** The Tic-Tac-Toe "Move mode" `GameModule`: place-then-slide 3-piece variant. */
-export const ticTacToeMove: GameModule<TicTacToeMoveState, TicTacToeMoveMove, TicTacToeMoveLine> =
-  {
-    id: "tictactoe-move",
-    playerCount: 2,
-    createInitialState,
-    legalMoves,
-    applyMove,
-    getResult,
-    currentPlayer,
-    evaluate,
-    orderMoves,
-  };
+export const ticTacToeMove: GameModule<TicTacToeMoveState, TicTacToeMoveMove, TicTacToeMoveLine> = {
+  id: "tictactoe-move",
+  playerCount: 2,
+  createInitialState,
+  legalMoves,
+  applyMove,
+  getResult,
+  currentPlayer,
+  evaluate,
+  orderMoves,
+};

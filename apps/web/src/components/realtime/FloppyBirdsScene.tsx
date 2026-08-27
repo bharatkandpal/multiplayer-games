@@ -33,7 +33,8 @@ interface Palette {
 
 function readPalette(el: HTMLElement): Palette {
   const cs = getComputedStyle(el);
-  const v = (name: string, fallback: string): string => cs.getPropertyValue(name).trim() || fallback;
+  const v = (name: string, fallback: string): string =>
+    cs.getPropertyValue(name).trim() || fallback;
   return {
     sky: v("--color-bg-inset", "#0b1020"),
     skyDeep: v("--color-bg", "#05070f"),
@@ -147,5 +148,7 @@ export function FloppyBirdsScene({
     draw(ctx, state, score, reducedMotion, readPalette(canvas));
   }, [state, score, reducedMotion]);
 
-  return <canvas ref={canvasRef} width={RES} height={RES} className={styles.canvas} aria-hidden="true" />;
+  return (
+    <canvas ref={canvasRef} width={RES} height={RES} className={styles.canvas} aria-hidden="true" />
+  );
 }

@@ -18,7 +18,12 @@ describe("TicTacToeMoveBoard", () => {
     const user = userEvent.setup();
     const onMove = vi.fn();
     render(
-      <TicTacToeMoveBoard state={stateWith(emptyBoard())} onMove={onMove} disabled={false} lastMove={null} />,
+      <TicTacToeMoveBoard
+        state={stateWith(emptyBoard())}
+        onMove={onMove}
+        disabled={false}
+        lastMove={null}
+      />,
     );
 
     await user.click(screen.getByRole("gridcell", { name: "Row 2, column 2, empty" }));
@@ -29,7 +34,12 @@ describe("TicTacToeMoveBoard", () => {
     const board = emptyBoard();
     board[0] = 1; // X has placed 1 of 3
     render(
-      <TicTacToeMoveBoard state={stateWith(board)} onMove={vi.fn()} disabled={false} lastMove={null} />,
+      <TicTacToeMoveBoard
+        state={stateWith(board)}
+        onMove={vi.fn()}
+        disabled={false}
+        lastMove={null}
+      />,
     );
 
     expect(screen.getAllByText("2 pieces left to place.").length).toBeGreaterThan(0);
@@ -44,7 +54,12 @@ describe("TicTacToeMoveBoard", () => {
     board[4] = 2;
     board[5] = 2;
     render(
-      <TicTacToeMoveBoard state={stateWith(board, 1)} onMove={vi.fn()} disabled={false} lastMove={null} />,
+      <TicTacToeMoveBoard
+        state={stateWith(board, 1)}
+        onMove={vi.fn()}
+        disabled={false}
+        lastMove={null}
+      />,
     );
 
     expect(screen.getAllByText("Select a piece to move.").length).toBeGreaterThan(0);
@@ -60,14 +75,23 @@ describe("TicTacToeMoveBoard", () => {
     board[4] = 2;
     board[5] = 2;
     render(
-      <TicTacToeMoveBoard state={stateWith(board, 1)} onMove={vi.fn()} disabled={false} lastMove={null} />,
+      <TicTacToeMoveBoard
+        state={stateWith(board, 1)}
+        onMove={vi.fn()}
+        disabled={false}
+        lastMove={null}
+      />,
     );
 
     const ownPiece = screen.getByRole("gridcell", { name: "Row 1, column 1, X" });
     await user.click(ownPiece);
 
-    expect(screen.getByRole("gridcell", { name: "Row 1, column 1, X, selected" })).toBeInTheDocument();
-    expect(screen.getAllByText("Choose where to move it — tap it again to cancel.").length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("gridcell", { name: "Row 1, column 1, X, selected" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText("Choose where to move it — tap it again to cancel.").length,
+    ).toBeGreaterThan(0);
 
     const emptyTarget = screen.getByRole("gridcell", { name: "Row 3, column 1, empty" });
     expect(emptyTarget.className).toMatch(new RegExp(styles.validTarget!));
@@ -84,7 +108,12 @@ describe("TicTacToeMoveBoard", () => {
     board[4] = 2;
     board[5] = 2;
     render(
-      <TicTacToeMoveBoard state={stateWith(board, 1)} onMove={onMove} disabled={false} lastMove={null} />,
+      <TicTacToeMoveBoard
+        state={stateWith(board, 1)}
+        onMove={onMove}
+        disabled={false}
+        lastMove={null}
+      />,
     );
 
     await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, X" }));
@@ -104,7 +133,12 @@ describe("TicTacToeMoveBoard", () => {
     board[4] = 2;
     board[5] = 2;
     render(
-      <TicTacToeMoveBoard state={stateWith(board, 1)} onMove={onMove} disabled={false} lastMove={null} />,
+      <TicTacToeMoveBoard
+        state={stateWith(board, 1)}
+        onMove={onMove}
+        disabled={false}
+        lastMove={null}
+      />,
     );
 
     await user.click(screen.getByRole("gridcell", { name: "Row 2, column 1, O" }));
@@ -123,7 +157,12 @@ describe("TicTacToeMoveBoard", () => {
     board[4] = 2;
     board[5] = 2;
     render(
-      <TicTacToeMoveBoard state={stateWith(board, 1)} onMove={onMove} disabled={false} lastMove={null} />,
+      <TicTacToeMoveBoard
+        state={stateWith(board, 1)}
+        onMove={onMove}
+        disabled={false}
+        lastMove={null}
+      />,
     );
 
     await user.click(screen.getByRole("gridcell", { name: "Row 3, column 1, empty" }));
@@ -141,12 +180,19 @@ describe("TicTacToeMoveBoard", () => {
     board[4] = 2;
     board[5] = 2;
     render(
-      <TicTacToeMoveBoard state={stateWith(board, 1)} onMove={vi.fn()} disabled={false} lastMove={null} />,
+      <TicTacToeMoveBoard
+        state={stateWith(board, 1)}
+        onMove={vi.fn()}
+        disabled={false}
+        lastMove={null}
+      />,
     );
 
     const ownPiece = screen.getByRole("gridcell", { name: "Row 1, column 1, X" });
     await user.click(ownPiece);
-    expect(screen.getAllByText("Choose where to move it — tap it again to cancel.").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Choose where to move it — tap it again to cancel.").length,
+    ).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, X, selected" }));
     expect(screen.getAllByText("Select a piece to move.").length).toBeGreaterThan(0);
@@ -163,12 +209,19 @@ describe("TicTacToeMoveBoard", () => {
     board[4] = 2;
     board[5] = 2;
     render(
-      <TicTacToeMoveBoard state={stateWith(board, 1)} onMove={onMove} disabled={false} lastMove={null} />,
+      <TicTacToeMoveBoard
+        state={stateWith(board, 1)}
+        onMove={onMove}
+        disabled={false}
+        lastMove={null}
+      />,
     );
 
     const ownPiece = screen.getByRole("gridcell", { name: "Row 1, column 1, X" });
     await user.click(ownPiece);
-    expect(screen.getAllByText("Choose where to move it — tap it again to cancel.").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Choose where to move it — tap it again to cancel.").length,
+    ).toBeGreaterThan(0);
 
     await user.keyboard("{Escape}");
     expect(screen.getAllByText("Select a piece to move.").length).toBeGreaterThan(0);
@@ -214,21 +267,33 @@ describe("TicTacToeMoveBoard", () => {
     board[4] = 2;
     board[5] = 2;
     render(
-      <TicTacToeMoveBoard state={stateWith(board, 1)} onMove={onMove} disabled={false} lastMove={null} />,
+      <TicTacToeMoveBoard
+        state={stateWith(board, 1)}
+        onMove={onMove}
+        disabled={false}
+        lastMove={null}
+      />,
     );
 
     await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, X" }));
     await user.click(screen.getByRole("gridcell", { name: "Row 1, column 2, X" }));
 
     expect(onMove).not.toHaveBeenCalled();
-    expect(screen.getByRole("gridcell", { name: "Row 1, column 2, X, selected" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("gridcell", { name: "Row 1, column 2, X, selected" }),
+    ).toBeInTheDocument();
   });
 
   it("marks every cell aria-disabled and ignores clicks when disabled, without removing them from the tab order", async () => {
     const user = userEvent.setup();
     const onMove = vi.fn();
     render(
-      <TicTacToeMoveBoard state={stateWith(emptyBoard())} onMove={onMove} disabled lastMove={null} />,
+      <TicTacToeMoveBoard
+        state={stateWith(emptyBoard())}
+        onMove={onMove}
+        disabled
+        lastMove={null}
+      />,
     );
 
     const cells = screen.getAllByRole("gridcell");
@@ -260,7 +325,9 @@ describe("TicTacToeMoveBoard", () => {
     );
 
     await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, X" }));
-    expect(screen.queryAllByText("Choose where to move it — tap it again to cancel.")).toHaveLength(0);
+    expect(screen.queryAllByText("Choose where to move it — tap it again to cancel.")).toHaveLength(
+      0,
+    );
   });
 
   it("highlights the three winning cells when a winningLine is supplied", () => {
@@ -289,7 +356,12 @@ describe("TicTacToeMoveBoard", () => {
   it("supports arrow-key roving-tabindex navigation between cells", async () => {
     const user = userEvent.setup();
     render(
-      <TicTacToeMoveBoard state={stateWith(emptyBoard())} onMove={vi.fn()} disabled={false} lastMove={null} />,
+      <TicTacToeMoveBoard
+        state={stateWith(emptyBoard())}
+        onMove={vi.fn()}
+        disabled={false}
+        lastMove={null}
+      />,
     );
 
     const first = screen.getByRole("gridcell", { name: "Row 1, column 1, empty" });

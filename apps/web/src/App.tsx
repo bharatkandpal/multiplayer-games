@@ -47,9 +47,7 @@ const THEME_LABEL: Record<ReturnType<typeof useTheme>["theme"], string> = {
   system: "System",
 };
 
-const GAME_ROUTES: Partial<
-  Record<GameId, (props: GameRouteProps) => React.JSX.Element>
-> = {
+const GAME_ROUTES: Partial<Record<GameId, (props: GameRouteProps) => React.JSX.Element>> = {
   tictactoe: TicTacToeRoute,
   "tictactoe-move": TicTacToeMoveRoute,
   connect4: ConnectFourRoute,

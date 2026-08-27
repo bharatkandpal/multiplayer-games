@@ -33,7 +33,13 @@ describe("useRealtimeLoop", () => {
   beforeEach(() => {
     // Fake the rAF loop so the fixed-step sim advances deterministically under test.
     vi.useFakeTimers({
-      toFake: ["requestAnimationFrame", "cancelAnimationFrame", "setTimeout", "clearTimeout", "Date"],
+      toFake: [
+        "requestAnimationFrame",
+        "cancelAnimationFrame",
+        "setTimeout",
+        "clearTimeout",
+        "Date",
+      ],
     });
   });
 
@@ -46,7 +52,12 @@ describe("useRealtimeLoop", () => {
     const sampleInput = (): number => nextInput++;
     const module = makeCounter(endAt);
     const view = renderHook(() =>
-      useRealtimeLoop({ module, seed: 123, sampleInput, ...(onRunComplete ? { onRunComplete } : {}) }),
+      useRealtimeLoop({
+        module,
+        seed: 123,
+        sampleInput,
+        ...(onRunComplete ? { onRunComplete } : {}),
+      }),
     );
     return view;
   }

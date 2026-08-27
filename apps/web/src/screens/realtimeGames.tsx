@@ -64,7 +64,7 @@ export const REALTIME_GAMES: Partial<Record<RealtimeGameId, RealtimeGameWiring>>
 
 /** A fresh pseudo-random seed for a run — 16 bits is plenty for the PRNG. */
 function makeSeed(): number {
-  return (Date.now() & 0xffff) || 1;
+  return Date.now() & 0xffff || 1;
 }
 
 export interface RealtimeGameRouteProps {
@@ -78,7 +78,10 @@ export interface RealtimeGameRouteProps {
  * catalog entries straight here (no `SetupScreen` — nothing to configure for a
  * solo run). The initial seed is fixed per mount so a given run is reproducible.
  */
-export function RealtimeGameRoute({ gameId, onExit }: RealtimeGameRouteProps): React.JSX.Element | null {
+export function RealtimeGameRoute({
+  gameId,
+  onExit,
+}: RealtimeGameRouteProps): React.JSX.Element | null {
   const [seed] = useState(makeSeed);
   const wiring = REALTIME_GAMES[gameId];
   if (!wiring) return null;

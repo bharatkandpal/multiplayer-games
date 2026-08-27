@@ -1,10 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { floppyBirds, WORLD, type FloppyInput, type FloppyState } from "./floppy-birds";
-import {
-  clearRealtimeRegistry,
-  getRealtimeGame,
-  listRealtimeGames,
-} from "./realtime-registry";
+import { clearRealtimeRegistry, getRealtimeGame, listRealtimeGames } from "./realtime-registry";
 import { registerBuiltInRealtimeGames } from "./realtime-games";
 
 const NO_FLAP: FloppyInput = { flap: false };
@@ -65,7 +61,10 @@ describe("floppyBirds module", () => {
   });
 
   it("with no flaps the bird falls and the run ends with score 0", () => {
-    const states = run(7, Array.from({ length: 90 }, () => NO_FLAP));
+    const states = run(
+      7,
+      Array.from({ length: 90 }, () => NO_FLAP),
+    );
     const overAt = gameOverTick(states);
     expect(overAt).toBeGreaterThan(0); // it does end
     expect(states[overAt]!.birdY).toBeGreaterThan(WORLD.height / 2); // fell downward
@@ -73,7 +72,10 @@ describe("floppyBirds module", () => {
   });
 
   it("flapping every tick flies the bird into the ceiling (also ends, score 0)", () => {
-    const states = run(7, Array.from({ length: 90 }, () => FLAP));
+    const states = run(
+      7,
+      Array.from({ length: 90 }, () => FLAP),
+    );
     const overAt = gameOverTick(states);
     expect(overAt).toBeGreaterThan(0);
     expect(states[overAt]!.birdY).toBeLessThan(WORLD.height / 2); // flew upward
