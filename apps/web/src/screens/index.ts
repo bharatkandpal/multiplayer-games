@@ -17,3 +17,6 @@ export type {
 
 export { TicTacToeRoute, TicTacToeMoveRoute, ConnectFourRoute } from "./games";
 export type { GameRouteProps } from "./games";
+
+export { RealtimeGameRoute, REALTIME_GAMES } from "./realtimeGames";
+export type { RealtimeGameRouteProps, RealtimeGameWiring } from "./realtimeGames";
