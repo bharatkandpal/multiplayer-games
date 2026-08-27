@@ -1,5 +1,5 @@
 import { useId } from "react";
-import type { GameId } from "@mpg/engine";
+import type { GameId, RealtimeGameId } from "@mpg/engine";
 import styles from "./gameThumbnails.module.css";
 
 /**
@@ -145,6 +145,28 @@ function TicTacToeMoveThumbnail(): React.JSX.Element {
   );
 }
 
+function FloppyBirdsThumbnail(): React.JSX.Element {
+  return (
+    <svg
+      className={styles.svg}
+      viewBox="0 0 100 100"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {/* Two pipe pairs framing passable gaps. */}
+      <g className={styles.floppyPipe}>
+        <rect x="20" y="0" width="16" height="38" rx="2" />
+        <rect x="20" y="62" width="16" height="38" rx="2" />
+        <rect x="64" y="0" width="16" height="24" rx="2" />
+        <rect x="64" y="48" width="16" height="52" rx="2" />
+      </g>
+      {/* The bird, mid-flight between the gaps. */}
+      <circle className={styles.floppyBird} cx="48" cy="52" r="9" />
+      <circle className={styles.floppyEye} cx="51" cy="49" r="2" />
+    </svg>
+  );
+}
+
 /** Generic fallback so an uncatalogued game never renders without a thumbnail. */
 function GenericThumbnail(): React.JSX.Element {
   return (
@@ -178,7 +200,16 @@ export const GAME_THUMBNAILS: Partial<Record<GameId, () => React.JSX.Element>> =
   "tictactoe-move": TicTacToeMoveThumbnail,
 };
 
-export function GameThumbnail({ gameId }: { gameId: GameId }): React.JSX.Element {
-  const Thumbnail = GAME_THUMBNAILS[gameId] ?? GenericThumbnail;
+/** Real-time (arcade) thumbnails — sibling of GAME_THUMBNAILS, keyed by RealtimeGameId. */
+export const REALTIME_THUMBNAILS: Partial<Record<RealtimeGameId, () => React.JSX.Element>> = {
+  "floppy-birds": FloppyBirdsThumbnail,
+};
+
+/** Accepts either family's id (both are plain string unions); falls back to the generic mark. */
+export function GameThumbnail({ gameId }: { gameId: string }): React.JSX.Element {
+  const Thumbnail =
+    GAME_THUMBNAILS[gameId as GameId] ??
+    REALTIME_THUMBNAILS[gameId as RealtimeGameId] ??
+    GenericThumbnail;
   return <Thumbnail />;
 }

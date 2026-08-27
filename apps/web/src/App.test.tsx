@@ -13,13 +13,45 @@ async function advanceBotStep(): Promise<void> {
 }
 
 describe("App", () => {
-  it("renders engine-backed content (version + registered games)", () => {
+  it("renders engine-backed content (version + registered games, both families)", () => {
     render(<App />);
 
     expect(screen.getByText("Engine version:")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Available games" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tic-Tac-Toe" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connect Four" })).toBeInTheDocument();
+    // MPG-040f: the real-time family shows up in the same grid.
+    expect(screen.getByRole("button", { name: /Floppy Birds/ })).toBeInTheDocument();
+  });
+
+  it("MPG-040f: selecting a real-time game skips Setup and goes straight to the play surface", () => {
+    // jsdom has no 2D canvas; keep the Floppy renderer's getContext quiet.
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Floppy Birds/ }));
+
+    // No seat setup at all — the quick-start preset buttons never appear.
+    expect(screen.queryByRole("button", { name: /Play vs Bot/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Play a friend/ })).not.toBeInTheDocument();
+
+    // Straight to the realtime play surface: labelled play area + the one "Start".
+    expect(
+      screen.getByRole("application", { name: /Floppy Birds play area/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
+
+    vi.restoreAllMocks();
+  });
+
+  it("a turn-based game still routes through Setup (unchanged)", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Tic-Tac-Toe/ }));
+
+    // Setup's quick-start presets are present — we did NOT skip Setup.
+    expect(screen.getByRole("button", { name: /Play vs Bot/ })).toBeInTheDocument();
+    expect(screen.queryByRole("application")).not.toBeInTheDocument();
   });
 
   describe("MPG-050: opponent-switch on game-over (full Home -> Setup -> Play flow)", () => {
