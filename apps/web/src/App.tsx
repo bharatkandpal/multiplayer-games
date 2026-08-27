@@ -1,12 +1,20 @@
 import { useMemo, useState } from "react";
-import { hasGame, listGames, registerBuiltInGames } from "@mpg/engine";
-import type { GameId } from "@mpg/engine";
+import {
+  hasGame,
+  hasRealtimeGame,
+  listGames,
+  listRealtimeGames,
+  registerBuiltInGames,
+  registerBuiltInRealtimeGames,
+} from "@mpg/engine";
+import type { GameId, RealtimeGameId } from "@mpg/engine";
 import { useTheme } from "./lib/useTheme";
 import { UiGallery } from "./components/UiGallery";
 import { Button } from "./components/ui";
 import {
   ConnectFourRoute,
   HomeScreen,
+  RealtimeGameRoute,
   SetupScreen,
   TicTacToeMoveRoute,
   TicTacToeRoute,
@@ -20,11 +28,17 @@ import styles from "./App.module.css";
 if (!hasGame("tictactoe") && !hasGame("connect4")) {
   registerBuiltInGames();
 }
+if (!hasRealtimeGame("floppy-birds")) {
+  registerBuiltInRealtimeGames();
+}
 
 type Route =
   | { screen: "home" }
   | { screen: "setup"; gameId: GameId }
   | { screen: "play"; gameId: GameId; seats: SeatsConfig }
+  // Real-time (solo arcade) games skip Setup entirely — nothing to configure
+  // for a solo run — and go straight to the realtime play surface (ADR 0002 §2).
+  | { screen: "realtime"; gameId: RealtimeGameId }
   | { screen: "gallery" };
 
 const THEME_LABEL: Record<ReturnType<typeof useTheme>["theme"], string> = {
@@ -33,9 +47,7 @@ const THEME_LABEL: Record<ReturnType<typeof useTheme>["theme"], string> = {
   system: "System",
 };
 
-const GAME_ROUTES: Partial<
-  Record<GameId, (props: GameRouteProps) => React.JSX.Element>
-> = {
+const GAME_ROUTES: Partial<Record<GameId, (props: GameRouteProps) => React.JSX.Element>> = {
   tictactoe: TicTacToeRoute,
   "tictactoe-move": TicTacToeMoveRoute,
   connect4: ConnectFourRoute,
@@ -58,6 +70,7 @@ function GameRoute({
  */
 export default function App(): React.JSX.Element {
   const games = useMemo(() => listGames(), []);
+  const realtimeGames = useMemo(() => listRealtimeGames(), []);
   const { theme, resolvedTheme, cycleTheme } = useTheme();
   const [route, setRoute] = useState<Route>({ screen: "home" });
   // MPG-050: `useLocalPlayController` only (re-)initializes its session on
@@ -81,7 +94,9 @@ export default function App(): React.JSX.Element {
       {route.screen === "home" ? (
         <HomeScreen
           games={games}
+          realtimeGames={realtimeGames}
           onSelectGame={(gameId) => setRoute({ screen: "setup", gameId })}
+          onSelectRealtimeGame={(gameId) => setRoute({ screen: "realtime", gameId })}
           onShowGallery={() => setRoute({ screen: "gallery" })}
         />
       ) : null}
@@ -105,6 +120,10 @@ export default function App(): React.JSX.Element {
             setRoute({ screen: "play", gameId: route.gameId, seats });
           }}
         />
+      ) : null}
+
+      {route.screen === "realtime" ? (
+        <RealtimeGameRoute gameId={route.gameId} onExit={() => setRoute({ screen: "home" })} />
       ) : null}
 
       {route.screen === "gallery" ? (

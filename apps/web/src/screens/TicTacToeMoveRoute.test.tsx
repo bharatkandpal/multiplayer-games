@@ -117,9 +117,7 @@ describe("GamePlayScreen — local play-through (via TicTacToeMoveRoute)", () =>
 
     await waitFor(() => {
       const statuses = screen.getAllByRole("status");
-      expect(
-        statuses.some((el) => el.textContent?.includes("repeated three times")),
-      ).toBe(true);
+      expect(statuses.some((el) => el.textContent?.includes("repeated three times"))).toBe(true);
     });
 
     // Board is still visible (and inert) once the game is over — no dialog.

@@ -3,7 +3,9 @@ import { ticTacToe } from "@mpg/engine";
 import type { TicTacToeMove, TicTacToeState } from "@mpg/engine";
 import { createGameSession, gameSessionReducer } from "./gameSession";
 
-function play(moves: TicTacToeMove[]): ReturnType<typeof createGameSession<TicTacToeState, TicTacToeMove>> {
+function play(
+  moves: TicTacToeMove[],
+): ReturnType<typeof createGameSession<TicTacToeState, TicTacToeMove>> {
   let session = createGameSession(ticTacToe);
   session = gameSessionReducer(session, { type: "start" });
   for (const move of moves) {
@@ -63,9 +65,7 @@ describe("gameSessionReducer", () => {
     // X | O | X
     // X | O | O
     // O | X | X
-    const session = play(
-      [0, 1, 2, 4, 3, 6, 5, 8, 7].map((cell) => ({ cell })),
-    );
+    const session = play([0, 1, 2, 4, 3, 6, 5, 8, 7].map((cell) => ({ cell })));
 
     expect(session.result).toEqual({ status: "draw", reason: "board-full" });
     expect(session.status).toEqual({ type: "game_over" });

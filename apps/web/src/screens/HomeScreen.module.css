@@ -90,6 +90,21 @@
   font-weight: var(--font-weight-bold);
 }
 
+/* Marks a real-time (solo arcade) card so the family reads at a glance — these
+   skip seat setup and go straight to play. Small, muted; part of the card's
+   accessible name (not aria-hidden) so it's conveyed to assistive tech too. */
+.gameKindTag {
+  align-self: flex-start;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-bg-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-100);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
 .empty {
   padding: var(--space-6);
   border: var(--border-width-thin) dashed var(--color-border-strong);

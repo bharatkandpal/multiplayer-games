@@ -40,3 +40,18 @@
 .moveArrowHead {
   fill: var(--color-text-muted);
 }
+
+/* Real-time "arcade" thumbnails (Floppy Birds) — pipes + bird, using the same
+   success/warning tokens the live Canvas renderer reads, so the preview reads
+   as the game in both themes. */
+.floppyPipe {
+  fill: var(--color-success);
+}
+
+.floppyBird {
+  fill: var(--color-warning);
+}
+
+.floppyEye {
+  fill: var(--color-text);
+}

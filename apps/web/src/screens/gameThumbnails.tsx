@@ -1,5 +1,5 @@
 import { useId } from "react";
-import type { GameId } from "@mpg/engine";
+import type { GameId, RealtimeGameId } from "@mpg/engine";
 import styles from "./gameThumbnails.module.css";
 
 /**
@@ -16,12 +16,7 @@ import styles from "./gameThumbnails.module.css";
 
 function TicTacToeThumbnail(): React.JSX.Element {
   return (
-    <svg
-      className={styles.svg}
-      viewBox="0 0 100 100"
-      aria-hidden="true"
-      focusable="false"
-    >
+    <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
       <g className={styles.grid} fill="none" strokeWidth="4" strokeLinecap="round">
         <line x1="34" y1="8" x2="34" y2="92" />
         <line x1="66" y1="8" x2="66" y2="92" />
@@ -34,14 +29,7 @@ function TicTacToeThumbnail(): React.JSX.Element {
         <line x1="26" y1="14" x2="14" y2="26" />
       </g>
       {/* O in center cell */}
-      <circle
-        className={styles.markPlayer2}
-        cx="50"
-        cy="50"
-        r="9"
-        fill="none"
-        strokeWidth="5"
-      />
+      <circle className={styles.markPlayer2} cx="50" cy="50" r="9" fill="none" strokeWidth="5" />
     </svg>
   );
 }
@@ -50,12 +38,7 @@ function ConnectFourThumbnail(): React.JSX.Element {
   const cols = [15, 38, 61, 84];
   const rows = [15, 38, 61, 84];
   return (
-    <svg
-      className={styles.svg}
-      viewBox="0 0 100 100"
-      aria-hidden="true"
-      focusable="false"
-    >
+    <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
       <rect
         x="4"
         y="4"
@@ -68,13 +51,7 @@ function ConnectFourThumbnail(): React.JSX.Element {
       />
       {cols.map((cx) =>
         rows.map((cy) => (
-          <circle
-            key={`${cx}-${cy}`}
-            cx={cx}
-            cy={cy}
-            r="9"
-            className={styles.slot}
-          />
+          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="9" className={styles.slot} />
         )),
       )}
       {/* A couple of stacked player discs at the bottom of one column */}
@@ -91,12 +68,7 @@ function TicTacToeMoveThumbnail(): React.JSX.Element {
   const arrowheadId = useId();
 
   return (
-    <svg
-      className={styles.svg}
-      viewBox="0 0 100 100"
-      aria-hidden="true"
-      focusable="false"
-    >
+    <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
       <g className={styles.grid} fill="none" strokeWidth="4" strokeLinecap="round">
         <line x1="34" y1="8" x2="34" y2="92" />
         <line x1="66" y1="8" x2="66" y2="92" />
@@ -109,14 +81,7 @@ function TicTacToeMoveThumbnail(): React.JSX.Element {
         <line x1="26" y1="14" x2="14" y2="26" />
       </g>
       {/* a second, settled piece */}
-      <circle
-        className={styles.markPlayer2}
-        cx="82"
-        cy="82"
-        r="9"
-        fill="none"
-        strokeWidth="5"
-      />
+      <circle className={styles.markPlayer2} cx="82" cy="82" r="9" fill="none" strokeWidth="5" />
       {/* relocation cue: a subtle dashed arrow from the moving piece toward
           the empty center cell, hinting the "move a piece" variant. Part of
           the decorative graphic — not an independent focusable element. */}
@@ -145,15 +110,27 @@ function TicTacToeMoveThumbnail(): React.JSX.Element {
   );
 }
 
+function FloppyBirdsThumbnail(): React.JSX.Element {
+  return (
+    <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      {/* Two pipe pairs framing passable gaps. */}
+      <g className={styles.floppyPipe}>
+        <rect x="20" y="0" width="16" height="38" rx="2" />
+        <rect x="20" y="62" width="16" height="38" rx="2" />
+        <rect x="64" y="0" width="16" height="24" rx="2" />
+        <rect x="64" y="48" width="16" height="52" rx="2" />
+      </g>
+      {/* The bird, mid-flight between the gaps. */}
+      <circle className={styles.floppyBird} cx="48" cy="52" r="9" />
+      <circle className={styles.floppyEye} cx="51" cy="49" r="2" />
+    </svg>
+  );
+}
+
 /** Generic fallback so an uncatalogued game never renders without a thumbnail. */
 function GenericThumbnail(): React.JSX.Element {
   return (
-    <svg
-      className={styles.svg}
-      viewBox="0 0 100 100"
-      aria-hidden="true"
-      focusable="false"
-    >
+    <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
       <rect
         x="4"
         y="4"
@@ -178,7 +155,16 @@ export const GAME_THUMBNAILS: Partial<Record<GameId, () => React.JSX.Element>> =
   "tictactoe-move": TicTacToeMoveThumbnail,
 };
 
-export function GameThumbnail({ gameId }: { gameId: GameId }): React.JSX.Element {
-  const Thumbnail = GAME_THUMBNAILS[gameId] ?? GenericThumbnail;
+/** Real-time (arcade) thumbnails — sibling of GAME_THUMBNAILS, keyed by RealtimeGameId. */
+export const REALTIME_THUMBNAILS: Partial<Record<RealtimeGameId, () => React.JSX.Element>> = {
+  "floppy-birds": FloppyBirdsThumbnail,
+};
+
+/** Accepts either family's id (both are plain string unions); falls back to the generic mark. */
+export function GameThumbnail({ gameId }: { gameId: string }): React.JSX.Element {
+  const Thumbnail =
+    GAME_THUMBNAILS[gameId as GameId] ??
+    REALTIME_THUMBNAILS[gameId as RealtimeGameId] ??
+    GenericThumbnail;
   return <Thumbnail />;
 }
