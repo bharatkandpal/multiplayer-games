@@ -201,74 +201,212 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* LOSE — sole local human (MPG-047): cracked-glass fracture lines snap  */
-/* over the board while it briefly shakes. The bot's winning line is     */
-/* recolored red by the board itself (winningLineTone="loss").           */
+/* LOSE — sole local human: the light drains out. A dark vignette closes */
+/* in over the board (center stays clearest, so the red winning line     */
+/* still reads), the board gives one heavy downward "sink", and grey ash  */
+/* drifts down the whole viewport — the somber mirror of the win confetti.*/
+/* The bot's winning line is recolored red by the board (tone="loss").    */
 /* ------------------------------------------------------------------ */
 
-.boardShake {
-  animation: boardShake 0.5s var(--ease-standard);
+.boardSink {
+  animation: boardSink 0.7s var(--ease-standard);
 }
 
-@keyframes boardShake {
-  0%,
+@keyframes boardSink {
+  0% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(10px) scale(0.985);
+  }
   100% {
-    transform: translateX(0);
-  }
-  10%,
-  50%,
-  90% {
-    transform: translateX(-5px);
-  }
-  30%,
-  70% {
-    transform: translateX(5px);
+    transform: translateY(0);
   }
 }
 
-.loseCracks {
+/* Vignette closing in from the edges. Transparent core keeps the center (and
+   the red winning line) legible; fades in and holds. */
+.loseVeil {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 30%,
+    rgba(10, 12, 15, 0.35) 68%,
+    rgba(10, 12, 15, 0.62) 100%
+  );
+  animation: loseVeilIn 0.9s var(--ease-standard) forwards;
+}
+
+@keyframes loseVeilIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Full-viewport grey ashfall — slower, sparser and dimmer than the confetti. */
+.ashLayer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.ashPiece {
+  position: absolute;
+  top: 0;
+  left: var(--x);
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background-color: hsl(220 8% var(--shade));
+  opacity: 0;
+  transform: translateY(-8vh) scale(var(--scale));
+  animation: ashFall var(--duration) var(--ease-linear) var(--delay) forwards;
+}
+
+@keyframes ashFall {
+  0% {
+    opacity: 0;
+    transform: translateY(-8vh) translateX(0) scale(var(--scale));
+  }
+  12% {
+    opacity: 0.5;
+  }
+  85% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(108vh) translateX(var(--drift)) scale(var(--scale));
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* DRAW — neutral: two evenly-matched sides deadlock. Neutral bars slide  */
+/* in from opposite edges and meet dead-center, where a soft pulse blooms  */
+/* — symmetric by construction, so it can't read as either side winning.   */
+/* ------------------------------------------------------------------ */
+
+.drawStalemate {
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 2;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.crackSvg {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
+.drawBar {
+  position: absolute;
+  top: 50%;
+  width: 50%;
+  height: 4px;
+  margin-top: -2px;
+  opacity: 0;
+  background: linear-gradient(var(--dir, to right), transparent, var(--color-border-strong));
 }
 
-/* White fractures with a dark halo so they read on any board color. */
-.crackGroup {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.92);
-  stroke-width: 1.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  filter: drop-shadow(0 0 1.2px rgba(0, 0, 0, 0.7));
-  vector-effect: non-scaling-stroke;
+.drawBarLeft {
+  left: 0;
+  --dir: to right;
+  animation: drawInLeft 0.55s var(--ease-standard) forwards;
 }
 
-.crackGroup polyline {
-  stroke-dasharray: 200;
-  stroke-dashoffset: 200;
-  animation: crackDraw 0.42s var(--ease-standard) forwards;
+.drawBarRight {
+  right: 0;
+  --dir: to left;
+  animation: drawInRight 0.55s var(--ease-standard) forwards;
 }
 
-@keyframes crackDraw {
-  to {
-    stroke-dashoffset: 0;
+@keyframes drawInLeft {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  60% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 0.9;
+  }
+}
+
+@keyframes drawInRight {
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  60% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 0.9;
+  }
+}
+
+/* Soft neutral bloom where the two bars meet, timed to land as they touch. */
+.drawSpark {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  opacity: 0;
+  transform: scale(0.3);
+  background: radial-gradient(circle, var(--color-text-muted) 0%, transparent 70%);
+  animation: drawSpark 0.6s var(--ease-standard) 0.45s forwards;
+}
+
+@keyframes drawSpark {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  45% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .boardShake {
+  .boardSink {
     animation: none;
   }
 
-  .crackGroup polyline {
+  .loseVeil {
     animation: none;
-    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+
+  .ashPiece {
+    animation: none;
+    opacity: 0;
+  }
+
+  .drawBar {
+    animation: none;
+    opacity: 0.9;
+    transform: translateX(0);
+  }
+
+  .drawSpark {
+    animation: none;
+    opacity: 0.5;
+    transform: scale(1);
   }
 }
