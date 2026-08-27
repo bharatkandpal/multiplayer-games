@@ -1,0 +1,124 @@
+.main {
+  max-width: var(--container-md);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+@media (max-width: 420px) {
+  .main {
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+  }
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.heading {
+  font-size: var(--font-size-500);
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--space-8);
+  margin-bottom: var(--space-4);
+}
+
+/* The score total, made prominent within the badge — read as text, never
+   conveyed by motion alone (ADR 0002 §5). Tabular figures so it doesn't
+   jitter as the count climbs. */
+.scoreValue {
+  margin-left: var(--space-1);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The play surface hosts the per-game renderer plus the state overlays. Square
+   by default, capped to the container width so it stays responsive down to
+   320px. Focusable so keyboard users can flap once the run is under way. */
+.surface {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto var(--space-4);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-surface-sunken, var(--color-surface));
+  touch-action: none;
+  user-select: none;
+}
+
+.surface:focus-visible {
+  outline: var(--focus-ring-width, 3px) solid var(--color-focus, var(--color-primary));
+  outline-offset: 2px;
+}
+
+.surfaceRunning {
+  cursor: pointer;
+}
+
+/* Ready / paused / game-over overlays: a translucent scrim over the frozen
+   scene with a single primary action, centered. */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--color-bg) 62%, transparent);
+  backdrop-filter: blur(1px);
+  text-align: center;
+}
+
+.overlayInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.overlayTitle {
+  margin: 0;
+  font-size: var(--font-size-500);
+  font-weight: var(--font-weight-bold);
+}
+
+.overlayText {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-300);
+}
+
+.playAgainIcon {
+  display: inline-block;
+  margin-right: var(--space-2);
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+/* On-screen action buttons for multi-action games (single-action games tap the
+   surface itself and render none of these). */
+.touchControls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.hint {
+  margin: 0;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-200);
+}

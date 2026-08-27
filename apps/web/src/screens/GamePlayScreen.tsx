@@ -290,7 +290,8 @@ export function GamePlayScreen<S, M, L = unknown>({
   // MPG-051: the crown marks who won, independent of tone/celebration — shown
   // for every win, in every mode (including the "subdued" defeat case, where
   // the winning bot still gets its crown). No crown on a draw.
-  const winnerSeatIndex = session.result.status === "win" ? seatIndexOf(session.result.winner) : null;
+  const winnerSeatIndex =
+    session.result.status === "win" ? seatIndexOf(session.result.winner) : null;
 
   const renderSeatCard = (seat: (typeof seats)[number], indexInSeats: number): ReactNode => (
     <SeatCard
@@ -359,13 +360,9 @@ export function GamePlayScreen<S, M, L = unknown>({
       ) : null}
 
       {/* MPG-046: all seats in a single row above the board. */}
-      <div className={styles.seatRow}>
-        {seats.map((seat, i) => renderSeatCard(seat, i))}
-      </div>
+      <div className={styles.seatRow}>{seats.map((seat, i) => renderSeatCard(seat, i))}</div>
 
-      <div
-        className={cx(styles.boardWrap, isGameOver && tone === "subdued" && styles.boardShake)}
-      >
+      <div className={cx(styles.boardWrap, isGameOver && tone === "subdued" && styles.boardShake)}>
         {renderBoard({
           state: session.state,
           onMove: play,
@@ -378,7 +375,9 @@ export function GamePlayScreen<S, M, L = unknown>({
         {/* MPG-046/047: tone-specific decoration over the board, entirely
             aria-hidden — the outcome itself is carried by the live region
             below, not by these effects. */}
-        {isGameOver && tone === "celebrate" ? <div className={styles.winFlash} aria-hidden="true" /> : null}
+        {isGameOver && tone === "celebrate" ? (
+          <div className={styles.winFlash} aria-hidden="true" />
+        ) : null}
         {isGameOver && tone === "subdued" ? <CrackedGlass /> : null}
       </div>
 
@@ -404,7 +403,11 @@ export function GamePlayScreen<S, M, L = unknown>({
           </Button>
 
           {onPlayAgain && playAgainPresets.length > 0 ? (
-            <div className={styles.playAgainGroup} role="group" aria-labelledby={playAgainHeadingId}>
+            <div
+              className={styles.playAgainGroup}
+              role="group"
+              aria-labelledby={playAgainHeadingId}
+            >
               <span id={playAgainHeadingId} className={styles.playAgainLabel}>
                 or play again vs…
               </span>

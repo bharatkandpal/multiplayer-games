@@ -1,47 +1,28 @@
-// THROWAWAY SPIKE (MPG-039) — not shipped. See docs/adr/0002-realtime-games.md.
+// Floppy Birds (MPG-040) — a solo real-time arcade game implementing the pure
+// RealtimeModule<S, I> contract (ADR 0002). Tap-to-flap against gravity; thread the
+// bird through gaps in scrolling pipes; score one per pipe passed; a collision with a
+// pipe, the ceiling, or the ground ends the run.
 //
-// A prototype `RealtimeModule<S, I>` implementation used to de-risk the ADR's
-// proposed abstraction. It mirrors what the shared engine (packages/engine) would
-// export for realtime games: PURE, no I/O, no clock, no Math.random. The rAF loop,
-// wall-clock, DOM input sampling, and rendering all live OUTSIDE this module (in
-// FloppySpike.tsx) — exactly the client/engine split the turn-based side already has.
-//
-// NOTE: the interface below is sketched here (throwaway) rather than in
-// packages/engine on purpose — landing it in the engine is the actual MPG-040 work,
-// gated on ADR sign-off. This file only proves the shape is implementable & testable.
+// PURE, exactly like the turn-based GameModules: no clock, no rAF, no Math.random. All
+// randomness (pipe gap positions) derives from the seed and is carried in state via the
+// PRNG (see ./prng). The rAF loop, wall-clock pacing, input sampling and rendering all
+// live in the web controller/renderer (MPG-040c/e). Given a seed + a per-tick input
+// sequence, a run is fully deterministic and replayable — unit-testable with no fakes.
 
 import { nextFloat, seedPrng, type PrngState } from "./prng";
+import type { RealtimeModule } from "./realtime";
 
-// ── Proposed sibling interface (sketch; real home is packages/engine on adoption) ──
-
-/** Per-tick input sampled by the controller. Discrete edge or continuous — module-defined. */
-export interface RealtimeModule<S, I> {
-  readonly id: string;
-  readonly kind: "realtime";
-  /** Fixed simulation rate. The controller steps the sim at exactly this Hz (see FloppySpike). */
-  readonly tickHz: number;
-  /** Fresh state from a seed. All randomness is derived from `seed` and carried in S. */
-  createInitialState(seed: number): S;
-  /** Advance the sim by exactly one fixed tick. PURE: (state, input) → state. */
-  tick(state: S, input: I): S;
-  /** Current run score. */
-  getScore(state: S): number;
-  /** Whether the run has ended (score is final). */
-  isGameOver(state: S): boolean;
-}
-
-// ── Floppy Birds toy ──
-
+/** Per-tick input: a flap is a rising edge (true only on the tick it's requested). */
 export interface FloppyInput {
-  /** True only on the tick a flap was requested (rising edge). */
   readonly flap: boolean;
 }
 
 export interface Pipe {
+  /** Leading-edge x position in world units; decreases each tick as pipes scroll left. */
   readonly x: number;
-  /** Vertical center of the gap. */
+  /** Vertical center of the passable gap. */
   readonly gapY: number;
-  /** Whether the bird has already passed this pipe (for scoring). */
+  /** Whether the bird has already passed (and scored) this pipe. */
   readonly scored: boolean;
 }
 
@@ -52,11 +33,14 @@ export interface FloppyState {
   readonly score: number;
   readonly over: boolean;
   readonly rng: PrngState;
-  /** Ticks since spawn — drives pipe cadence deterministically (no wall clock). */
+  /** Ticks since start — drives pipe spawn cadence deterministically (no wall clock). */
   readonly t: number;
 }
 
-// World constants in "world units"; the renderer maps these to canvas pixels.
+/**
+ * World constants in abstract "world units" (the renderer maps these to canvas pixels,
+ * MPG-040e). Tuned in the MPG-039 spike; reproduced here to spec.
+ */
 export const WORLD = {
   width: 100,
   height: 100,
@@ -72,6 +56,7 @@ export const WORLD = {
 
 const TICK_HZ = 60;
 
+/** Spawns a pipe at the right edge with a randomly-placed gap. Pure: advances the RNG. */
 function spawnPipe(rng: PrngState): { pipe: Pipe; rng: PrngState } {
   const { value, next } = nextFloat(rng);
   const margin = WORLD.pipeGap / 2 + 6;
@@ -80,7 +65,7 @@ function spawnPipe(rng: PrngState): { pipe: Pipe; rng: PrngState } {
 }
 
 export const floppyBirds: RealtimeModule<FloppyState, FloppyInput> = {
-  id: "floppy-birds-spike",
+  id: "floppy-birds",
   kind: "realtime",
   tickHz: TICK_HZ,
 
@@ -99,13 +84,17 @@ export const floppyBirds: RealtimeModule<FloppyState, FloppyInput> = {
   },
 
   tick(state: FloppyState, input: FloppyInput): FloppyState {
+    // Once over, the run is frozen — ticks are a no-op (score is final).
     if (state.over) return state;
 
     const t = state.t + 1;
+    // A flap replaces the current velocity with the (upward) impulse; gravity then
+    // applies this tick either way.
     const birdV = (input.flap ? WORLD.flapImpulse : state.birdV) + WORLD.gravity;
     const birdY = state.birdY + birdV;
 
-    // Advance pipes; score when the bird's x passes a pipe's trailing edge.
+    // Scroll pipes left; score the tick the bird's x passes a pipe's trailing edge;
+    // drop pipes once fully off the left edge.
     let score = state.score;
     const moved: Pipe[] = [];
     for (const p of state.pipes) {
@@ -127,11 +116,12 @@ export const floppyBirds: RealtimeModule<FloppyState, FloppyInput> = {
       pipes = [...moved, spawned.pipe];
     }
 
-    // Collision: ground/ceiling, or hitting a pipe body outside the gap.
+    // Collision: ground/ceiling, or a pipe body outside its gap.
     let over = birdY - WORLD.birdRadius < 0 || birdY + WORLD.birdRadius > WORLD.height;
     for (const p of pipes) {
       const withinX =
-        WORLD.birdX + WORLD.birdRadius > p.x && WORLD.birdX - WORLD.birdRadius < p.x + WORLD.pipeWidth;
+        WORLD.birdX + WORLD.birdRadius > p.x &&
+        WORLD.birdX - WORLD.birdRadius < p.x + WORLD.pipeWidth;
       if (!withinX) continue;
       const gapTop = p.gapY - WORLD.pipeGap / 2;
       const gapBottom = p.gapY + WORLD.pipeGap / 2;

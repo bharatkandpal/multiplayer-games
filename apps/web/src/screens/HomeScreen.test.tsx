@@ -95,9 +95,59 @@ describe("HomeScreen", () => {
   it("calls onShowGallery when the design-system kit link is activated", async () => {
     const user = userEvent.setup();
     const onShowGallery = vi.fn();
-    render(<HomeScreen games={["tictactoe"]} onSelectGame={vi.fn()} onShowGallery={onShowGallery} />);
+    render(
+      <HomeScreen games={["tictactoe"]} onSelectGame={vi.fn()} onShowGallery={onShowGallery} />,
+    );
 
     await user.click(screen.getByRole("button", { name: "View design-system kit" }));
     expect(onShowGallery).toHaveBeenCalledOnce();
+  });
+
+  // MPG-040f: real-time (arcade) games share the one Home grid, tagged by kind.
+  it("lists real-time games alongside turn-based ones in the same grid, tagged 'Solo arcade'", () => {
+    render(
+      <HomeScreen
+        games={["tictactoe", "connect4"]}
+        realtimeGames={["floppy-birds"]}
+        onSelectGame={vi.fn()}
+        onSelectRealtimeGame={vi.fn()}
+        onShowGallery={vi.fn()}
+      />,
+    );
+
+    const list = screen.getByRole("list", { name: "Available games" });
+    const cards = within(list).getAllByRole("button");
+    expect(cards).toHaveLength(3); // 2 turn-based + 1 real-time, one grid
+
+    // Turn-based cards come first; the real-time card is tagged.
+    expect(screen.getByRole("button", { name: /Floppy Birds/ })).toBeInTheDocument();
+    expect(screen.getByText("Solo arcade")).toBeInTheDocument();
+
+    // Every card still carries a decorative, AT-hidden thumbnail.
+    const floppySvg = screen.getByRole("button", { name: /Floppy Birds/ }).querySelector("svg");
+    expect(floppySvg).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("routes a real-time card through onSelectRealtimeGame (never onSelectGame)", async () => {
+    const user = userEvent.setup();
+    const onSelectGame = vi.fn();
+    const onSelectRealtimeGame = vi.fn();
+    render(
+      <HomeScreen
+        games={["tictactoe"]}
+        realtimeGames={["floppy-birds"]}
+        onSelectGame={onSelectGame}
+        onSelectRealtimeGame={onSelectRealtimeGame}
+        onShowGallery={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Floppy Birds/ }));
+    expect(onSelectRealtimeGame).toHaveBeenCalledExactlyOnceWith("floppy-birds");
+    expect(onSelectGame).not.toHaveBeenCalled();
+
+    // ...and a turn-based card still goes through onSelectGame.
+    await user.click(screen.getByRole("button", { name: /Tic-Tac-Toe/ }));
+    expect(onSelectGame).toHaveBeenCalledExactlyOnceWith("tictactoe");
   });
 });

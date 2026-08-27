@@ -4,7 +4,15 @@
 
 export const ENGINE_VERSION = "0.0.0";
 
-export type { Player, GameId, Difficulty, GameStatus, Result, GameModule, DrawReason } from "./types";
+export type {
+  Player,
+  GameId,
+  Difficulty,
+  GameStatus,
+  Result,
+  GameModule,
+  DrawReason,
+} from "./types";
 
 export { IllegalMoveError } from "./errors";
 export type { IllegalMoveReason } from "./errors";
@@ -12,15 +20,31 @@ export type { IllegalMoveReason } from "./errors";
 export { registerGame, getGame, hasGame, listGames, clearRegistry } from "./registry";
 export type { AnyGameModule } from "./registry";
 
+// Real-time arcade game family (ADR 0002) — a sibling of the turn-based surface
+// above, with its own module interface, id union, and registry.
+export type { RealtimeModule, RealtimeGameId } from "./realtime";
+export {
+  registerRealtimeGame,
+  getRealtimeGame,
+  hasRealtimeGame,
+  listRealtimeGames,
+  clearRealtimeRegistry,
+} from "./realtime-registry";
+export type { AnyRealtimeModule } from "./realtime-registry";
+
+export { seedPrng, nextFloat } from "./prng";
+export type { PrngState } from "./prng";
+
+export { floppyBirds, WORLD as FLOPPY_WORLD } from "./floppy-birds";
+export type { FloppyState, FloppyInput, Pipe } from "./floppy-birds";
+
+export { builtInRealtimeGames, registerBuiltInRealtimeGames } from "./realtime-games";
+
 export { ticTacToe } from "./tictactoe";
 export type { TicTacToeState, TicTacToeMove, TicTacToeLine, Cell } from "./tictactoe";
 
 export { ticTacToeMove } from "./tictactoe-move";
-export type {
-  TicTacToeMoveState,
-  TicTacToeMoveMove,
-  TicTacToeMoveLine,
-} from "./tictactoe-move";
+export type { TicTacToeMoveState, TicTacToeMoveMove, TicTacToeMoveLine } from "./tictactoe-move";
 
 export { connectFour } from "./connect4";
 export type {

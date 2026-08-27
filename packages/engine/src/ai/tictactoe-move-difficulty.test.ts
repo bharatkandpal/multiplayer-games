@@ -105,9 +105,7 @@ describe("tictactoe-move AI: pickMove legality", () => {
     state = ticTacToeMove.applyMove(state, { kind: "place", cell: 4 }, 2);
     state = ticTacToeMove.applyMove(state, { kind: "place", cell: 2 }, 1); // X wins.
     expect(ticTacToeMove.getResult(state).status).toBe("win");
-    expect(() => pickMove(ticTacToeMove, state, "hard", mulberry32(1))).toThrow(
-      /no legal moves/i,
-    );
+    expect(() => pickMove(ticTacToeMove, state, "hard", mulberry32(1))).toThrow(/no legal moves/i);
   });
 });
 
