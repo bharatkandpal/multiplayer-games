@@ -50,6 +50,18 @@ jobs:
             echo "prod_flag=" >> "$GITHUB_OUTPUT"
           fi
 
+      # vercel build runs the project's own build, which uses pnpm — it must be
+      # on PATH on the runner (otherwise: "Error: spawn pnpm ENOENT").
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        # Version is read from the "packageManager" field in package.json.
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
