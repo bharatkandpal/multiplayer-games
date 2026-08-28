@@ -184,7 +184,10 @@ guest joins open seat → play → result → rematch. _(Empty seat can be switc
 
 - Turn clock in link-share games for the POC? (Assumed: no.)
 - Easy bot: "random with occasional good moves" or "shallow minimax"? (Proposed in GAME_LOGIC.md.)
-- Persist finished-game results in the POC, or fully ephemeral? (Assumed: ephemeral.)
+- ~~Persist finished-game results in the POC, or fully ephemeral?~~ **Resolved
+  ([ADR 0003](adr/0003-durable-persistence.md)):** we **persist** server-authoritative
+  finished-game results (and their move/input logs) in Postgres once the first durable
+  social feature ships — decoupled from accounts, on a minimal no-PII session token.
 - Display-name profanity filtering for the POC? (Assumed: light client-side check.)
 - For bot-vs-bot watch, do we want a pacing delay between moves so it's watchable? (Assumed: yes, ~600ms.)
 

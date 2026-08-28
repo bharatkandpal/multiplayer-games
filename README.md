@@ -78,3 +78,6 @@ multiplayer-games/
 | [docs/ROADMAP.md](docs/ROADMAP.md)                                 | Milestones & phased delivery                                                   |
 | [docs/adr/0001-tech-stack.md](docs/adr/0001-tech-stack.md)         | ADR: core tech stack decision (TypeScript both ends)                           |
 | [docs/adr/0002-realtime-games.md](docs/adr/0002-realtime-games.md) | ADR (Accepted): real-time arcade games alongside turn-based (`RealtimeModule`) |
+| [docs/adr/0003-durable-persistence.md](docs/adr/0003-durable-persistence.md) | ADR (Accepted): durable persistence & data store (Postgres; adapter boundary) |
+| [docs/adr/0004-identity-and-social-writes.md](docs/adr/0004-identity-and-social-writes.md) | ADR (Accepted): lightweight identity, durable sessions & social write model |
+| [docs/adr/0005-realtime-chat-and-reactions.md](docs/adr/0005-realtime-chat-and-reactions.md) | ADR (Accepted): in-game realtime chat & emoji reactions (ephemeral; fan-out; moderation) |

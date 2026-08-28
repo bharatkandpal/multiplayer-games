@@ -28,7 +28,7 @@ power AI mode, multiplayer mode, and tests without duplication.
 | Realtime transport | Socket.IO                                              | Rooms, reconnection, fallbacks out of the box.                                                                                                  |
 | Backend            | Node.js + Express (HTTP) + Socket.IO                   | Same runtime as engine; simple.                                                                                                                 |
 | Ephemeral state    | Redis                                                  | Room/game state, TTL expiry, horizontal scale later.                                                                                            |
-| Persistent store   | Postgres (Phase 3+)                                    | Accounts/stats when we add them. Not in v1.                                                                                                     |
+| Persistent store   | Postgres (durable system-of-record)                    | **Ratified in [ADR 0003](adr/0003-durable-persistence.md).** Results, leaderboard, sessions, share links; introduced with the first durable feature (MPG-053), **decoupled from accounts**. Behind a repository adapter (Postgres + in-memory/SQLite for DB-free tests), mirroring the Redis pattern. Redis stays ephemeral-only. |
 | Monorepo tooling   | pnpm workspaces (or npm)                               | Share `packages/engine` between apps.                                                                                                           |
 | Tests              | Vitest + Playwright                                    | Unit for engine/AI, e2e for flows.                                                                                                              |
 
@@ -238,7 +238,13 @@ One loop drives every seat type. After any applied move:
 ## 11. Security & Privacy
 
 - No auth in v1; identity is ephemeral per session. Optional display name only.
-- No PII stored. Rooms TTL-expire.
+- No PII stored for the ephemeral POC. Rooms TTL-expire.
+- **Durable social features (leaderboard/sessions/sharing)** shift this to a *minimal,
+  self-declared, no-accounts* posture: an opaque session token (no PII) + self-declared
+  display name, with defined retention + delete paths. See
+  [ADR 0003 §4](adr/0003-durable-persistence.md) and
+  [ADR 0004](adr/0004-identity-and-social-writes.md) (the session token also unifies the
+  §6.4 reconnect "same session token").
 - **Rate limiting — reuse the existing in-house rate limiter** (do not build one).
   Docs: https://rate-limiter-seven.vercel.app/getting-started. Configuration deferred
   (tracked as MPG-021). Surfaces to protect once wired: `POST /api/rooms` (per-IP) and
