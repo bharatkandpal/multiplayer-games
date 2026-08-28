@@ -20,3 +20,6 @@ export { Spinner } from "./Spinner";
 
 export { VisuallyHidden } from "./VisuallyHidden";
 export type { VisuallyHiddenProps } from "./VisuallyHidden";
+
+export { BackArrowIcon, HomeIcon } from "./icons";
+export type { IconProps } from "./icons";

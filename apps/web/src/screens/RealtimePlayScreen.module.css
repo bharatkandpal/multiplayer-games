@@ -25,6 +25,15 @@
   margin: 0;
 }
 
+/* Home control: back-arrow + house glyph, no visible text (accessible name
+   comes from the Button's aria-label="Home"). */
+.homeIcons {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-300);
+}
+
 .statusRow {
   display: flex;
   align-items: center;
