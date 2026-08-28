@@ -16,9 +16,21 @@
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(38rem 38rem at 12% 8%, color-mix(in srgb, var(--color-accent) 22%, transparent), transparent 60%),
-    radial-gradient(32rem 32rem at 92% 22%, color-mix(in srgb, var(--color-player-2) 18%, transparent), transparent 60%),
-    radial-gradient(40rem 40rem at 70% 96%, color-mix(in srgb, var(--color-success) 16%, transparent), transparent 60%);
+    radial-gradient(
+      38rem 38rem at 12% 8%,
+      color-mix(in srgb, var(--color-accent) 22%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      32rem 32rem at 92% 22%,
+      color-mix(in srgb, var(--color-player-2) 18%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      40rem 40rem at 70% 96%,
+      color-mix(in srgb, var(--color-success) 16%, transparent),
+      transparent 60%
+    );
   pointer-events: none;
 }
 
@@ -81,11 +93,7 @@
   border: var(--border-width-thin) solid var(--glass-border);
   border-radius: var(--radius-lg);
   background-color: var(--glass-bg);
-  background-image: linear-gradient(
-    160deg,
-    var(--glass-highlight) 0%,
-    rgba(255, 255, 255, 0) 42%
-  );
+  background-image: linear-gradient(160deg, var(--glass-highlight) 0%, rgba(255, 255, 255, 0) 42%);
   box-shadow: var(--glass-shadow);
   color: var(--color-text);
   text-align: left;
