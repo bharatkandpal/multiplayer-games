@@ -1,8 +1,25 @@
 .main {
+  position: relative;
   max-width: var(--container-md);
   margin: 0 auto;
   padding: var(--space-6) var(--space-4);
   font-family: var(--font-family-base);
+}
+
+/* Soft color washes sitting behind the grid so the frosted-glass tiles have
+   something to refract and blur — without them, backdrop-filter over a flat
+   page background is invisible. Purely decorative; kept low-opacity so text
+   contrast on the page is untouched. */
+.main::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(38rem 38rem at 12% 8%, color-mix(in srgb, var(--color-accent) 22%, transparent), transparent 60%),
+    radial-gradient(32rem 32rem at 92% 22%, color-mix(in srgb, var(--color-player-2) 18%, transparent), transparent 60%),
+    radial-gradient(40rem 40rem at 70% 96%, color-mix(in srgb, var(--color-success) 16%, transparent), transparent 60%);
+  pointer-events: none;
 }
 
 .topBar {
@@ -33,14 +50,26 @@
 
 .gameGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  /* Every row shares the tallest card's height, so tiles read as one uniform
+     set regardless of title length or the optional "Solo arcade" tag. */
+  grid-auto-rows: 1fr;
   gap: var(--space-4);
   list-style: none;
   margin: 0 0 var(--space-8);
   padding: 0;
 }
 
+/* Stretch the list item and its card to fill the equal-height grid row. */
+.gameGrid > li {
+  display: flex;
+}
+
+/* Liquid glass: a frosted, translucent tile — blurred backdrop, a soft sheen
+   along the top edge (::before), and a light-catching rim border. The solid
+   @supports fallback below keeps it readable where backdrop-filter is absent. */
 .gameCard {
+  position: relative;
   display: flex;
   width: 100%;
   flex-direction: column;
@@ -48,25 +77,55 @@
   gap: var(--space-2);
   min-height: var(--size-touch-target);
   padding: var(--space-5);
-  border: var(--border-width-thin) solid var(--color-border-strong);
+  overflow: hidden;
+  border: var(--border-width-thin) solid var(--glass-border);
   border-radius: var(--radius-lg);
-  background-color: var(--color-surface);
+  background-color: var(--glass-bg);
+  background-image: linear-gradient(
+    160deg,
+    var(--glass-highlight) 0%,
+    rgba(255, 255, 255, 0) 42%
+  );
+  box-shadow: var(--glass-shadow);
   color: var(--color-text);
   text-align: left;
   cursor: pointer;
   transition:
     background-color var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard),
     transform var(--duration-fast) var(--ease-standard);
 }
 
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .gameCard {
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+    backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  }
+}
+
+/* Top-edge sheen — the highlight that sells the "glass" read. */
+.gameCard::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 40%;
+  background: linear-gradient(to bottom, var(--glass-highlight), rgba(255, 255, 255, 0));
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 .gameCard:hover {
-  background-color: var(--color-bg-subtle);
+  background-color: var(--glass-bg-hover);
   border-color: var(--color-accent);
+  box-shadow:
+    var(--glass-shadow),
+    0 0 0 var(--border-width-thin) var(--color-accent);
+  transform: translateY(-2px);
 }
 
 .gameCard:active {
-  transform: translateY(1px);
+  transform: translateY(0);
 }
 
 .gameCard:focus-visible {
@@ -75,6 +134,7 @@
 }
 
 .gameThumbnail {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -82,7 +142,15 @@
   aspect-ratio: 3 / 2;
   padding: var(--space-2);
   border-radius: var(--radius-md);
-  background-color: var(--color-surface);
+  border: var(--border-width-thin) solid var(--glass-border);
+  background-color: var(--glass-bg);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .gameThumbnail {
+    -webkit-backdrop-filter: blur(calc(var(--glass-blur) / 2));
+    backdrop-filter: blur(calc(var(--glass-blur) / 2));
+  }
 }
 
 .gameTitle {
@@ -95,9 +163,13 @@
    accessible name (not aria-hidden) so it's conveyed to assistive tech too. */
 .gameKindTag {
   align-self: flex-start;
+  /* Pin to the bottom of the card so the title baseline lines up whether or
+     not a card carries this tag — part of keeping every tile uniform. */
+  margin-top: auto;
   padding: var(--space-1) var(--space-2);
+  border: var(--border-width-thin) solid var(--glass-border);
   border-radius: var(--radius-sm);
-  background-color: var(--color-bg-subtle);
+  background-color: var(--glass-bg);
   color: var(--color-text-muted);
   font-size: var(--font-size-100);
   font-weight: var(--font-weight-medium);
