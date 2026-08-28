@@ -166,8 +166,8 @@ describe("GamePlayScreen — human vs. bot", () => {
     expect(screen.queryByText(/is thinking…/)).not.toBeInTheDocument();
 
     // The bot has moved: exactly one O now on the board, and it's the human's turn again.
-    // (describeSeat reads a solo human as "You" — see seatConfig.ts.)
-    expect(screen.getByText("You's turn")).toBeInTheDocument();
+    // (describeSeat reads a solo human as "You", rendered as the possessive "Your turn".)
+    expect(screen.getByText("Your turn")).toBeInTheDocument();
     const oCells = screen
       .getAllByRole("gridcell")
       .filter((el) => el.getAttribute("aria-label")?.endsWith(", O"));

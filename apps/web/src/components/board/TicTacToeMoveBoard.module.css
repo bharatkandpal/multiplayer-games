@@ -42,7 +42,10 @@
   padding: var(--space-2);
   border: var(--border-width-thick) solid var(--color-border-strong);
   border-radius: var(--radius-md);
-  background-color: var(--color-surface);
+  /* Raised (not flat surface) so empty wells lift off the page background —
+     matters most in dark mode, where surface sits very close to --color-bg. */
+  background-color: var(--color-surface-raised);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
   transition:
     background-color var(--duration-fast) var(--ease-standard),

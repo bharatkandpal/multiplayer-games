@@ -39,6 +39,35 @@ body {
     color var(--duration-base) var(--ease-standard);
 }
 
+/* App-wide ambient color wash behind every screen — gives the frosted-glass
+   surfaces (Home tiles, Setup seat cards, the board) something to refract and
+   blur so the liquid-glass language reads consistently across the app, not
+   just on Home. Fixed + behind content; low-opacity so text contrast on the
+   page background is untouched. Purely decorative (pointer-events: none). */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(
+      38rem 38rem at 12% 8%,
+      color-mix(in srgb, var(--color-accent) 22%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      32rem 32rem at 92% 22%,
+      color-mix(in srgb, var(--color-player-2) 18%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      40rem 40rem at 70% 96%,
+      color-mix(in srgb, var(--color-success) 16%, transparent),
+      transparent 60%
+    );
+  pointer-events: none;
+}
+
 /* Visible focus everywhere (UX_PRINCIPLES §4/§8) — components may layer a
    more specific ring, but nothing should ever suppress focus outlines. */
 :focus-visible {

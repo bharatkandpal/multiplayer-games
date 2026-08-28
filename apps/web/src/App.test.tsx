@@ -69,7 +69,7 @@ describe("App", () => {
       fireEvent.click(screen.getByRole("button", { name: /^Tic-Tac-Toe/ }));
       fireEvent.click(screen.getByRole("button", { name: /Play vs Bot/ }));
 
-      expect(screen.getByText("You's turn")).toBeInTheDocument();
+      expect(screen.getByText("Your turn")).toBeInTheDocument();
 
       // Drive the game to completion: click an open cell on the human's turn,
       // then let the bot's paced move land, until Rematch appears.
