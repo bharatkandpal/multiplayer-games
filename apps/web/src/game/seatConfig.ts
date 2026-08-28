@@ -35,7 +35,10 @@ export const DEFAULT_DIFFICULTY: Difficulty = "medium";
  * should come from the selected game's `playerCount`; defaults to 2 for
  * callers (and tests) that don't need to think about seat count.
  */
-export function createDefaultSeats(seatCount = 2, difficulty: Difficulty = DEFAULT_DIFFICULTY): SeatsConfig {
+export function createDefaultSeats(
+  seatCount = 2,
+  difficulty: Difficulty = DEFAULT_DIFFICULTY,
+): SeatsConfig {
   return Array.from({ length: seatCount }, (_, index) =>
     index === 0 ? { kind: "human" } : { kind: "bot", difficulty },
   );

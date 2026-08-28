@@ -138,17 +138,9 @@ export function SetupScreen({ gameId, onStart, onBack }: SetupScreenProps): Reac
             </span>
           </Button>
 
-          <div
-            className={styles.difficultyToggle}
-            role="radiogroup"
-            aria-label="Bot difficulty"
-          >
+          <div className={styles.difficultyToggle} role="radiogroup" aria-label="Bot difficulty">
             {DIFFICULTIES.map((difficulty) => (
-              <label
-                key={difficulty}
-                className={styles.difficultyChip}
-                data-level={difficulty}
-              >
+              <label key={difficulty} className={styles.difficultyChip} data-level={difficulty}>
                 <input
                   className={styles.difficultyChipInput}
                   type="radio"
