@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import type { RealtimeModule } from "@mpg/engine";
-import { Button, StatusBadge, VisuallyHidden } from "../components/ui";
+import { BackArrowIcon, Button, HomeIcon, StatusBadge, VisuallyHidden } from "../components/ui";
 import { cx } from "../components/ui/cx";
 import { type RealtimeLoopPhase, type RunComplete, useRealtimeLoop } from "../game";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
@@ -207,8 +207,11 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
   return (
     <div className={styles.main}>
       <div className={styles.topBar}>
-        <Button variant="ghost" size="sm" onClick={onExit}>
-          Home
+        <Button variant="ghost" size="sm" onClick={onExit} aria-label="Home">
+          <span className={styles.homeIcons}>
+            <BackArrowIcon />
+            <HomeIcon />
+          </span>
         </Button>
         <h1 className={styles.heading}>{gameTitle}</h1>
       </div>

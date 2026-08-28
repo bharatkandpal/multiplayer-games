@@ -1,6 +1,14 @@
 import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from "react";
 import type { DrawReason, GameModule, Player, Result } from "@mpg/engine";
-import { Button, SeatCard, StatusBadge, Toast, VisuallyHidden } from "../components/ui";
+import {
+  BackArrowIcon,
+  Button,
+  HomeIcon,
+  SeatCard,
+  StatusBadge,
+  Toast,
+  VisuallyHidden,
+} from "../components/ui";
 import type { StatusBadgeStatus } from "../components/ui";
 import { cx } from "../components/ui/cx";
 import {
@@ -349,8 +357,11 @@ export function GamePlayScreen<S, M, L = unknown>({
   return (
     <div className={styles.main}>
       <div className={styles.topBar}>
-        <Button variant="ghost" size="sm" onClick={onExit}>
-          Home
+        <Button variant="ghost" size="sm" onClick={onExit} aria-label="Home">
+          <span className={styles.homeIcons}>
+            <BackArrowIcon />
+            <HomeIcon />
+          </span>
         </Button>
         <h1 className={styles.heading}>{gameTitle}</h1>
       </div>
