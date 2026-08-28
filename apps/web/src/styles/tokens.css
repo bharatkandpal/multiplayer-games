@@ -164,6 +164,18 @@
   --shadow-lg: 0 12px 32px rgba(20, 23, 26, 0.16);
 
   /* ---------------------------------------------------------------- */
+  /* Liquid glass — frosted, translucent surfaces (blur + sheen).      */
+  /* Consumed via backdrop-filter with a solid @supports fallback so   */
+  /* the surface never turns unreadable where blur is unsupported.     */
+  /* ---------------------------------------------------------------- */
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-bg-hover: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-highlight: rgba(255, 255, 255, 0.85); /* top-edge sheen */
+  --glass-blur: 16px;
+  --glass-shadow: 0 8px 32px rgba(20, 23, 26, 0.12);
+
+  /* ---------------------------------------------------------------- */
   /* Motion                                                            */
   /* ---------------------------------------------------------------- */
   --duration-instant: 0ms;
@@ -245,6 +257,13 @@
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
     --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+
+    --glass-bg: rgba(34, 38, 43, 0.5);
+    --glass-bg-hover: rgba(44, 50, 57, 0.66);
+    --glass-border: rgba(255, 255, 255, 0.14);
+    --glass-highlight: rgba(255, 255, 255, 0.22);
+    --glass-blur: 16px;
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -298,6 +317,13 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+
+  --glass-bg: rgba(34, 38, 43, 0.5);
+  --glass-bg-hover: rgba(44, 50, 57, 0.66);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-highlight: rgba(255, 255, 255, 0.22);
+  --glass-blur: 16px;
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -352,6 +378,13 @@
   --shadow-sm: 0 1px 2px rgba(20, 23, 26, 0.06);
   --shadow-md: 0 4px 12px rgba(20, 23, 26, 0.1);
   --shadow-lg: 0 12px 32px rgba(20, 23, 26, 0.16);
+
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-bg-hover: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-highlight: rgba(255, 255, 255, 0.85);
+  --glass-blur: 16px;
+  --glass-shadow: 0 8px 32px rgba(20, 23, 26, 0.12);
 }
 
 /* ---------------------------------------------------------------------- */
