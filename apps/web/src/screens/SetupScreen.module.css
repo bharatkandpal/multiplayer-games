@@ -73,6 +73,7 @@
 
 .customizeChevron {
   display: inline-block;
+  margin-right: var(--space-2);
   transition: transform var(--duration-fast) var(--ease-standard);
 }
 
@@ -91,11 +92,22 @@
   margin-bottom: var(--space-8);
 }
 
+/* Frosted-glass panel — shares the liquid-glass language with the Home tiles
+   (see tokens.css --glass-*). Solid @supports fallback keeps it readable where
+   backdrop-filter is unsupported. */
 .seatCard {
   padding: var(--space-5);
-  border: var(--border-width-thin) solid var(--color-border-strong);
+  border: var(--border-width-thin) solid var(--glass-border);
   border-radius: var(--radius-lg);
-  background-color: var(--color-surface);
+  background-color: var(--glass-bg);
+  box-shadow: var(--glass-shadow);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .seatCard {
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+    backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  }
 }
 
 .seatLegend {

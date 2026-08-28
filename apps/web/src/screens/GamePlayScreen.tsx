@@ -67,6 +67,15 @@ function seatIndexOf(player: Player): number {
 }
 
 /**
+ * "<name>'s turn" for a named seat, but "Your turn" for the sole human —
+ * `describeSeat` returns the literal "You" in that case, and "You's turn"
+ * is ungrammatical. Keeps the possessive correct without a separate copy path.
+ */
+function turnPhrase(seatName: string): string {
+  return seatName === "You" ? "Your turn" : `${seatName}'s turn`;
+}
+
+/**
  * Human copy for each semantic draw reason the engine can emit (MPG-045-e).
  * The engine only surfaces the token (`DrawReason`); the client owns how it
  * reads. `undefined` (no reason given) falls back to the original generic
@@ -273,7 +282,7 @@ export function GamePlayScreen<S, M, L = unknown>({
       ? `${describeSeat(seats, seatIndexOf(session.status.player))} is thinking…`
       : session.status.type === "game_over"
         ? "Game over"
-        : `${turnSeatName}'s turn`;
+        : turnPhrase(turnSeatName);
 
   const announcement = (() => {
     if (session.status.type === "error") return session.status.message;
@@ -284,7 +293,7 @@ export function GamePlayScreen<S, M, L = unknown>({
     if (session.status.type === "thinking") {
       return `${lastMoveText}${describeSeat(seats, seatIndexOf(session.status.player))} is thinking.`;
     }
-    return `${lastMoveText}${turnSeatName}'s turn.`;
+    return `${lastMoveText}${turnPhrase(turnSeatName)}.`;
   })();
 
   const boardDisabled = !isHumanTurn;

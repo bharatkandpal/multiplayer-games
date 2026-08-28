@@ -1,37 +1,8 @@
 .main {
-  position: relative;
   max-width: var(--container-md);
   margin: 0 auto;
   padding: var(--space-6) var(--space-4);
   font-family: var(--font-family-base);
-}
-
-/* Soft color washes sitting behind the grid so the frosted-glass tiles have
-   something to refract and blur — without them, backdrop-filter over a flat
-   page background is invisible. Purely decorative; kept low-opacity so text
-   contrast on the page is untouched. */
-.main::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(
-      38rem 38rem at 12% 8%,
-      color-mix(in srgb, var(--color-accent) 22%, transparent),
-      transparent 60%
-    ),
-    radial-gradient(
-      32rem 32rem at 92% 22%,
-      color-mix(in srgb, var(--color-player-2) 18%, transparent),
-      transparent 60%
-    ),
-    radial-gradient(
-      40rem 40rem at 70% 96%,
-      color-mix(in srgb, var(--color-success) 16%, transparent),
-      transparent 60%
-    );
-  pointer-events: none;
 }
 
 .topBar {
