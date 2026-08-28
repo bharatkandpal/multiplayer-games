@@ -1,3 +1,6 @@
+/* Borderless: just the avatar + name, no boxed card. The whose-turn and
+   winner states are carried by a soft accent ring (below) and the crown badge
+   respectively, so no resting border/background is needed. */
 .card {
   display: flex;
   align-items: center;
@@ -5,36 +8,44 @@
   min-height: var(--size-touch-target);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
-  border: var(--border-width-thick) solid var(--color-border);
-  background-color: var(--color-surface);
-  transition:
-    border-color var(--duration-fast) var(--ease-standard),
-    box-shadow var(--duration-fast) var(--ease-standard);
+  transition: box-shadow var(--duration-fast) var(--ease-standard);
 }
 
-/* Active seat = whose turn it is — the primary turn-ownership signal
-   (UX_PRINCIPLES §4: never color-only, so this pairs a border/glow change
-   with a visible "Thinking" text hint when applicable, not just a color). */
+/* Active seat = whose turn it is — the primary turn-ownership signal. Rather
+   than a hard boundary, it's a "liquid glass" panel: a soft accent-tinted,
+   backdrop-blurred fill with a faint rim, a top sheen and a gentle glow that
+   breathes. Still paired with the textual status badge, so it's never
+   color-only per UX_PRINCIPLES §4. */
 .active {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-info-bg);
-  animation: seat-pulse 1.8s var(--ease-standard) infinite;
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  backdrop-filter: blur(8px) saturate(1.4);
+  -webkit-backdrop-filter: blur(8px) saturate(1.4);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 22%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 4px 16px color-mix(in srgb, var(--color-accent) 16%, transparent);
+  animation: seat-glow 2.4s var(--ease-standard) infinite;
 }
 
-@keyframes seat-pulse {
+@keyframes seat-glow {
   0%,
   100% {
-    box-shadow: 0 0 0 3px var(--color-info-bg);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-accent) 22%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      0 4px 16px color-mix(in srgb, var(--color-accent) 14%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 6px var(--color-info-bg);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-accent) 32%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      0 6px 22px color-mix(in srgb, var(--color-accent) 26%, transparent);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .active {
     animation: none;
-    box-shadow: 0 0 0 4px var(--color-info-bg);
   }
 }
 
@@ -55,9 +66,9 @@
   line-height: 1;
 }
 
-/* Winner seat (MPG-051): a distinct border (not color-only — paired with the
-   crown badge + a non-visual "Winner" text) so the winning seat reads clearly
-   even in every mode, independent of the celebrate/subdued tone.
+/* Winner seat (MPG-051): signalled by the crown badge + a non-visual "Winner"
+   text (not color-only) so the winning seat reads clearly in every mode,
+   independent of the celebrate/subdued tone.
    `position: relative` + a z-index above the full-viewport confetti layer
    (GamePlayScreen.module.css `.confettiLayer`, z-index 50) is deliberate —
    with no visible result-text banner, the crown IS the at-a-glance
@@ -67,7 +78,6 @@
 .winner {
   position: relative;
   z-index: 60;
-  border-color: var(--color-warning);
 }
 
 /* Crown badge: a solid, high-contrast circular badge (not just a bare glyph)
@@ -137,53 +147,31 @@
   white-space: nowrap;
 }
 
-.thinking {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--font-size-100);
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
-.thinkingDots {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.thinkingDot {
-  width: 4px;
-  height: 4px;
+/* Bot "thinking" spinner: a rotating arc ring overlaid on the active seat's
+   avatar. Absolutely positioned (inset outside the avatar's own ring) so it
+   sits on top without ever changing the card's dimensions — replaces the old
+   inline "Thinking…" text, whose variable width jittered the seat row / board
+   layout on every bot turn. Doesn't obscure the avatar emoji. */
+.spinner {
+  position: absolute;
+  inset: -3px;
   border-radius: var(--radius-full);
-  background-color: currentColor;
-  opacity: 0.35;
-  animation: thinking-pulse 1.2s var(--ease-linear, ease-in-out) infinite;
+  border: var(--border-width-thick) solid transparent;
+  border-top-color: var(--color-accent);
+  border-right-color: var(--color-accent);
+  pointer-events: none;
+  animation: spinner-rotate 0.7s linear infinite;
 }
 
-.thinkingDot:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.thinkingDot:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-@keyframes thinking-pulse {
-  0%,
-  80%,
-  100% {
-    opacity: 0.35;
-  }
-  40% {
-    opacity: 1;
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .thinkingDot {
+  .spinner {
+    /* Keep the static arc as a "working" indicator, drop the spin. */
     animation: none;
-    opacity: 0.7;
   }
 }

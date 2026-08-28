@@ -154,11 +154,11 @@ describe("GamePlayScreen — human vs. bot", () => {
     expect(badgeText).toBeInTheDocument();
     expect(screen.getByRole("gridcell", { name: "Row 2, column 2, X" })).toBeInTheDocument();
 
-    // A subtle, decorative "thinking" indicator lives on the active seat's
-    // SeatCard (not a content-loading Skeleton, and not duplicated on the
-    // status badge too) while the bot computes its move.
+    // A subtle, decorative thinking spinner lives on the active seat's
+    // SeatCard avatar (not a content-loading Skeleton, and not duplicated on
+    // the status badge too) while the bot computes its move.
     const seatCard = screen.getByText("Player 2").closest("div");
-    expect(seatCard?.querySelector('[class*="thinkingDots"]')).not.toBeNull();
+    expect(seatCard?.querySelector('[class*="spinner"]')).not.toBeNull();
 
     await advanceBotStep();
 

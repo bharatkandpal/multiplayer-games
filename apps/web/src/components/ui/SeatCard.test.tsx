@@ -44,21 +44,21 @@ describe("SeatCard", () => {
     expect(active.querySelector('[class*="active"]')).not.toBeNull();
   });
 
-  it("shows a decorative 'Thinking' hint only when active and thinking", () => {
+  it("shows a decorative thinking spinner only when active and thinking", () => {
     const { container: notThinking } = render(
       <SeatCard seatIndex={1} kind="bot" active thinking={false} />,
     );
-    expect(notThinking.querySelector('[class*="thinkingDots"]')).toBeNull();
+    expect(notThinking.querySelector('[class*="spinner"]')).toBeNull();
 
     const { container: thinking } = render(<SeatCard seatIndex={1} kind="bot" active thinking />);
-    const dots = thinking.querySelector('[class*="thinkingDots"]');
-    expect(dots).not.toBeNull();
-    expect(dots?.closest('[aria-hidden="true"]')).not.toBeNull();
+    const spinner = thinking.querySelector('[class*="spinner"]');
+    expect(spinner).not.toBeNull();
+    expect(spinner).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("does not show the 'Thinking' hint for an inactive seat even if thinking is passed", () => {
+  it("does not show the thinking spinner for an inactive seat even if thinking is passed", () => {
     const { container } = render(<SeatCard seatIndex={1} kind="bot" active={false} thinking />);
-    expect(container.querySelector('[class*="thinkingDots"]')).toBeNull();
+    expect(container.querySelector('[class*="spinner"]')).toBeNull();
   });
 
   it("shows a crown badge with an accessible 'Winner' name when winner is true", () => {
@@ -91,7 +91,7 @@ describe("SeatCard", () => {
       <SeatCard seatIndex={1} kind="bot" active thinking winner={false} />,
     );
     expect(container.querySelector('[class*="active"]')).not.toBeNull();
-    expect(container.querySelector('[class*="thinkingDots"]')).not.toBeNull();
+    expect(container.querySelector('[class*="spinner"]')).not.toBeNull();
     expect(container.querySelector('[class*="crown"]')).toBeNull();
   });
 });

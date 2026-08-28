@@ -62,6 +62,15 @@ export function SeatCard({
             👑
           </span>
         ) : null}
+        {/*
+          Bot "thinking" affordance: a rotating spinner ring overlaid on the
+          active seat's avatar (absolutely positioned, so it never changes the
+          card's dimensions — the old inline "Thinking…" text did, jittering
+          the seat row / board layout on every bot turn). Decorative
+          (aria-hidden); the status badge + aria-live region carry "is
+          thinking" for assistive tech.
+        */}
+        {active && thinking ? <span className={styles.spinner} aria-hidden="true" /> : null}
       </span>
       <span className={styles.info}>
         <span className={styles.name}>Player {seatIndex + 1}</span>
@@ -75,16 +84,6 @@ export function SeatCard({
         seat, not an announcement).
       */}
       {winner ? <VisuallyHidden>Winner</VisuallyHidden> : null}
-      {active && thinking ? (
-        <span className={styles.thinking} aria-hidden="true">
-          <span className={styles.thinkingText}>Thinking</span>
-          <span className={styles.thinkingDots}>
-            <span className={styles.thinkingDot} />
-            <span className={styles.thinkingDot} />
-            <span className={styles.thinkingDot} />
-          </span>
-        </span>
-      ) : null}
     </div>
   );
 }
