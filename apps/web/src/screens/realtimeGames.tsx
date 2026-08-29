@@ -6,12 +6,16 @@
 
 import { useState, type ReactNode } from "react";
 import {
+  drunkWalk,
   floppyBirds,
+  type DrunkWalkInput,
+  type DrunkWalkState,
   type FloppyInput,
   type FloppyState,
   type RealtimeGameId,
   type RealtimeModule,
 } from "@mpg/engine";
+import { DrunkWalkScene } from "../components/realtime/DrunkWalkScene";
 import { FloppyBirdsScene } from "../components/realtime/FloppyBirdsScene";
 import {
   RealtimePlayScreen,
@@ -49,6 +53,31 @@ const floppyControls: RealtimeControls<FloppyInput, "flap"> = {
   actionHint: "Tap, Space, or ↑ to flap",
 };
 
+// Drunk Walk's input isn't a single boolean flap — it's "which half of the
+// screen" (left/right). `primaryAction` still needs a value (used only as the
+// keyboard-parity fallback and README-style default), but `resolveTapAction`
+// is what actually drives plain taps: it splits the play surface at its
+// horizontal midpoint, matching the two on-screen "L"/"R" zones the renderer
+// draws (see DrunkWalkScene). ← / → and A / D give keyboard parity per side.
+const drunkWalkControls: RealtimeControls<DrunkWalkInput, "left" | "right"> = {
+  primaryAction: "left",
+  keyMap: {
+    ArrowLeft: "left",
+    KeyA: "left",
+    ArrowRight: "right",
+    KeyD: "right",
+  },
+  toInput: (pressed) => {
+    if (pressed.has("left")) return { tap: "left" };
+    if (pressed.has("right")) return { tap: "right" };
+    return { tap: null };
+  },
+  actionHint: "Tap left/right (or ←/→, A/D) to balance",
+  readyExplainer:
+    "You lean under gravity. Tap the side OPPOSITE your lean to correct it — tapping the same side speeds up the fall.",
+  resolveTapAction: (fractionX) => (fractionX < 0.5 ? "left" : "right"),
+};
+
 /**
  * The real-time catalog. `Partial` like the turn-based `GAME_CATALOG`:
  * `RealtimeGameId` already includes `"lumberjack"` (MPG-041), which isn't built
@@ -59,6 +88,11 @@ export const REALTIME_GAMES: Partial<Record<RealtimeGameId, RealtimeGameWiring>>
     floppyBirds,
     (props) => <FloppyBirdsScene {...props} />,
     floppyControls,
+  ),
+  "drunk-walk": defineRealtimeGame<DrunkWalkState, DrunkWalkInput, "left" | "right">(
+    drunkWalk,
+    (props) => <DrunkWalkScene {...props} />,
+    drunkWalkControls,
   ),
 };
 
