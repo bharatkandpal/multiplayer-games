@@ -6,7 +6,7 @@
 **Decision lens:** Add a social realtime layer without a second socket, a durable-chat
 liability, or an unbounded watch-scale fan-out
 **Related:** [ADR 0002](0002-realtime-games.md) (room channel, server authority),
-[ADR 0003](0003-durable-persistence.md) (durable store — deliberately *not* used here),
+[ADR 0003](0003-durable-persistence.md) (durable store — deliberately _not_ used here),
 [ADR 0004](0004-identity-and-social-writes.md) (session token = sender identity),
 MPG-011/013 (Socket.IO room + broadcast), MPG-019 (display names), MPG-021 (rate limiter)
 
@@ -38,17 +38,17 @@ first-class, not afterthoughts.
 5. **Server stays authoritative** — order and timestamps are assigned server-side; clients
    never define message order or trust their own clocks (consistent with ADR 0002).
 
-## Decision — persistence: **ephemeral** (chat *and* reactions)
+## Decision — persistence: **ephemeral** (chat _and_ reactions)
 
 **Chat and reactions are ephemeral. They live only in the room's realtime plane and are
 NOT written to the ADR-0003 durable store.** `GameResult` carries **no transcript**; there
 is no chat table; reactions are decorative bursts with nothing to persist. This is the
 load-bearing call, so the alternatives are on the record:
 
-| Option | Verdict |
-| --- | --- |
-| **Ephemeral** — relayed live; optional short **Redis ring buffer** (last N messages in room state, TTL'd) for reconnect/late-join context; dies with the room | **Chosen** |
-| **Durable** — chat/reactions attached to `GameResult`, replayable via an MPG-056 share link | **Rejected for now** (Revisit trigger) |
+| Option                                                                                                                                                        | Verdict                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| **Ephemeral** — relayed live; optional short **Redis ring buffer** (last N messages in room state, TTL'd) for reconnect/late-join context; dies with the room | **Chosen**                             |
+| **Durable** — chat/reactions attached to `GameResult`, replayable via an MPG-056 share link                                                                   | **Rejected for now** (Revisit trigger) |
 
 **Why ephemeral wins:** chat is conversational and transient; a durable transcript adds a
 retention/redaction/moderation burden (force #3) far exceeding its value, and it would
@@ -102,6 +102,7 @@ batches announcements (see UX ACs) to avoid aria-live flooding.
 Company/HR framing → anti-abuse is in-scope, sized POC-vs-later:
 
 **In for POC:**
+
 - **Rate-limit chat and reactions** via the **existing rate limiter (MPG-021)** — reuse,
   do not build — keyed per session token + per room, on the `chat:message` / `reaction:send`
   socket events (the surfaces MPG-021 already names for `join`/`move`).
@@ -113,6 +114,7 @@ Company/HR framing → anti-abuse is in-scope, sized POC-vs-later:
   local, no server state).
 
 **Deferred to event mode (north-star; with MPG-027 spectators / MPG-028 events):**
+
 - **Report/flag → organizer moderation** (server-side blocklist, per-event mute/kick,
   moderation queue). This is where durable moderation state would live if ever needed.
 - Stronger/server-authoritative profanity, per-event chat enable/disable, slow-mode.
@@ -130,13 +132,13 @@ Company/HR framing → anti-abuse is in-scope, sized POC-vs-later:
 
 **Negative / risks (and mitigations)**
 
-- *No chat history after the room expires.* → Intended; a TTL'd Redis ring buffer covers
+- _No chat history after the room expires._ → Intended; a TTL'd Redis ring buffer covers
   reconnect/late-join; durable transcript is a deliberate non-goal (revisit trigger).
-- *Light profanity filter is bypassable.* → Accepted for POC; report/organizer-moderation is
+- _Light profanity filter is bypassable._ → Accepted for POC; report/organizer-moderation is
   the event-mode answer; rate-limit + client-mute blunt spam meanwhile.
-- *Aggregation adds a small server tick + latency to reactions.* → ~250–500ms is
+- _Aggregation adds a small server tick + latency to reactions._ → ~250–500ms is
   imperceptible for decorative confetti and is the price of watch-scale safety.
-- *Chat aria-live could flood screen readers.* → Batched/polite announcements + reactions
+- _Chat aria-live could flood screen readers._ → Batched/polite announcements + reactions
   `aria-hidden`, captured as UX-DoD ACs on the task.
 
 ## Guardrails

@@ -78,7 +78,7 @@ the seat model, not a rewrite. Sequenced roughly:
       with the first durable social feature (leaderboard/sessions/sharing, MPG-053/054/055/056),
       on a lightweight no-PII session token, **before** full accounts. See
       [ADR 0003](adr/0003-durable-persistence.md) + [ADR 0004](adr/0004-identity-and-social-writes.md).
-- [ ] **Accounts** (later): profiles/login as an *upgrade* over the same tables
+- [ ] **Accounts** (later): profiles/login as an _upgrade_ over the same tables
       (token→account claim), not a new store.
 - [ ] **Horizontal scale:** Socket.IO Redis adapter, sticky sessions, AI worker pool.
 - [ ] Turn clocks / timed modes; shareable result cards; a third game to prove extensibility.

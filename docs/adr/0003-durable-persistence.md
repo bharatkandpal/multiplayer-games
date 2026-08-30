@@ -21,19 +21,19 @@ that outlives a single room's Redis TTL.** Today:
   behind an adapter with an in-memory fallback for dev (TDD §5, ARCHITECTURE §2).
 - The docs **assume** Postgres "when accounts/stats/leaderboards arrive" (TDD §2,
   ROADMAP Phase 4) — but this was never argued in an ADR, and it **bundles** the store
-  with accounts. PRD §10 still open: *"persist finished-game results, or fully ephemeral?"*
+  with accounts. PRD §10 still open: _"persist finished-game results, or fully ephemeral?"_
 
 Two things need deciding on the record: **(1)** what durable store we adopt, and **(2)**
 **when** it enters — specifically, whether durable persistence must wait for full accounts.
 
 ### What the three features actually need to store (decide against this, not in the abstract)
 
-| Entity | Shape | Access pattern |
-| --- | --- | --- |
-| **Game result** (gameId, seats snapshot, outcome, duration, timestamp, optional move/input log) | relational: result ↔ seats ↔ game, optional child log | append on game-over; read by id; list by owner |
-| **Leaderboard entry** (gameId, metric, score/W-L, owner, displayName, optional eventId, bucket) | relational aggregate | **read-heavy, ranked, filtered**: top-N per game / window / event |
-| **Session / identity** (opaque token, displayName, createdAt) | key + a little | lookup by token; join to owned results/entries |
-| **Share link** (token → target result/replay/leaderboard, expiry, revoked) | relational reference | lookup by token; revoke by owner |
+| Entity                                                                                          | Shape                                                 | Access pattern                                                    |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------- |
+| **Game result** (gameId, seats snapshot, outcome, duration, timestamp, optional move/input log) | relational: result ↔ seats ↔ game, optional child log | append on game-over; read by id; list by owner                    |
+| **Leaderboard entry** (gameId, metric, score/W-L, owner, displayName, optional eventId, bucket) | relational aggregate                                  | **read-heavy, ranked, filtered**: top-N per game / window / event |
+| **Session / identity** (opaque token, displayName, createdAt)                                   | key + a little                                        | lookup by token; join to owned results/entries                    |
+| **Share link** (token → target result/replay/leaderboard, expiry, revoked)                      | relational reference                                  | lookup by token; revoke by owner                                  |
 
 This is **relational-shaped**: a handful of entities with clear foreign keys and
 **ranked, filtered aggregate reads** (the leaderboard). Volume is tiny — even the
@@ -50,18 +50,18 @@ leaderboard is hundreds to low-thousands of rows, not millions.
    submissions (the anti-cheat boundary in ADR 0002 depends on this).
 4. **Swappable behind an adapter** — mirror the Redis/in-memory pattern so the store can
    change and dev/test need no running database (ADR 0001 guardrail #2 generalized).
-5. **Decouple durability from auth** — we can persist results with a *lightweight* identity
+5. **Decouple durability from auth** — we can persist results with a _lightweight_ identity
    (ADR 0004) long before we build accounts/login.
 6. **Scale is modest** — nothing here needs horizontal document-store scale-out.
 
 ## Options Considered
 
-| Option | Ranked queries | One store for all 4 | Txn integrity | New infra | Verdict |
-| --- | --- | --- | --- | --- | --- |
-| **Postgres (SQL) — system of record** | ✅ native (`ORDER BY`, indexes, windows) | ✅ | ✅ | one managed DB | **Chosen** |
-| **Reuse Redis as the *durable* store** (AOF/RDB, sorted sets) | ✅ ZSET is a great leaderboard *primitive* | ⚠️ results/links/sessions become ad-hoc blobs | ❌ weak multi-key txn | none | Rejected as SoR (see §Redis) |
-| **Document store** (Mongo/Dynamo/Firestore) | ⚠️ ranked/filtered + joins get awkward | ⚠️ | ⚠️ | new dependency | Rejected — solves a scale problem we don't have |
-| **Hybrid now** (Postgres SoR + Redis ZSET leaderboard cache) | ✅ | ✅ | ✅ | two stores + sync | Rejected *for now* (premature; a revisit trigger) |
+| Option                                                        | Ranked queries                             | One store for all 4                           | Txn integrity         | New infra         | Verdict                                           |
+| ------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------- | --------------------- | ----------------- | ------------------------------------------------- |
+| **Postgres (SQL) — system of record**                         | ✅ native (`ORDER BY`, indexes, windows)   | ✅                                            | ✅                    | one managed DB    | **Chosen**                                        |
+| **Reuse Redis as the _durable_ store** (AOF/RDB, sorted sets) | ✅ ZSET is a great leaderboard _primitive_ | ⚠️ results/links/sessions become ad-hoc blobs | ❌ weak multi-key txn | none              | Rejected as SoR (see §Redis)                      |
+| **Document store** (Mongo/Dynamo/Firestore)                   | ⚠️ ranked/filtered + joins get awkward     | ⚠️                                            | ⚠️                    | new dependency    | Rejected — solves a scale problem we don't have   |
+| **Hybrid now** (Postgres SoR + Redis ZSET leaderboard cache)  | ✅                                         | ✅                                            | ✅                    | two stores + sync | Rejected _for now_ (premature; a revisit trigger) |
 
 ## Decision
 
@@ -83,7 +83,7 @@ measurement-driven option — see Revisit triggers — never a second system of 
 We **overturn the bundling** of Postgres with accounts. Durable persistence enters when
 the first durable feature ships (MPG-053 → the foundation under 054/055/056), gated behind
 the adapter so nothing in the current ephemeral POC changes until then. Identity for these
-features is the **lightweight session token** in ADR 0004 — *not* login. This resolves the
+features is the **lightweight session token** in ADR 0004 — _not_ login. This resolves the
 PRD open question: **we persist finished-game results** (server-authoritative outcomes
 only), we do **not** stay fully ephemeral.
 
@@ -96,19 +96,30 @@ the Redis adapter, one per aggregate:
 ```ts
 // apps/server/src/store/ports.ts (sketch — server-only)
 interface ResultRepo {
-  save(r: GameResult): Promise<void>;          // idempotent on runId (see ADR 0004)
+  save(r: GameResult): Promise<void>; // idempotent on runId (see ADR 0004)
   byId(id: string): Promise<GameResult | null>;
   listByOwner(sessionToken: string, page: Page): Promise<GameResult[]>;
 }
 interface LeaderboardRepo {
-  submit(e: LeaderboardEntry): Promise<void>;  // idempotent; server-validated only
-  top(query: { gameId: GameId; metric: Metric; eventId?: string;
-               window?: TimeWindow; limit: number }): Promise<RankedRow[]>;
+  submit(e: LeaderboardEntry): Promise<void>; // idempotent; server-validated only
+  top(query: {
+    gameId: GameId;
+    metric: Metric;
+    eventId?: string;
+    window?: TimeWindow;
+    limit: number;
+  }): Promise<RankedRow[]>;
   rankFor(owner: string, query: LeaderboardQuery): Promise<RankedRow | null>;
 }
-interface ShareLinkRepo { create(l: ShareLink): Promise<void>;
-  resolve(token: string): Promise<ShareTarget | null>; revoke(token: string, owner: string): Promise<void>; }
-interface SessionRepo { upsert(s: SessionRecord): Promise<void>; byToken(t: string): Promise<SessionRecord | null>; }
+interface ShareLinkRepo {
+  create(l: ShareLink): Promise<void>;
+  resolve(token: string): Promise<ShareTarget | null>;
+  revoke(token: string, owner: string): Promise<void>;
+}
+interface SessionRepo {
+  upsert(s: SessionRecord): Promise<void>;
+  byToken(t: string): Promise<SessionRecord | null>;
+}
 ```
 
 Two adapters, exactly like Redis has:
@@ -121,8 +132,8 @@ Two adapters, exactly like Redis has:
 **Tooling:** use a **TypeScript-native, type-safe query layer with lightweight migrations**
 (recommended: Drizzle; Kysely + a migration runner is an acceptable equivalent). This keeps
 "TypeScript both ends" honest for data access and gives versioned, reviewable migrations.
-A heavyweight ORM is not warranted for four tables. *(Tool choice is a low-cost, revisitable
-implementation detail, not the load-bearing part of this ADR.)*
+A heavyweight ORM is not warranted for four tables. _(Tool choice is a low-cost, revisitable
+implementation detail, not the load-bearing part of this ADR.)_
 
 DTO/record **types** that cross the client/server boundary (result summary, ranked row,
 share target) are plain types and may live in a shared spot referenced by `API_SPEC`; they
@@ -154,22 +165,22 @@ The POC's "no PII" posture becomes **"minimal, self-declared, no accounts."**
 - The adapter boundary keeps the store swappable and lets **all tests + local dev run with
   no database**, exactly like the Redis fallback.
 - Durability is **decoupled from auth**: we ship social features on a lightweight token now,
-  and a real accounts system (Phase 4, MPG-028) becomes an *upgrade* over the same tables,
+  and a real accounts system (Phase 4, MPG-028) becomes an _upgrade_ over the same tables,
   not a rewrite.
 - Transactional, idempotent writes give the ADR-0002 anti-cheat boundary a place to enforce
   exactly-once, server-validated scores.
 
 **Negative / risks (and mitigations)**
 
-- *A new stateful dependency to run, migrate and back up.* → Managed Postgres (same
+- _A new stateful dependency to run, migrate and back up._ → Managed Postgres (same
   provider posture as managed Redis, TDD §12); versioned migrations; in-memory/SQLite
   adapter means CI and laptops carry no DB.
-- *Crossing the "no PII" line at all.* → Held to a minimal, self-declared, no-accounts
+- _Crossing the "no PII" line at all._ → Held to a minimal, self-declared, no-accounts
   posture with explicit retention + delete paths (§4); nothing verified/sensitive is stored.
-- *Mixing durable and ephemeral concerns in one server.* → They stay physically separated:
+- _Mixing durable and ephemeral concerns in one server._ → They stay physically separated:
   Redis = ephemeral rooms (unchanged), Postgres = durable records; the write boundary
   (game-over promotion) is defined in ADR 0004, not smeared across the room hot path.
-- *Postgres could later strain on a leaderboard hot path.* → Not at 100–200 concurrent; if
+- _Postgres could later strain on a leaderboard hot path._ → Not at 100–200 concurrent; if
   measured, add a Redis ZSET read-cache in front (revisit trigger), keeping Postgres SoR.
 
 ## Guardrails to protect the bet

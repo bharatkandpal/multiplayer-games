@@ -48,12 +48,12 @@ so the team knows what to build when it's time.
 
 ## Options considered
 
-| Option | Pros | Cons | Verdict |
-| --- | --- | --- | --- |
-| **A — Managed WebRTC service** (LiveKit Cloud, Daily.co, Agora, 100ms) | Zero media infra ops; client SDK handles overbuild, overbuild, overbuild. Server-side room APIs for mute/kick. Scales to hundreds. | Vendor dependency; per-minute cost; one more SDK in the client bundle. | **Chosen** |
-| **B — Self-hosted SFU** (LiveKit OSS, mediasoup, Janus) | Full control; no per-minute cost at scale. | Heavy ops: TURN, overbuild, multi-region, certificate rotation, overbuild, overbuild. Not our core business. | Rejected |
-| **C — Peer-to-peer mesh** (simple WebRTC) | No server; free. | Collapses at 5+ peers; NAT traversal pain; no moderation hooks; incompatible with north-star scale. | Rejected |
-| **D — Don't add voice; keep it a non-goal** | Zero complexity. | Organizer must wrangle a second app for audio; platform is less self-contained. | Rejected for north-star; correct for POC |
+| Option                                                                 | Pros                                                                                                                               | Cons                                                                                                         | Verdict                                  |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| **A — Managed WebRTC service** (LiveKit Cloud, Daily.co, Agora, 100ms) | Zero media infra ops; client SDK handles overbuild, overbuild, overbuild. Server-side room APIs for mute/kick. Scales to hundreds. | Vendor dependency; per-minute cost; one more SDK in the client bundle.                                       | **Chosen**                               |
+| **B — Self-hosted SFU** (LiveKit OSS, mediasoup, Janus)                | Full control; no per-minute cost at scale.                                                                                         | Heavy ops: TURN, overbuild, multi-region, certificate rotation, overbuild, overbuild. Not our core business. | Rejected                                 |
+| **C — Peer-to-peer mesh** (simple WebRTC)                              | No server; free.                                                                                                                   | Collapses at 5+ peers; NAT traversal pain; no moderation hooks; incompatible with north-star scale.          | Rejected                                 |
+| **D — Don't add voice; keep it a non-goal**                            | Zero complexity.                                                                                                                   | Organizer must wrangle a second app for audio; platform is less self-contained.                              | Rejected for north-star; correct for POC |
 
 ## Decision
 
@@ -113,11 +113,11 @@ covers **audio only**. Video would require a separate ADR if ever pursued.
 
 ### Voice topology by room size
 
-| Room size | Topology | Notes |
-| --- | --- | --- |
-| 1–2 players, no spectators (POC) | Peer-to-peer via SFU | SFU handles overbuild; could fall back to P2P but not worth the branch |
-| 2+ players + spectators (event mode) | SFU with speaker/listener roles | Spectators are **listeners by default** (receive-only); organizer can promote to speaker |
-| 100–200 watch mode | SFU with stage model | Only promoted speakers transmit; audience receives a single mixed stream or selective forward |
+| Room size                            | Topology                        | Notes                                                                                         |
+| ------------------------------------ | ------------------------------- | --------------------------------------------------------------------------------------------- |
+| 1–2 players, no spectators (POC)     | Peer-to-peer via SFU            | SFU handles overbuild; could fall back to P2P but not worth the branch                        |
+| 2+ players + spectators (event mode) | SFU with speaker/listener roles | Spectators are **listeners by default** (receive-only); organizer can promote to speaker      |
+| 100–200 watch mode                   | SFU with stage model            | Only promoted speakers transmit; audience receives a single mixed stream or selective forward |
 
 ### Moderation (event mode)
 
@@ -138,7 +138,7 @@ interface VoiceProvider {
   createRoom(gameRoomId: string, options?: VoiceRoomOptions): Promise<VoiceRoom>;
 
   /** Generate a short-lived token for a participant */
-  createToken(roomId: string, participantId: string, role: 'speaker' | 'listener'): Promise<string>;
+  createToken(roomId: string, participantId: string, role: "speaker" | "listener"): Promise<string>;
 
   /** Destroy the voice room */
   destroyRoom(roomId: string): Promise<void>;
@@ -168,17 +168,17 @@ This lets the team swap vendors (LiveKit → Daily → self-hosted) without touc
 
 **Negative / risks (and mitigations)**
 
-- *Per-minute cost at scale.* → Managed services charge per participant-minute; at event
+- _Per-minute cost at scale._ → Managed services charge per participant-minute; at event
   scale (200 × 30 min = 100 hours/event) this is material. Mitigation: evaluate cost at event
   mode launch; LiveKit OSS self-host is the escape hatch if costs are prohibitive.
-- *Additional client SDK (~50–100 KB gzipped).* → Lazy-loaded; only fetched when the user
+- _Additional client SDK (~50–100 KB gzipped)._ → Lazy-loaded; only fetched when the user
   clicks "Join voice." No impact on initial load or users who never use voice.
-- *Vendor lock-in risk.* → Mitigated by the `VoiceProvider` abstraction and by choosing a
+- _Vendor lock-in risk._ → Mitigated by the `VoiceProvider` abstraction and by choosing a
   vendor with an open-source alternative (LiveKit).
-- *Voice quality depends on participant's network.* → This is inherent to all WebRTC; the
+- _Voice quality depends on participant's network._ → This is inherent to all WebRTC; the
   managed service handles overbuild quality adaptation (bitrate, overbuild, overbuild). Not our
   problem to solve.
-- *Moderation complexity at event scale.* → Deferred to event mode implementation; the stage
+- _Moderation complexity at event scale._ → Deferred to event mode implementation; the stage
   model (speakers + listeners) is the primary control surface.
 
 ## Guardrails

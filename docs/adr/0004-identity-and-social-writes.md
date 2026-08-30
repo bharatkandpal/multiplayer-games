@@ -13,7 +13,7 @@ MPG-018 (reconnect grace), MPG-016 (live-room invite)
 
 ## Context
 
-ADR 0003 adopts Postgres and decides *what* store backs the leaderboard, sessions and
+ADR 0003 adopts Postgres and decides _what_ store backs the leaderboard, sessions and
 durable link sharing. This ADR decides the **connective tissue** those three features
 share, which is heavy enough to stand alone:
 
@@ -32,11 +32,11 @@ share, which is heavy enough to stand alone:
 
 The draft (§C-1) conflated three concepts. We name them and keep them distinct:
 
-| Term (used from here on) | What it is | Where it lives |
-| --- | --- | --- |
-| **Session token** | an opaque, long-lived, per-visitor **identity** handle (no login) | issued by server; stored client-side |
-| **Game-session record** (`GameResult`) | a durable, finished-game record promoted from a room | Postgres (ADR 0003) |
-| **History** ("my games") | a read view listing a visitor's past `GameResult`s | derived query, by session token |
+| Term (used from here on)               | What it is                                                        | Where it lives                       |
+| -------------------------------------- | ----------------------------------------------------------------- | ------------------------------------ |
+| **Session token**                      | an opaque, long-lived, per-visitor **identity** handle (no login) | issued by server; stored client-side |
+| **Game-session record** (`GameResult`) | a durable, finished-game record promoted from a room              | Postgres (ADR 0003)                  |
+| **History** ("my games")               | a read view listing a visitor's past `GameResult`s                | derived query, by session token      |
 
 MPG-054 delivers all three; the noise in the term is resolved by never again saying
 "session" unqualified.
@@ -49,9 +49,9 @@ posture as `roomId`), issued by the server on first visit, stored client-side
 implementer's call), long-lived (rolling ~1 year), carrying **no PII**. It is:
 
 - the **owner key** for every durable record (leaderboard entries, saved results, share
-  links) — records are attributed to the *token*, never to the display name;
+  links) — records are attributed to the _token_, never to the display name;
 - **the** value MPG-018 means by "same session token" for reconnect grace — we do **not**
-  invent a second token. MPG-018 *consumes* the token this ADR defines. (Reconnect grace
+  invent a second token. MPG-018 _consumes_ the token this ADR defines. (Reconnect grace
   itself remains a Redis/room concern; the token is just the stable handle across sockets.)
 - the seam to real accounts later: Phase-4 accounts (MPG-028) add a `token → account` claim
   so a returning visitor can adopt their existing history — an upgrade over ADR 0003's
@@ -88,7 +88,7 @@ This keeps the split clean: **Redis = live room, Postgres = the record of what h
 
 ### 5. Leaderboard trust & shape (the write side that identity gates)
 
-- **One feature, two ranking metrics**, behind a `metric` discriminator — *not* two
+- **One feature, two ranking metrics**, behind a `metric` discriminator — _not_ two
   features. Real-time games rank by **numeric score** (natural fit, ADR 0002); turn-based
   games rank by **W/L/D standings** (win rate / points). Same table shape, same store, same
   screens. Ship the **real-time numeric leaderboard first** (ADR 0002 already built the
@@ -109,7 +109,7 @@ The draft's biggest ambiguity. Resolution: **they are two different links, both 
 
 - **MPG-016 stays the ephemeral live-room invite** — a capability URL to a Redis `room`,
   inherently dies with the room's TTL. **Unchanged by this work.**
-- **MPG-056 is a new *durable* share link** — an unguessable token in a `share_link` row
+- **MPG-056 is a new _durable_ share link** — an unguessable token in a `share_link` row
   (ADR 0003) that resolves to a **persisted target**: a **result card**, its **replay**
   (from the stored move/input log, §4), or a **leaderboard view** (a saved gameId + filter).
   It outlives any room because it points at Postgres, not Redis.
@@ -138,15 +138,15 @@ Design of the durable link:
 
 **Negative / risks (and mitigations)**
 
-- *A long-lived client token is soft identity — clearing storage loses history.* → Accepted
+- _A long-lived client token is soft identity — clearing storage loses history._ → Accepted
   for a no-accounts POC; the Phase-4 account claim path is the durable fix; a "forget me"
   action (ADR 0003 §4) makes the softness a feature for privacy.
-- *Persisting move/input logs grows storage.* → Tiny at our scale; retention-bounded; pays
+- _Persisting move/input logs grows storage._ → Tiny at our scale; retention-bounded; pays
   for replay + audit, both of which we're committing to.
-- *Two link kinds could confuse users/devs.* → They're surfaced differently (invite a
+- _Two link kinds could confuse users/devs._ → They're surfaced differently (invite a
   friend to play **now** vs. share **what happened**); documented in API_SPEC and the task
   ACs.
-- *Impersonation via copied display names.* → Ownership binds to token, not name;
+- _Impersonation via copied display names._ → Ownership binds to token, not name;
   attribution is uncorrupted (§2).
 
 ## Revisit triggers
