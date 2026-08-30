@@ -6,3 +6,6 @@ export type { ConnectFourBoardProps } from "./ConnectFourBoard";
 
 export { TicTacToeMoveBoard } from "./TicTacToeMoveBoard";
 export type { TicTacToeMoveBoardProps } from "./TicTacToeMoveBoard";
+
+export { NimBoard } from "./NimBoard";
+export type { NimBoardProps } from "./NimBoard";

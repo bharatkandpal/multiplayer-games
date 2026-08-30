@@ -3,9 +3,14 @@
 // purpose — all the actual orchestration lives in the shared, engine-agnostic
 // pieces (GamePlayScreen, useLocalPlayController).
 
-import { connectFour, ticTacToe, ticTacToeMove } from "@mpg/engine";
-import type { Player, TicTacToeMoveMove } from "@mpg/engine";
-import { ConnectFourBoard, TicTacToeBoard, TicTacToeMoveBoard } from "../components/board";
+import { connectFour, nim, ticTacToe, ticTacToeMove } from "@mpg/engine";
+import type { NimMove, Player, TicTacToeMoveMove } from "@mpg/engine";
+import {
+  ConnectFourBoard,
+  NimBoard,
+  TicTacToeBoard,
+  TicTacToeMoveBoard,
+} from "../components/board";
 import type { SeatsConfig } from "../game";
 import { GamePlayScreen } from "./GamePlayScreen";
 import { GAME_CATALOG } from "./HomeScreen";
@@ -89,6 +94,34 @@ export function TicTacToeMoveRoute({
 
 function describeConnectFourMove(move: { column: number }, player: Player): string {
   return `Player ${player} dropped a disc in column ${move.column + 1}`;
+}
+
+function describeNimMove(move: NimMove, player: Player): string {
+  const taken = move.count === 1 ? "1 object" : `${move.count} objects`;
+  return `Player ${player} took ${taken} from pile ${move.pile + 1}`;
+}
+
+export function NimRoute({ seats, onExit, onPlayAgain }: GameRouteProps): React.JSX.Element {
+  return (
+    <GamePlayScreen
+      game={nim}
+      gameTitle={GAME_CATALOG.nim?.title ?? "Nim"}
+      seats={seats}
+      describeMove={describeNimMove}
+      onExit={onExit}
+      {...(onPlayAgain ? { onPlayAgain } : {})}
+      renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
+        <NimBoard
+          state={state}
+          onMove={onMove}
+          disabled={disabled}
+          lastMove={lastMove}
+          winningLine={winningLine}
+          winningLineTone={winningLineTone ?? "win"}
+        />
+      )}
+    />
+  );
 }
 
 export function ConnectFourRoute({

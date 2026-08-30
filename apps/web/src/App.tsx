@@ -14,6 +14,7 @@ import { Button } from "./components/ui";
 import {
   ConnectFourRoute,
   HomeScreen,
+  NimRoute,
   RealtimeGameRoute,
   SetupScreen,
   TicTacToeMoveRoute,
@@ -51,6 +52,7 @@ const GAME_ROUTES: Partial<Record<GameId, (props: GameRouteProps) => React.JSX.E
   tictactoe: TicTacToeRoute,
   "tictactoe-move": TicTacToeMoveRoute,
   connect4: ConnectFourRoute,
+  nim: NimRoute,
 };
 
 function GameRoute({

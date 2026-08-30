@@ -150,6 +150,33 @@ function DrunkWalkThumbnail(): React.JSX.Element {
   );
 }
 
+function NimThumbnail(): React.JSX.Element {
+  // Four bars of increasing height, echoing the default 1/3/5/7 pile sizes —
+  // a quick "piles of objects" read at a glance, no text required.
+  const bars = [
+    { x: 12, height: 18 },
+    { x: 34, height: 38 },
+    { x: 56, height: 58 },
+    { x: 78, height: 78 },
+  ];
+  return (
+    <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      <line x1="4" y1="92" x2="96" y2="92" className={styles.grid} strokeWidth="4" />
+      {bars.map(({ x, height }) => (
+        <rect
+          key={x}
+          x={x - 6}
+          y={92 - height}
+          width="12"
+          height={height}
+          rx="2"
+          className={styles.markPlayer1}
+        />
+      ))}
+    </svg>
+  );
+}
+
 /** Generic fallback so an uncatalogued game never renders without a thumbnail. */
 function GenericThumbnail(): React.JSX.Element {
   return (
@@ -176,6 +203,7 @@ export const GAME_THUMBNAILS: Partial<Record<GameId, () => React.JSX.Element>> =
   tictactoe: TicTacToeThumbnail,
   connect4: ConnectFourThumbnail,
   "tictactoe-move": TicTacToeMoveThumbnail,
+  nim: NimThumbnail,
 };
 
 /** Real-time (arcade) thumbnails — sibling of GAME_THUMBNAILS, keyed by RealtimeGameId. */
