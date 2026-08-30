@@ -114,7 +114,13 @@ PRD §1). That's presence-heavy but modest in absolute numbers — well within r
   trivial for Socket.IO; a shared big-screen view is just another subscriber.
 - **Bots at event scale:** AI is stateless per call → move to a worker pool / serverless if
   many concurrent bot rooms strain a node. Bot-vs-bot exhibition games are a natural event feature.
-- Add Postgres when accounts/stats/leaderboards/tournaments arrive with event mode.
+- **Durable store — Postgres** (ratified in [ADR 0003](adr/0003-durable-persistence.md)):
+  the single system-of-record for results, leaderboard, sessions and durable share links,
+  behind a repository adapter (Postgres + in-memory/SQLite dev fallback) that mirrors the
+  Redis store. Introduced with the **first durable feature** (MPG-053), **decoupled from
+  accounts**; identity is a lightweight session token
+  ([ADR 0004](adr/0004-identity-and-social-writes.md)). Redis remains ephemeral-only. Full
+  accounts (Phase 4) become an upgrade over the same tables, not a new store.
 - These numbers are why the TypeScript stack holds rather than needing an Elixir-class
   runtime — see [ADR 0001](adr/0001-tech-stack.md).
 

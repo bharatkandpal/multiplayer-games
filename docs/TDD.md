@@ -20,17 +20,17 @@ power AI mode, multiplayer mode, and tests without duplication.
 
 ## 2. Technology Choices
 
-| Layer              | Choice                                                 | Rationale                                                                                                                                       |
-| ------------------ | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Language           | TypeScript (front + back)                              | One language, shared engine + types across client/server.                                                                                       |
-| Frontend           | React + Vite                                           | Fast dev, component model fits board UI.                                                                                                        |
-| Styling            | CSS Modules + CSS-variable tokens (decided 2026-08-25) | Zero-runtime, Vite-native, scoped; tokens as CSS custom properties themed via `data-theme` (light/dark). Best fit for a bespoke UX-centric kit. |
-| Realtime transport | Socket.IO                                              | Rooms, reconnection, fallbacks out of the box.                                                                                                  |
-| Backend            | Node.js + Express (HTTP) + Socket.IO                   | Same runtime as engine; simple.                                                                                                                 |
-| Ephemeral state    | Redis                                                  | Room/game state, TTL expiry, horizontal scale later.                                                                                            |
-| Persistent store   | Postgres (Phase 3+)                                    | Accounts/stats when we add them. Not in v1.                                                                                                     |
-| Monorepo tooling   | pnpm workspaces (or npm)                               | Share `packages/engine` between apps.                                                                                                           |
-| Tests              | Vitest + Playwright                                    | Unit for engine/AI, e2e for flows.                                                                                                              |
+| Layer              | Choice                                                 | Rationale                                                                                                                                                                                                                                                                                                                         |
+| ------------------ | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language           | TypeScript (front + back)                              | One language, shared engine + types across client/server.                                                                                                                                                                                                                                                                         |
+| Frontend           | React + Vite                                           | Fast dev, component model fits board UI.                                                                                                                                                                                                                                                                                          |
+| Styling            | CSS Modules + CSS-variable tokens (decided 2026-08-25) | Zero-runtime, Vite-native, scoped; tokens as CSS custom properties themed via `data-theme` (light/dark). Best fit for a bespoke UX-centric kit.                                                                                                                                                                                   |
+| Realtime transport | Socket.IO                                              | Rooms, reconnection, fallbacks out of the box.                                                                                                                                                                                                                                                                                    |
+| Backend            | Node.js + Express (HTTP) + Socket.IO                   | Same runtime as engine; simple.                                                                                                                                                                                                                                                                                                   |
+| Ephemeral state    | Redis                                                  | Room/game state, TTL expiry, horizontal scale later.                                                                                                                                                                                                                                                                              |
+| Persistent store   | Postgres (durable system-of-record)                    | **Ratified in [ADR 0003](adr/0003-durable-persistence.md).** Results, leaderboard, sessions, share links; introduced with the first durable feature (MPG-053), **decoupled from accounts**. Behind a repository adapter (Postgres + in-memory/SQLite for DB-free tests), mirroring the Redis pattern. Redis stays ephemeral-only. |
+| Monorepo tooling   | pnpm workspaces (or npm)                               | Share `packages/engine` between apps.                                                                                                                                                                                                                                                                                             |
+| Tests              | Vitest + Playwright                                    | Unit for engine/AI, e2e for flows.                                                                                                                                                                                                                                                                                                |
 
 > **Decision status: ACCEPTED** — see [ADR 0001](adr/0001-tech-stack.md). TypeScript
 > both ends was chosen on technical merit + long-term platform strategy (not stack
@@ -238,7 +238,13 @@ One loop drives every seat type. After any applied move:
 ## 11. Security & Privacy
 
 - No auth in v1; identity is ephemeral per session. Optional display name only.
-- No PII stored. Rooms TTL-expire.
+- No PII stored for the ephemeral POC. Rooms TTL-expire.
+- **Durable social features (leaderboard/sessions/sharing)** shift this to a _minimal,
+  self-declared, no-accounts_ posture: an opaque session token (no PII) + self-declared
+  display name, with defined retention + delete paths. See
+  [ADR 0003 §4](adr/0003-durable-persistence.md) and
+  [ADR 0004](adr/0004-identity-and-social-writes.md) (the session token also unifies the
+  §6.4 reconnect "same session token").
 - **Rate limiting — reuse the existing in-house rate limiter** (do not build one).
   Docs: https://rate-limiter-seven.vercel.app/getting-started. Configuration deferred
   (tracked as MPG-021). Surfaces to protect once wired: `POST /api/rooms` (per-IP) and

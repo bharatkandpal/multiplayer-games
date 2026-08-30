@@ -74,7 +74,12 @@ the seat model, not a rewrite. Sequenced roughly:
 - [ ] **Teams & multi-player:** 2v2 and 3+ player game variants (more seats, team turn order).
 - [ ] **Spectator seats at scale:** read-only live subscribers; shared big-screen view.
 - [ ] **Event/tournament orchestration:** organizer creates an event, brackets, many rooms.
-- [ ] **Accounts + persistence** (introduces Postgres): profiles, stats, leaderboards.
+- [ ] **Durable persistence pulled forward, decoupled from accounts** — Postgres enters
+      with the first durable social feature (leaderboard/sessions/sharing, MPG-053/054/055/056),
+      on a lightweight no-PII session token, **before** full accounts. See
+      [ADR 0003](adr/0003-durable-persistence.md) + [ADR 0004](adr/0004-identity-and-social-writes.md).
+- [ ] **Accounts** (later): profiles/login as an _upgrade_ over the same tables
+      (token→account claim), not a new store.
 - [ ] **Horizontal scale:** Socket.IO Redis adapter, sticky sessions, AI worker pool.
 - [ ] Turn clocks / timed modes; shareable result cards; a third game to prove extensibility.
 - [ ] **(v2) Games as npm packages:** stable public plugin API so anyone can add a game via
