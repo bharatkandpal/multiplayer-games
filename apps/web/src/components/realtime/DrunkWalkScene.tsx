@@ -19,6 +19,12 @@ function dangerFraction(angle: number): number {
  * three.js decision): a foreshortened trapezoid ground plane converging toward
  * a horizon, gradient shading on the figure, and perspective-spaced "rungs"
  * scrolling toward the viewer to sell forward motion — all cheap 2D tricks.
+ * The figure and rungs stay purely procedural (imperative Canvas draw calls);
+ * the roadside trees and the asphalt ground texture are instead small
+ * hand-authored inline SVG "sprites" (see `TREE_SVGS`/`GROUND_TEXTURE_SVG`
+ * below), preloaded once into `Image` objects at module scope and painted via
+ * `ctx.drawImage` — same placeholder-art complexity as the code they replace,
+ * just asset-based instead of drawn shape-by-shape every frame.
  *
  * `aria-hidden`: same convention as Floppy Birds — the accessible state (score
  * text, live-region announcements, tap-zone hint) lives on the screen; this
@@ -35,8 +41,10 @@ const GROUND_BOTTOM_HALF_WIDTH = RES * 0.62; // walkway width at the viewer's fe
 interface Palette {
   sky: string;
   skyDeep: string;
-  ground: string;
-  groundFar: string;
+  /** Asphalt near the viewer (bottom of the ground trapezoid) — lighter than `asphaltFar`. */
+  asphalt: string;
+  /** Asphalt at the horizon (top of the ground trapezoid) — darker, blends with the sky. */
+  asphaltFar: string;
   rung: string;
   left: string;
   right: string;
@@ -53,8 +61,13 @@ function readPalette(el: HTMLElement): Palette {
   return {
     sky: v("--color-bg-inset", "#0b1020"),
     skyDeep: v("--color-bg", "#05070f"),
-    ground: v("--color-text-muted", "#3a3f4a"),
-    groundFar: v("--color-bg-inset", "#0b1020"),
+    // Dedicated (currently un-themed) tokens rather than reusing --color-text-muted /
+    // --color-bg-inset: those are shared, semantically-neutral tokens already assigned
+    // elsewhere in this palette (bg-inset backs `sky`), so borrowing them here would
+    // either couple the road color to the sky's or drift with unrelated text-contrast
+    // tuning. Dark asphalt charcoal, lightening slightly toward the viewer.
+    asphalt: v("--color-asphalt", "#3f4045"),
+    asphaltFar: v("--color-asphalt-far", "#2a2b2f"),
     rung: v("--color-border-strong", "#4a5060"),
     left: v("--color-player-1", "#0072b2"),
     right: v("--color-player-2", "#b34700"),
@@ -237,6 +250,174 @@ function yAt(depth: number): number {
   return HORIZON_Y + (RES - HORIZON_Y) * depth ** 1.6;
 }
 
+/**
+ * Depth (0 = horizon .. 1 = feet) for recycled-slot `i` of `slotCount`, evenly
+ * phase-offset so each slot continuously traverses the FULL horizon→feet range
+ * — approaching the viewer smoothly, then recycling once it passes depth 1 — rather
+ * than being confined to a fixed 1/slotCount band of the road.
+ *
+ * A naive `(i + 1 - f) / slotCount` (f = fractional progress through one spacing
+ * cycle) instead traps slot `i` inside its own static band, DECREASING toward the
+ * horizon as distance advances (backwards — objects should approach, not recede)
+ * and, worse, snapping back to the top of its band once per cycle. Because every
+ * slot shares the same `f`, that snap lands slot `i` almost exactly where slot
+ * `i - 1` sat a moment earlier — read as two sprites popping in on top of each
+ * other, most visible on large distinct sprites like trees (present but harder to
+ * notice on the plain rung lines / speckle texture, which have the same bug).
+ *
+ * This formula avoids that: `depth` for each slot increases monotonically and
+ * continuously with `distance` (via `%1` wraparound, not a per-cycle reset), and
+ * two slots are never at the same depth at the same instant (they're always
+ * exactly `1/slotCount` apart, mod 1).
+ */
+function recycledDepth(
+  slotIndex: number,
+  slotCount: number,
+  distance: number,
+  spacingUnits: number,
+  reducedMotion: boolean,
+): number {
+  const f = reducedMotion ? 0 : distance / spacingUnits;
+  const raw = slotIndex / slotCount + f;
+  return raw - Math.floor(raw);
+}
+
+// ---------------------------------------------------------------------------
+// Scenery assets — hand-authored inline SVGs, preloaded once (module scope)
+// into `Image` objects and painted per-frame via `ctx.drawImage`, replacing
+// the tree/speckle procedural draw calls that used to live here. Colors are
+// baked directly into the SVG markup rather than threaded from the live
+// theme (a real limitation vs. the old procedural version, which read CSS
+// custom properties) — picked to read reasonably against both the light and
+// dark `sky`/`skyDeep` tokens in `readPalette` above.
+// ---------------------------------------------------------------------------
+
+/** Wrap raw SVG markup as a `data:` URI Canvas can `drawImage` once loaded
+ * into an `Image`. `charset=utf-8,` + `encodeURIComponent` avoids the extra
+ * base64 encode/decode step. */
+function svgDataUri(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+/** Kicks off loading immediately (`new Image()` + `src =`) and returns the
+ * element right away — callers check `.complete` before drawing each frame
+ * rather than awaiting a promise, since `draw()` is a synchronous, per-frame
+ * function with no async step of its own. Safe to call at module scope: in
+ * non-browser/test environments (jsdom) `Image` exists but never actually
+ * decodes, so `.complete` simply stays `false` forever and callers just skip
+ * painting that asset — same "don't throw, just don't paint yet" posture as
+ * the `!canvas || !ctx` guard in the mount effect below. */
+function loadSvgImage(svg: string): HTMLImageElement {
+  const img = new Image();
+  img.src = svgDataUri(svg);
+  return img;
+}
+
+/** Two slightly different tree sprites (trunk + gradient-shaded canopy,
+ * viewBox 40x60 — trunk base at the bottom edge) alternated per roadside
+ * slot below so recycled trees don't read as identical stamped clones,
+ * without needing a per-slot RNG. */
+const TREE_SVGS = [
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60">
+    <defs>
+      <linearGradient id="trunk" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#3a2718"/>
+        <stop offset="0.5" stop-color="#6b4a30"/>
+        <stop offset="1" stop-color="#3a2718"/>
+      </linearGradient>
+      <radialGradient id="canopy" cx="35%" cy="32%" r="68%">
+        <stop offset="0" stop-color="#3f8f4d"/>
+        <stop offset="1" stop-color="#1c4d26"/>
+      </radialGradient>
+    </defs>
+    <rect x="17" y="34" width="6" height="26" fill="url(#trunk)"/>
+    <circle cx="20" cy="24" r="20" fill="url(#canopy)"/>
+  </svg>`,
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60">
+    <defs>
+      <linearGradient id="trunk" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#3a2718"/>
+        <stop offset="0.5" stop-color="#7c5a3e"/>
+        <stop offset="1" stop-color="#3a2718"/>
+      </linearGradient>
+      <radialGradient id="canopy" cx="42%" cy="28%" r="72%">
+        <stop offset="0" stop-color="#4fae5c"/>
+        <stop offset="1" stop-color="#2f7a3d"/>
+      </radialGradient>
+    </defs>
+    <rect x="16" y="30" width="7" height="30" fill="url(#trunk)"/>
+    <ellipse cx="19.5" cy="21" rx="18.5" ry="21" fill="url(#canopy)"/>
+  </svg>`,
+].map(loadSvgImage);
+
+/** A small tileable asphalt-speckle texture (transparent background — it's
+ * layered ON TOP of the procedural asphalt/asphaltFar gradient fill below,
+ * not replacing it, so that gradient's near/far depth shading — which still
+ * reads live theme tokens — stays intact). Dot positions are "random but
+ * fixed", hand-picked directly in the markup rather than generated. */
+const GROUND_TEXTURE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <circle cx="5" cy="8" r="1.1" fill="#e8eaf0" fill-opacity="0.3"/>
+  <circle cx="14" cy="4" r="0.7" fill="#05070f" fill-opacity="0.35"/>
+  <circle cx="24" cy="12" r="1.3" fill="#e8eaf0" fill-opacity="0.22"/>
+  <circle cx="33" cy="6" r="0.8" fill="#05070f" fill-opacity="0.3"/>
+  <circle cx="42" cy="15" r="1" fill="#e8eaf0" fill-opacity="0.28"/>
+  <circle cx="8" cy="20" r="0.9" fill="#05070f" fill-opacity="0.32"/>
+  <circle cx="19" cy="24" r="1.2" fill="#e8eaf0" fill-opacity="0.24"/>
+  <circle cx="29" cy="21" r="0.7" fill="#05070f" fill-opacity="0.3"/>
+  <circle cx="38" cy="27" r="1.1" fill="#e8eaf0" fill-opacity="0.26"/>
+  <circle cx="45" cy="33" r="0.8" fill="#05070f" fill-opacity="0.3"/>
+  <circle cx="3" cy="34" r="1" fill="#e8eaf0" fill-opacity="0.24"/>
+  <circle cx="12" cy="38" r="0.7" fill="#05070f" fill-opacity="0.32"/>
+  <circle cx="22" cy="40" r="1.3" fill="#e8eaf0" fill-opacity="0.2"/>
+  <circle cx="32" cy="36" r="0.9" fill="#05070f" fill-opacity="0.3"/>
+  <circle cx="40" cy="44" r="1" fill="#e8eaf0" fill-opacity="0.26"/>
+  <circle cx="16" cy="14" r="0.6" fill="#05070f" fill-opacity="0.28"/>
+</svg>`;
+const GROUND_TEXTURE_IMAGE = loadSvgImage(GROUND_TEXTURE_SVG);
+
+const TREE_SPACING_UNITS = 14; // world "distance" per tree slot, sparser than the rungs
+const TREE_SLOTS_PER_SIDE = 3; // recycled slots -> ~6 trees on screen at once
+
+// Ground texture is tiled in horizontal "bands" recycled the same way the
+// trees' slots are, rather than per-speckle — a full asphalt-texture image
+// is harder to recycle seamlessly per-dot than discrete sprites, so instead
+// of computing individual speckle positions in JS each frame (the old
+// approach) we scroll a handful of stretched copies of one small tile up
+// the ground plane, clipped to the trapezoid so nothing spills onto the sky.
+const GROUND_TEXTURE_ROWS = 8;
+const GROUND_TEXTURE_SPACING_UNITS = 10;
+
+/** A single roadside tree sprite, scaled by `depth` the same way `halfWidthAt`
+ * scales rung width, drawn from a preloaded `Image` instead of shape-by-shape
+ * Canvas calls. `sideX` is the screen-space x of the roadside edge the tree
+ * anchors outward from (left edge -> negative outward, right edge ->
+ * positive outward). No-ops (skips the frame) if the image hasn't finished
+ * loading yet — same posture as the missing-2D-context guard below. */
+function drawTree(
+  ctx: CanvasRenderingContext2D,
+  depth: number,
+  sideX: number,
+  outward: 1 | -1,
+  variantIndex: number,
+): void {
+  const img = TREE_SVGS[variantIndex % TREE_SVGS.length];
+  if (!img || !img.complete || img.naturalWidth === 0) return;
+
+  const y = yAt(depth);
+  const scale = 0.4 + depth * 1.4;
+  const drawH = 46 * scale;
+  const drawW = (40 / 60) * drawH; // preserve the sprite's 40:60 viewBox aspect
+  const margin = 6 * scale;
+  const x = sideX + outward * margin;
+
+  ctx.save();
+  ctx.globalAlpha = 0.35 + depth * 0.65;
+  // Trunk base flush with the ground line at `y`, matching where the old
+  // procedural trunk's `fillRect` bottom edge sat.
+  ctx.drawImage(img, x - drawW / 2, y - drawH, drawW, drawH);
+  ctx.restore();
+}
+
 function draw(
   ctx: CanvasRenderingContext2D,
   state: DrunkWalkState,
@@ -244,6 +425,16 @@ function draw(
   reducedMotion: boolean,
   palette: Palette,
 ): void {
+  // Clear the full frame first. The sky fill below only covers the strip above the
+  // horizon, and the ground fill only covers the walkway trapezoid — but trees are
+  // deliberately drawn OUTSIDE that trapezoid, in the side margins below the horizon.
+  // Without an explicit clear, that side-margin region is never repainted between
+  // frames, so every previous frame's tree draws (at every position they ever
+  // scrolled through) just accumulate — reads as trees piling up/rendering on top of
+  // each other as they move. Same risk applies to anything else ever drawn outside
+  // the sky/ground fills, so clear unconditionally rather than patching per-element.
+  ctx.clearRect(0, 0, RES, RES);
+
   // Sky.
   const sky = ctx.createLinearGradient(0, 0, 0, HORIZON_Y);
   sky.addColorStop(0, palette.skyDeep);
@@ -251,11 +442,38 @@ function draw(
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, RES, HORIZON_Y);
 
+  // Roadside trees, scrolling toward the viewer via `state.distance` exactly like the
+  // rungs below (a fixed set of recycled "slots" whose depth cycles). Drawn BEFORE the
+  // ground plane fill so the asphalt correctly overlaps/grounds their trunk bases at the
+  // roadside edge, rather than floating on top of it — far-depth trees first, near-depth
+  // last, so nearer trees correctly occlude farther ones. Purely decorative scenery, so
+  // frozen (statically placed, not removed) under reduced motion, same treatment as the
+  // rung scroll.
+  const treeDepths: number[] = [];
+  for (let i = 0; i < TREE_SLOTS_PER_SIDE; i++) {
+    treeDepths.push(
+      recycledDepth(i, TREE_SLOTS_PER_SIDE, state.distance, TREE_SPACING_UNITS, reducedMotion),
+    );
+  }
+  // Far first (small index in the sorted-by-depth-ascending sense is "far"; depth itself
+  // already runs 0=horizon..1=feet, so ascending depth IS far-to-near).
+  const orderedSlots = treeDepths
+    .map((depth, i) => ({ depth, i }))
+    .sort((a, b) => a.depth - b.depth);
+  for (const { depth, i } of orderedSlots) {
+    if (depth <= 0 || depth > 1) continue;
+    const hw = halfWidthAt(depth);
+    drawTree(ctx, depth, RES / 2 - hw, -1, i);
+    drawTree(ctx, depth, RES / 2 + hw, 1, TREE_SLOTS_PER_SIDE + i);
+  }
+
   // Ground plane: a foreshortened trapezoid receding to a vanishing point on
-  // the horizon, shaded lighter near the viewer for a cheap depth cue.
+  // the horizon, shaded lighter near the viewer for a cheap depth cue. Asphalt
+  // charcoal, not the sky's blue-toned dark — see the `asphalt`/`asphaltFar`
+  // palette entries.
   const ground = ctx.createLinearGradient(0, HORIZON_Y, 0, RES);
-  ground.addColorStop(0, palette.groundFar);
-  ground.addColorStop(1, palette.ground);
+  ground.addColorStop(0, palette.asphaltFar);
+  ground.addColorStop(1, palette.asphalt);
   ctx.fillStyle = ground;
   ctx.beginPath();
   ctx.moveTo(RES / 2 - GROUND_TOP_HALF_WIDTH, HORIZON_Y);
@@ -265,17 +483,51 @@ function draw(
   ctx.closePath();
   ctx.fill();
 
+  // Asphalt speckle texture: the `GROUND_TEXTURE_IMAGE` SVG tile stretched across
+  // recycled horizontal "bands" up the ground plane (same recycled-slot scroll
+  // pattern the trees use above), clipped to the ground trapezoid so nothing spills
+  // onto the sky. This replaces the old per-frame loop that computed each speckle
+  // dot's position individually — a full-width tiled image is simpler to recycle
+  // seamlessly than trying to scroll dozens of discrete dots.
+  if (GROUND_TEXTURE_IMAGE.complete && GROUND_TEXTURE_IMAGE.naturalWidth > 0) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(RES / 2 - GROUND_TOP_HALF_WIDTH, HORIZON_Y);
+    ctx.lineTo(RES / 2 + GROUND_TOP_HALF_WIDTH, HORIZON_Y);
+    ctx.lineTo(RES / 2 + GROUND_BOTTOM_HALF_WIDTH, RES);
+    ctx.lineTo(RES / 2 - GROUND_BOTTOM_HALF_WIDTH, RES);
+    ctx.closePath();
+    ctx.clip();
+
+    for (let i = 0; i < GROUND_TEXTURE_ROWS; i++) {
+      const depth = recycledDepth(
+        i,
+        GROUND_TEXTURE_ROWS,
+        state.distance,
+        GROUND_TEXTURE_SPACING_UNITS,
+        reducedMotion,
+      );
+      if (depth <= 0 || depth > 1) continue;
+      const hw = halfWidthAt(depth);
+      const y = yAt(depth);
+      const rowH = Math.max(4, 44 * depth) / GROUND_TEXTURE_ROWS + 6;
+      ctx.globalAlpha = 0.5 + depth * 0.5;
+      ctx.drawImage(GROUND_TEXTURE_IMAGE, RES / 2 - hw, y - rowH / 2, hw * 2, rowH);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
   // Perspective "rungs" scrolling toward the viewer as distance increases —
   // sells forward motion (endless-runner framing). Purely decorative, so
   // frozen under reduced motion (no non-essential motion, ADR §5) — the score
   // readout already carries distance as text.
   const RUNG_COUNT = 7;
   const SPACING_UNITS = 6; // world "distance" per rung, tuned to a readable cadence
-  const scrollOffset = reducedMotion ? 0 : state.distance % SPACING_UNITS;
   ctx.strokeStyle = palette.rung;
   ctx.lineWidth = 1.5;
   for (let i = 0; i < RUNG_COUNT; i++) {
-    const depth = (i + 1 - scrollOffset / SPACING_UNITS) / RUNG_COUNT;
+    const depth = recycledDepth(i, RUNG_COUNT, state.distance, SPACING_UNITS, reducedMotion);
     if (depth <= 0 || depth > 1) continue;
     const y = yAt(depth);
     const hw = halfWidthAt(depth);
