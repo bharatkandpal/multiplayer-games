@@ -127,6 +127,29 @@ function FloppyBirdsThumbnail(): React.JSX.Element {
   );
 }
 
+function DrunkWalkThumbnail(): React.JSX.Element {
+  return (
+    <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      {/* A foreshortened walkway receding to a horizon, echoing the live renderer. */}
+      <path d="M 40 34 L 60 34 L 86 96 L 14 96 Z" className={styles.drunkGround} />
+      <line
+        x1="50"
+        y1="34"
+        x2="50"
+        y2="96"
+        className={styles.drunkDivider}
+        strokeWidth="2"
+        strokeDasharray="3 3"
+      />
+      {/* The leaning figure, tilted off vertical (the core mechanic). */}
+      <g className={styles.drunkFigure} transform="rotate(18 50 82)">
+        <rect x="45" y="56" width="10" height="26" rx="4" />
+        <circle cx="50" cy="50" r="7" />
+      </g>
+    </svg>
+  );
+}
+
 /** Generic fallback so an uncatalogued game never renders without a thumbnail. */
 function GenericThumbnail(): React.JSX.Element {
   return (
@@ -158,6 +181,7 @@ export const GAME_THUMBNAILS: Partial<Record<GameId, () => React.JSX.Element>> =
 /** Real-time (arcade) thumbnails — sibling of GAME_THUMBNAILS, keyed by RealtimeGameId. */
 export const REALTIME_THUMBNAILS: Partial<Record<RealtimeGameId, () => React.JSX.Element>> = {
   "floppy-birds": FloppyBirdsThumbnail,
+  "drunk-walk": DrunkWalkThumbnail,
 };
 
 /** Accepts either family's id (both are plain string unions); falls back to the generic mark. */

@@ -1,0 +1,7 @@
+/* The canvas fills the square play surface; the internal RES is fixed and CSS
+   scales it responsively. `block` kills the inline-canvas baseline gap. */
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

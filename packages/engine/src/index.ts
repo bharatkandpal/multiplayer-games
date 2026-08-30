@@ -38,6 +38,9 @@ export type { PrngState } from "./prng";
 export { floppyBirds, WORLD as FLOPPY_WORLD } from "./floppy-birds";
 export type { FloppyState, FloppyInput, Pipe } from "./floppy-birds";
 
+export { drunkWalk, WORLD as DRUNK_WALK_WORLD } from "./drunk-walk";
+export type { DrunkWalkState, DrunkWalkInput, SteppingLeg } from "./drunk-walk";
+
 export { builtInRealtimeGames, registerBuiltInRealtimeGames } from "./realtime-games";
 
 export { ticTacToe } from "./tictactoe";

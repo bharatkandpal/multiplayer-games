@@ -59,11 +59,27 @@ export interface RealtimeControls<I, A extends string = string> {
   /** Short, plain-language control hint, e.g. "Tap, Space, or ↑ to flap". */
   readonly actionHint: string;
   /**
+   * Optional longer explainer shown once, only on the `ready` overlay, in
+   * addition to `actionHint` — for a game whose mechanic isn't obvious from a
+   * short hint alone (e.g. "tap the side OPPOSITE your lean; the same side
+   * makes it worse"). Omit for a self-explanatory game like a single tap-to-act.
+   */
+  readonly readyExplainer?: string;
+  /**
    * On-screen buttons for touch play. Omit for a single-action game — the whole
    * play surface is then the tap target. Supply one per action for multi-action
    * games so touch users get an unambiguous control per action.
    */
   readonly touchActions?: readonly TouchAction<A>[];
+  /**
+   * For a play surface split into tap zones (e.g. left half / right half),
+   * resolves a plain tap's horizontal position — as a fraction of the surface
+   * width, `0` (left edge) to `1` (right edge) — to the action it triggers.
+   * Takes priority over `primaryAction` for plain taps on the surface; keyboard
+   * input is unaffected (driven entirely by `keyMap`). Omit for a game where
+   * every tap on the surface means the same thing.
+   */
+  readonly resolveTapAction?: (fractionX: number) => A;
 }
 
 export interface RealtimePlayScreenProps<S, I, A extends string = string> {
@@ -158,11 +174,26 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
     return () => window.removeEventListener("keydown", onKey);
   }, [controls, handlePress]);
 
+  // Focus the one primary action for each state, so keyboard/AT users always
+  // land on the obvious next control (mirrors GamePlayScreen's rematch focus).
+  const startBtnRef = useRef<HTMLButtonElement>(null);
+  const resumeBtnRef = useRef<HTMLButtonElement>(null);
+  const playAgainBtnRef = useRef<HTMLButtonElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
+
   const onSurfacePointerDown = useCallback(
     (e: ReactPointerEvent): void => {
-      // Only a plain tap on the surface itself is the primary action; taps on
-      // the overlay buttons bubble here but are handled by the button.
+      // Only a plain tap on the surface itself triggers gameplay; taps on the
+      // overlay buttons bubble here but are handled by the button.
       if (e.target instanceof HTMLButtonElement) return;
+      if (controls.resolveTapAction) {
+        // Tap-zone games (e.g. left/right halves): resolve from the tap's
+        // horizontal position within the surface, not a single fixed action.
+        const rect = surfaceRef.current?.getBoundingClientRect();
+        const fractionX = rect && rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0.5;
+        handlePress(controls.resolveTapAction(fractionX));
+        return;
+      }
       handlePress(controls.primaryAction);
     },
     [controls, handlePress],
@@ -171,13 +202,6 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
   const handlePlayAgain = useCallback(() => {
     restart(nextSeed());
   }, [restart, nextSeed]);
-
-  // Focus the one primary action for each state, so keyboard/AT users always
-  // land on the obvious next control (mirrors GamePlayScreen's rematch focus).
-  const startBtnRef = useRef<HTMLButtonElement>(null);
-  const resumeBtnRef = useRef<HTMLButtonElement>(null);
-  const playAgainBtnRef = useRef<HTMLButtonElement>(null);
-  const surfaceRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (phase === "ready") startBtnRef.current?.focus();
     else if (phase === "paused") resumeBtnRef.current?.focus();
@@ -245,6 +269,9 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
             {phase === "ready" ? (
               <div className={styles.overlayInner}>
                 <p className={styles.overlayText}>{controls.actionHint}</p>
+                {controls.readyExplainer ? (
+                  <p className={styles.overlayText}>{controls.readyExplainer}</p>
+                ) : null}
                 <Button ref={startBtnRef} variant="primary" onClick={start}>
                   Start
                 </Button>
