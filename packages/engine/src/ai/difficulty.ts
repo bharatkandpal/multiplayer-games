@@ -67,6 +67,16 @@ export const DIFFICULTY_TABLE: Readonly<Partial<Record<GameId, PerDifficulty>>> 
     // already searching deep enough to see multi-move tactics in both phases.
     hard: { maxDepth: 8, blunderRate: 0 },
   },
+  // Nim's own AI (`ai/heuristics/nim.ts`) plays via the closed-form Nim-sum strategy,
+  // not this generic minimax-backed `pickMove` — but this entry keeps the game
+  // consistent with the rest of the table (e.g. `getDifficultyConfig` callers, and the
+  // fallback generic minimax search, which the default starting layout's small object
+  // count — 16 — makes fully solvable at this depth).
+  nim: {
+    easy: { maxDepth: 1, blunderRate: 0.75 },
+    medium: { maxDepth: 8, blunderRate: 0.2 },
+    hard: { maxDepth: 16, blunderRate: 0 },
+  },
 };
 
 /** Looks up the tuned `{maxDepth, blunderRate}` for `gameId` + `difficulty`, falling back
