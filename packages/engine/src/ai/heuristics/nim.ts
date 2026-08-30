@@ -2,9 +2,13 @@
 //
 // Nim has a closed-form solution — the game's entire game-theoretic value is captured by
 // XOR-ing the pile sizes — so search is unnecessary and strictly worse (it can only
-// rediscover the same answer, slower). This is the platform's first per-game AI override:
-// every other game funnels through the generic `pickMove`/`searchBestMove` (minimax); Nim
-// is the exception, exactly per docs/GAME_LOGIC.md's guidance to use the closed-form.
+// rediscover the same answer, slower).
+//
+// NOT CURRENTLY WIRED: there is no per-game AI dispatch layer yet, so Nim still runs
+// through the generic minimax-backed `pickMove` (see `../difficulty.ts`'s `nim` entry,
+// tuned to `maxDepth: 1` since `nim.evaluate` is exact, so depth-1 minimax already matches
+// this module's answers). This file is exported for a future per-game dispatch layer
+// (MPG-072 follow-up) so the closed-form solver is ready to use once that lands.
 //
 // Difficulty is layered the same way as the generic picker (see ../difficulty.ts): with
 // probability `blunderRate`, play a uniformly random legal move instead of the optimal

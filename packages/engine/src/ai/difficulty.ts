@@ -67,15 +67,18 @@ export const DIFFICULTY_TABLE: Readonly<Partial<Record<GameId, PerDifficulty>>> 
     // already searching deep enough to see multi-move tactics in both phases.
     hard: { maxDepth: 8, blunderRate: 0 },
   },
-  // Nim's own AI (`ai/heuristics/nim.ts`) plays via the closed-form Nim-sum strategy,
-  // not this generic minimax-backed `pickMove` — but this entry keeps the game
-  // consistent with the rest of the table (e.g. `getDifficultyConfig` callers, and the
-  // fallback generic minimax search, which the default starting layout's small object
-  // count — 16 — makes fully solvable at this depth).
+  // Nim routes through this generic minimax-backed `pickMove` like every other game —
+  // there is no per-game AI dispatch layer yet, so `ai/heuristics/nim.ts`'s closed-form
+  // Nim-sum solver (`pickNimMove`) is not currently on this path; it's exported for a
+  // future per-game dispatch layer (see MPG-072 follow-up). `nim.evaluate` returns the
+  // *exact* game-theoretic value (win/loss is fully determined by the nim-sum), so
+  // minimax needs only depth 1 to play optimally — deeper search buys nothing and cost
+  // ~1.7s/move at depth 16 (well over the <500ms budget). Medium blunders 20% of the
+  // time off that same depth-1-optimal line; Easy blunders 75%.
   nim: {
     easy: { maxDepth: 1, blunderRate: 0.75 },
-    medium: { maxDepth: 8, blunderRate: 0.2 },
-    hard: { maxDepth: 16, blunderRate: 0 },
+    medium: { maxDepth: 1, blunderRate: 0.2 },
+    hard: { maxDepth: 1, blunderRate: 0 },
   },
 };
 
