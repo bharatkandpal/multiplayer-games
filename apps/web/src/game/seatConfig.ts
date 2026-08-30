@@ -31,13 +31,16 @@ export const DEFAULT_DIFFICULTY: Difficulty = "medium";
 
 /**
  * A sensible starting configuration for the setup screen: seat 1 is human,
- * every other seat is a medium bot. `seatCount` should come from the
- * selected game's `playerCount`; defaults to 2 for callers (and tests) that
- * don't need to think about seat count.
+ * every other seat is a bot at `difficulty` (medium by default). `seatCount`
+ * should come from the selected game's `playerCount`; defaults to 2 for
+ * callers (and tests) that don't need to think about seat count.
  */
-export function createDefaultSeats(seatCount = 2): SeatsConfig {
+export function createDefaultSeats(
+  seatCount = 2,
+  difficulty: Difficulty = DEFAULT_DIFFICULTY,
+): SeatsConfig {
   return Array.from({ length: seatCount }, (_, index) =>
-    index === 0 ? { kind: "human" } : { kind: "bot", difficulty: DEFAULT_DIFFICULTY },
+    index === 0 ? { kind: "human" } : { kind: "bot", difficulty },
   );
 }
 
@@ -50,12 +53,17 @@ export type OpponentPreset = "bot" | "human";
 
 /**
  * Build a fresh seats config for one of the two quick-start presets:
- * "bot" — seat 1 human, every other seat a medium bot (same as
- * `createDefaultSeats`); "human" — every seat human (local pass-and-play).
+ * "bot" — seat 1 human, every other seat a bot at `difficulty` (medium by
+ * default, same as `createDefaultSeats`); "human" — every seat human (local
+ * pass-and-play).
  */
-export function presetSeats(preset: OpponentPreset, playerCount = 2): SeatsConfig {
+export function presetSeats(
+  preset: OpponentPreset,
+  playerCount = 2,
+  difficulty: Difficulty = DEFAULT_DIFFICULTY,
+): SeatsConfig {
   return preset === "bot"
-    ? createDefaultSeats(playerCount)
+    ? createDefaultSeats(playerCount, difficulty)
     : Array.from({ length: playerCount }, () => ({ kind: "human" as const }));
 }
 

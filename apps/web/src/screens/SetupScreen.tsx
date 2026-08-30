@@ -102,9 +102,11 @@ export function SetupScreen({ gameId, onStart, onBack }: SetupScreenProps): Reac
   const catalogEntry = GAME_CATALOG[gameId];
   const playerCount = catalogEntry?.playerCount ?? 2;
   const [seats, setSeats] = useState<SeatsConfig>(() => createDefaultSeats(playerCount));
+  const [botDifficulty, setBotDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const title = catalogEntry?.title ?? gameId;
   const customizeId = useId();
+  const botDifficultyGroupId = useId();
 
   return (
     <div className={styles.main}>
@@ -119,19 +121,38 @@ export function SetupScreen({ gameId, onStart, onBack }: SetupScreenProps): Reac
       ) : null}
 
       <div className={styles.quickStart}>
-        <Button
-          variant="primary"
-          className={styles.quickOption}
-          onClick={() => onStart(presetSeats("bot", playerCount))}
-        >
-          <span className={styles.quickContent}>
-            <span className={styles.quickIcon} aria-hidden="true">
-              🤖
+        <div className={styles.botOption}>
+          <Button
+            variant="primary"
+            className={styles.quickOption}
+            onClick={() => onStart(presetSeats("bot", playerCount, botDifficulty))}
+          >
+            <span className={styles.quickContent}>
+              <span className={styles.quickIcon} aria-hidden="true">
+                🤖
+              </span>
+              <span className={styles.quickLabel}>Play vs Bot</span>
+              <span className={styles.quickHint}>
+                You vs a {DIFFICULTY_LABEL[botDifficulty].toLowerCase()} bot — starts right away
+              </span>
             </span>
-            <span className={styles.quickLabel}>Play vs Bot</span>
-            <span className={styles.quickHint}>You vs a medium bot — starts right away</span>
-          </span>
-        </Button>
+          </Button>
+
+          <div className={styles.difficultyToggle} role="radiogroup" aria-label="Bot difficulty">
+            {DIFFICULTIES.map((difficulty) => (
+              <label key={difficulty} className={styles.difficultyChip} data-level={difficulty}>
+                <input
+                  className={styles.difficultyChipInput}
+                  type="radio"
+                  name={`${botDifficultyGroupId}-bot-difficulty`}
+                  checked={botDifficulty === difficulty}
+                  onChange={() => setBotDifficulty(difficulty)}
+                />
+                {DIFFICULTY_LABEL[difficulty]}
+              </label>
+            ))}
+          </div>
+        </div>
         <Button
           variant="primary"
           className={styles.quickOption}

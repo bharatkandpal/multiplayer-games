@@ -231,6 +231,118 @@ describe("RealtimePlayScreen — input parity + a11y", () => {
   });
 });
 
+describe("RealtimePlayScreen — tap-zone controls (resolveTapAction)", () => {
+  // A two-action fake module (left/right), standing in for a tap-zone game
+  // like Drunk Walk: score jumps by a different amount per action so the
+  // resolved zone is observable in the visible score.
+  interface ZoneState {
+    readonly ticks: number;
+    readonly score: number;
+    readonly over: boolean;
+  }
+  interface ZoneInput {
+    readonly zone: "left" | "right" | null;
+  }
+  const zoneModule: RealtimeModule<ZoneState, ZoneInput> = {
+    id: "drunk-walk",
+    kind: "realtime",
+    tickHz: TICK_HZ,
+    createInitialState: () => ({ ticks: 0, score: 0, over: false }),
+    tick: (state, input) => {
+      const ticks = state.ticks + 1;
+      const delta = input.zone === "left" ? 10 : input.zone === "right" ? 5 : 1;
+      return { ticks, score: state.score + delta, over: ticks >= OVER_TICKS };
+    },
+    getScore: (s) => s.score,
+    isGameOver: (s) => s.over,
+  };
+  const zoneControls: RealtimeControls<ZoneInput, "left" | "right"> = {
+    primaryAction: "left",
+    keyMap: { ArrowLeft: "left", ArrowRight: "right" },
+    toInput: (pressed) => {
+      if (pressed.has("left")) return { zone: "left" };
+      if (pressed.has("right")) return { zone: "right" };
+      return { zone: null };
+    },
+    actionHint: "Tap left or right",
+    readyExplainer: "Tap the side opposite your lean to correct it.",
+    resolveTapAction: (fractionX) => (fractionX < 0.5 ? "left" : "right"),
+  };
+
+  function renderZoneScreen() {
+    return render(
+      <RealtimePlayScreen<ZoneState, ZoneInput, "left" | "right">
+        module={zoneModule}
+        gameTitle="Zone Game"
+        seed={1}
+        controls={zoneControls}
+        renderScene={({ score }) => <div data-testid="scene">scene score {score}</div>}
+        onExit={vi.fn()}
+        nextSeed={() => 7}
+      />,
+    );
+  }
+
+  it("shows the readyExplainer alongside actionHint on the ready overlay", () => {
+    renderZoneScreen();
+    expect(screen.getByText("Tap the side opposite your lean to correct it.")).toBeInTheDocument();
+  });
+
+  it("a tap on the LEFT half of the surface resolves to the left action", () => {
+    const { container } = renderZoneScreen();
+    const surface = screen.getByRole("application", { name: "Zone Game play area" });
+    vi.spyOn(surface, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      right: 100,
+      width: 100,
+      top: 0,
+      bottom: 100,
+      height: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.pointerDown(surface, { clientX: 10 }); // fractionX 0.1 → left
+    primeClock();
+    advanceTicks(1);
+
+    expect(scoreText(container)).toBe("10"); // left → +10 on tick 1
+  });
+
+  it("a tap on the RIGHT half of the surface resolves to the right action", () => {
+    const { container } = renderZoneScreen();
+    const surface = screen.getByRole("application", { name: "Zone Game play area" });
+    vi.spyOn(surface, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      right: 100,
+      width: 100,
+      top: 0,
+      bottom: 100,
+      height: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.pointerDown(surface, { clientX: 90 }); // fractionX 0.9 → right
+    primeClock();
+    advanceTicks(1);
+
+    expect(scoreText(container)).toBe("5"); // right → +5 on tick 1
+  });
+
+  it("keyboard left/right parity matches the tap-zone resolution", () => {
+    const { container } = renderZoneScreen();
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    primeClock();
+    fireEvent.keyDown(window, { code: "ArrowRight" });
+    advanceTicks(1);
+
+    expect(scoreText(container)).toBe("5"); // ArrowRight → right → +5
+  });
+});
+
 describe("RealtimePlayScreen — prefers-reduced-motion (ADR 0002 §5)", () => {
   function stubReducedMotion(matches: boolean): void {
     vi.stubGlobal(
