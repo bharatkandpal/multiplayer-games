@@ -55,3 +55,20 @@
 .floppyEye {
   fill: var(--color-text);
 }
+
+/* Drunk Walk — a foreshortened walkway + leaning figure, using the same
+   tokens the live Canvas renderer reads, so the preview reads as the game in
+   both themes. */
+.drunkGround {
+  fill: var(--color-bg-inset);
+  stroke: var(--color-text-muted);
+  stroke-width: 2;
+}
+
+.drunkDivider {
+  stroke: var(--color-text-muted);
+}
+
+.drunkFigure {
+  fill: var(--color-warning);
+}

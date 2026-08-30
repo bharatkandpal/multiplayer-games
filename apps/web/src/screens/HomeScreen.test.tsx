@@ -150,4 +150,30 @@ describe("HomeScreen", () => {
     await user.click(screen.getByRole("button", { name: /Tic-Tac-Toe/ }));
     expect(onSelectGame).toHaveBeenCalledExactlyOnceWith("tictactoe");
   });
+
+  // MPG-076: a second real-time game (Drunk Walk) coexists with Floppy Birds
+  // in the same grid, following the exact same wiring as the first one.
+  it("lists Drunk Walk alongside other real-time games, tagged 'Solo arcade', routed via onSelectRealtimeGame", async () => {
+    const user = userEvent.setup();
+    const onSelectRealtimeGame = vi.fn();
+    render(
+      <HomeScreen
+        games={["tictactoe"]}
+        realtimeGames={["floppy-birds", "drunk-walk"]}
+        onSelectGame={vi.fn()}
+        onSelectRealtimeGame={onSelectRealtimeGame}
+        onShowGallery={vi.fn()}
+      />,
+    );
+
+    const list = screen.getByRole("list", { name: "Available games" });
+    expect(within(list).getAllByRole("button")).toHaveLength(3);
+
+    const drunkCard = screen.getByRole("button", { name: /Drunk Walk/ });
+    expect(drunkCard).toBeInTheDocument();
+    expect(drunkCard.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+
+    await user.click(drunkCard);
+    expect(onSelectRealtimeGame).toHaveBeenCalledExactlyOnceWith("drunk-walk");
+  });
 });

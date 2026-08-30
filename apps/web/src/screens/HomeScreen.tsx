@@ -65,6 +65,13 @@ export const REALTIME_CATALOG: Partial<Record<RealtimeGameId, RealtimeCatalogEnt
       "Tap to flap and thread the bird through the pipes. One player, one life — chase a high score.",
     kind: "realtime",
   },
+  "drunk-walk": {
+    id: "drunk-walk",
+    title: "Drunk Walk",
+    description:
+      "Balance a wobbly walker down an endless path. Tap the side opposite your lean to correct it — the wrong side makes it worse.",
+    kind: "realtime",
+  },
 };
 
 /** A single card in the unified Home grid, discriminated by family. */

@@ -91,6 +91,13 @@
   --color-info-bg: #e7f1fd;
   --color-info-text: #0969da;
 
+  /* Drunk Walk scenery (MPG-076) — asphalt ground plane. Tree colors used to
+     live here too, but roadside trees are now hand-authored SVG sprites with
+     colors baked into the asset (see DrunkWalkScene.tsx), so there's no
+     live-themed token for them anymore. */
+  --color-asphalt: #3f4045;
+  --color-asphalt-far: #2a2b2f;
+
   /* Focus ring — always visible, never the only affordance */
   --color-focus-ring: #2f5fff;
 
@@ -243,6 +250,9 @@
     --color-info-bg: #10283a;
     --color-info-text: #7cc4ff;
 
+    --color-asphalt: #4a4c52;
+    --color-asphalt-far: #2f3136;
+
     --color-focus-ring: #7fa1ff;
 
     /* Darker/more opaque than light-theme: the page behind is already dark,
@@ -305,6 +315,9 @@
   --color-info-bg: #10283a;
   --color-info-text: #7cc4ff;
 
+  --color-asphalt: #4a4c52;
+  --color-asphalt-far: #2f3136;
+
   --color-focus-ring: #7fa1ff;
 
   --color-overlay: rgba(0, 0, 0, 0.6);
@@ -365,6 +378,11 @@
   --color-info: #0969da;
   --color-info-bg: #e7f1fd;
   --color-info-text: #0969da;
+
+  --color-asphalt: #3f4045;
+  --color-asphalt-far: #2a2b2f;
+  --color-tree-trunk: #6b4a30;
+  --color-tree-canopy-shade: #1c4d26;
 
   --color-focus-ring: #2f5fff;
 
