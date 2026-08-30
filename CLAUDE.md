@@ -2,7 +2,9 @@
 
 Project guidance for Claude Code.
 
-## Open TODOs
+## Before calling any change done
 
-See [TODO.md](./TODO.md) for pending manual setup — notably the **Vercel deploy secrets**
-(`VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`) that the deploy workflow needs.
+Always run lint and typecheck (not just the test suite — Vitest alone does not typecheck;
+this repo's web tsconfig includes tests, so a change can pass `vitest` and still fail
+`tsc`). Run both per-package (`pnpm typecheck`, `pnpm lint`) and fix failures before
+reporting work as complete or opening a PR.
