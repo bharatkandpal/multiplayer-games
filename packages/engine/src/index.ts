@@ -57,6 +57,9 @@ export type {
   ConnectFourLine,
 } from "./connect4";
 
+export { gomoku } from "./gomoku";
+export type { GomokuState, GomokuMove, GomokuLine } from "./gomoku";
+
 export { builtInGames, registerBuiltInGames } from "./games";
 
 export { minimax, searchBestMove } from "./ai/minimax";
