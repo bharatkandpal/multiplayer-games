@@ -59,6 +59,8 @@ export type {
 
 export { nim, DEFAULT_PILES } from "./nim";
 export type { NimState, NimMove, NimLine } from "./nim";
+export { gomoku } from "./gomoku";
+export type { GomokuState, GomokuMove, GomokuLine } from "./gomoku";
 
 export { builtInGames, registerBuiltInGames } from "./games";
 
