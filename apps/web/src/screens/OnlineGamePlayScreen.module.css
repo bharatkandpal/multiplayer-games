@@ -1,0 +1,25 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.banner {
+  padding: var(--space-3) var(--space-4) 0;
+}
+
+.waitingWrap {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+}
+
+.abandonedWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 60vh;
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}

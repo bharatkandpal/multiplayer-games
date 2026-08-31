@@ -1,0 +1,17 @@
+# Local development services.
+# Usage: docker compose up -d
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: mpg
+      POSTGRES_PASSWORD: mpg_local
+      POSTGRES_DB: mpg_dev
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

@@ -76,6 +76,21 @@
   cursor: pointer;
 }
 
+/* An optional per-game control (e.g. Drunk Walk's cog) overlaid INSIDE the
+   game area rather than the page's top bar — pinned to the top-right corner,
+   stacked above the canvas and above the ready/paused/game-over scrim (later
+   in DOM order) so it's reachable in every phase. A translucent round
+   backdrop keeps it legible over whatever's rendered underneath. */
+.surfaceExtra {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: 1;
+  border-radius: var(--radius-full, 999px);
+  background: color-mix(in srgb, var(--color-bg) 55%, transparent);
+  backdrop-filter: blur(2px);
+}
+
 /* Ready / paused / game-over overlays: a translucent scrim over the frozen
    scene with a single primary action, centered. */
 .overlay {
@@ -87,6 +102,36 @@
   background: color-mix(in srgb, var(--color-bg) 62%, transparent);
   backdrop-filter: blur(1px);
   text-align: center;
+}
+
+/* Game-over only: hold off revealing the overlay for a couple of seconds so
+   the scene underneath (e.g. Drunk Walk's fall) stays visible before the
+   "Play again" scrim covers it, instead of snapping in the instant the run
+   ends. The overlay/button are still in the DOM immediately (score,
+   `aria-live` announcement, and focus are unaffected) — only the visible
+   reveal + click target are delayed, via a discrete `pointer-events` step at
+   the same keyframe as the fade start. Matches `FALL_SETTLE_MS` in
+   `DrunkWalkScene.tsx` so the fade-in lands right as the fall settles. */
+@keyframes gameOverReveal {
+  0%,
+  75% {
+    opacity: 0;
+    pointer-events: none;
+  }
+  100% {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.overlayOver {
+  animation: gameOverReveal 2000ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlayOver {
+    animation: none;
+  }
 }
 
 .overlayInner {

@@ -145,6 +145,17 @@
   white-space: nowrap;
 }
 
+.onlineSection {
+  margin-bottom: var(--space-6);
+}
+
+.onlineOption.onlineOption {
+  width: 100%;
+  min-height: 4.5rem;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+}
+
 .customizeSection {
   margin-bottom: var(--space-6);
 }
@@ -268,5 +279,12 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-3);
+}
+
+.watchHint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-100);
+  color: var(--color-text-muted);
 }

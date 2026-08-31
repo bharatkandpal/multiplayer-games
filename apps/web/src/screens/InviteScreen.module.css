@@ -1,0 +1,65 @@
+.main {
+  max-width: var(--container-md);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.backRow {
+  margin-bottom: var(--space-4);
+}
+
+.heading {
+  font-size: var(--font-size-600);
+  font-weight: var(--font-weight-bold);
+  margin: 0 0 var(--space-4);
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.seatCount {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-200);
+}
+
+.waitingBlock {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-8) 0;
+}
+
+.linkRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.linkLabel {
+  font-size: var(--font-size-200);
+  color: var(--color-text-muted);
+}
+
+.linkField {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.linkInput {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-200);
+}
+
+.toastSlot {
+  margin-top: var(--space-2);
+}

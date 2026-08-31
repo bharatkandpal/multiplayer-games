@@ -13,6 +13,7 @@ import type { StatusBadgeStatus } from "../components/ui";
 import { cx } from "../components/ui/cx";
 import {
   type AppliedMove,
+  type LocalPlayController,
   type OpponentPreset,
   type SeatsConfig,
   type WatchSpeed,
@@ -21,6 +22,7 @@ import {
   sameSeatKinds,
   useLocalPlayController,
 } from "../game";
+import { RankPreview } from "./RankPreview";
 import styles from "./GamePlayScreen.module.css";
 
 /**
@@ -50,6 +52,23 @@ export interface BoardRenderProps<S, M, L = unknown> {
   winningLineTone?: "win" | "loss";
 }
 
+/**
+ * MPG-015: wires the Rematch button to the server-authoritative rematch flow
+ * (`useRematch`) instead of the local-only `rematch()` from
+ * `useLocalPlayController`, for online (room-backed) games. Callers pass this
+ * straight through from `useRematch`'s result plus a flag saying whether this
+ * room ever finished server-side.
+ */
+export interface OnlineRematchProps {
+  /** True once the *room* (not just the local session) is `finished`. */
+  isRoomFinished: boolean;
+  rematchProposed: boolean;
+  opponentProposed: boolean;
+  rematchAccepted: boolean;
+  proposeRematch: () => void;
+  declineRematch: () => void;
+}
+
 export interface GamePlayScreenProps<S, M, L = unknown> {
   game: GameModule<S, M, L>;
   gameTitle: string;
@@ -67,6 +86,54 @@ export interface GamePlayScreenProps<S, M, L = unknown> {
    * only re-initializes on mount).
    */
   onPlayAgain?: (seats: SeatsConfig) => void;
+  /**
+   * MPG-015: when set, this is an online (room-backed) game — the Rematch
+   * button proposes a server-authoritative rematch instead of restarting the
+   * local session, and the negotiation state (waiting / opponent wants a
+   * rematch / accepted) is shown beneath it.
+   */
+  online?: OnlineRematchProps;
+  /**
+   * MPG-055: when provided (with `onViewLeaderboard`), the game-over actions
+   * show a lightweight post-game rank preview ("Leaderboard rank: #N" + a
+   * link to the full board). Omit for games/contexts with no leaderboard
+   * wired up yet.
+   */
+  gameId?: string;
+  onViewLeaderboard?: () => void;
+}
+
+/**
+ * The subset of `LocalPlayController`'s surface `GamePlayScreenView` actually
+ * needs to render — deliberately the *same* shape `useLocalPlayController`
+ * returns, so local play can pass it straight through. MPG-068's online path
+ * (`useOnlinePlay`, via a thin adapter) builds one of these too, stubbing the
+ * bot-vs-bot watch controls (`watchSpeed`/`isPaused`/`step`/…) that don't
+ * apply once moves are server-driven — `isAllBots: false` keeps that whole
+ * fieldset hidden for online games.
+ */
+export type PlayController<S, M> = LocalPlayController<S, M>;
+
+export interface GamePlayScreenViewProps<S, M, L = unknown> {
+  gameTitle: string;
+  seats: SeatsConfig;
+  renderBoard: (props: BoardRenderProps<S, M, L>) => ReactNode;
+  describeMove: (move: M, player: Player) => string;
+  onExit: () => void;
+  onPlayAgain?: (seats: SeatsConfig) => void;
+  online?: OnlineRematchProps;
+  gameId?: string;
+  onViewLeaderboard?: () => void;
+  /**
+   * MPG-025: hides the Rematch button (and its online negotiation status)
+   * on the game-over actions — used by the read-only watch screen, where
+   * "rematch" isn't a concept (no seat here to propose one from); the
+   * top-bar Home action is that screen's only game-over action. Defaults to
+   * `true` (every existing call site keeps its Rematch button unchanged).
+   */
+  showRematch?: boolean;
+  /** Owns session/turn/thinking/pacing state — supplied by the caller (local or online). */
+  controller: PlayController<S, M>;
 }
 
 /** Players are 1-based (`Player`); seats are 0-based array indices — works for any seat count. */
@@ -249,15 +316,19 @@ function DrawStalemate(): React.JSX.Element {
  * Engine-agnostic: callers supply `renderBoard`/`describeMove` for their game's
  * concrete state/move shape.
  */
-export function GamePlayScreen<S, M, L = unknown>({
-  game,
+export function GamePlayScreenView<S, M, L = unknown>({
   gameTitle,
   seats,
   renderBoard,
   describeMove,
   onExit,
   onPlayAgain,
-}: GamePlayScreenProps<S, M, L>): React.JSX.Element {
+  online,
+  gameId,
+  onViewLeaderboard,
+  showRematch = true,
+  controller,
+}: GamePlayScreenViewProps<S, M, L>): React.JSX.Element {
   const {
     session,
     isHumanTurn,
@@ -272,7 +343,7 @@ export function GamePlayScreen<S, M, L = unknown>({
     play,
     clearError,
     rematch,
-  } = useLocalPlayController(game, seats);
+  } = controller;
 
   const turnSeatIndex = seatIndexOf(session.turn);
   const turnSeatName = describeSeat(seats, turnSeatIndex);
@@ -329,8 +400,8 @@ export function GamePlayScreen<S, M, L = unknown>({
   // last-clicked (now-disabled) board cell.
   const rematchButtonRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (isGameOver) rematchButtonRef.current?.focus();
-  }, [isGameOver]);
+    if (isGameOver && showRematch) rematchButtonRef.current?.focus();
+  }, [isGameOver, showRematch]);
 
   // MPG-042/046: one SeatCard per seat, all in a single row above the board —
   // the primary "whose turn" signal (folds in the bot "thinking" affordance,
@@ -449,12 +520,38 @@ export function GamePlayScreen<S, M, L = unknown>({
       */}
       {isGameOver ? (
         <div className={styles.resultActions}>
-          <Button ref={rematchButtonRef} variant="primary" onClick={rematch}>
-            <span className={styles.rematchIcon} aria-hidden="true">
-              ↻
-            </span>
-            Rematch
-          </Button>
+          {showRematch ? (
+            <>
+              <Button
+                ref={rematchButtonRef}
+                variant="primary"
+                onClick={online ? online.proposeRematch : rematch}
+                disabled={online ? online.rematchProposed || online.rematchAccepted : false}
+              >
+                <span className={styles.rematchIcon} aria-hidden="true">
+                  ↻
+                </span>
+                Rematch
+              </Button>
+
+              {online ? (
+                <div aria-live="polite" className={styles.rematchStatus}>
+                  {online.rematchAccepted ? (
+                    <span>Rematch starting…</span>
+                  ) : online.opponentProposed ? (
+                    <>
+                      <span>Opponent wants a rematch!</span>
+                      <Button variant="ghost" size="sm" onClick={online.declineRematch}>
+                        No thanks
+                      </Button>
+                    </>
+                  ) : online.rematchProposed ? (
+                    <span>Rematch proposed — waiting for opponent…</span>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          ) : null}
 
           {onPlayAgain && playAgainPresets.length > 0 ? (
             <div
@@ -482,6 +579,10 @@ export function GamePlayScreen<S, M, L = unknown>({
               </div>
             </div>
           ) : null}
+
+          {gameId && onViewLeaderboard ? (
+            <RankPreview gameId={gameId} onViewLeaderboard={onViewLeaderboard} />
+          ) : null}
         </div>
       ) : null}
 
@@ -491,5 +592,32 @@ export function GamePlayScreen<S, M, L = unknown>({
       {isGameOver && tone === "celebrate" ? <ConfettiBurst /> : null}
       {isGameOver && tone === "subdued" ? <AshFall /> : null}
     </div>
+  );
+}
+
+/**
+ * Local-play entry point (MPG-009/MPG-010): owns a `useLocalPlayController`
+ * session (bot-turn orchestration, watch pacing, local rematch) and renders
+ * it via `GamePlayScreenView`. Engine-agnostic: callers supply
+ * `renderBoard`/`describeMove` for their game's concrete state/move shape.
+ *
+ * MPG-068's online path skips this wrapper and calls `GamePlayScreenView`
+ * directly with a `useOnlinePlay`-backed controller instead — see
+ * `OnlineGamePlayScreen.tsx`.
+ */
+export function GamePlayScreen<S, M, L = unknown>({
+  game,
+  seats,
+  gameId,
+  ...rest
+}: GamePlayScreenProps<S, M, L>): React.JSX.Element {
+  const controller = useLocalPlayController(game, seats);
+  return (
+    <GamePlayScreenView
+      seats={seats}
+      controller={controller}
+      gameId={gameId ?? game.id}
+      {...rest}
+    />
   );
 }

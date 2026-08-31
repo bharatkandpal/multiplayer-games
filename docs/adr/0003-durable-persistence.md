@@ -202,3 +202,32 @@ The POC's "no PII" posture becomes **"minimal, self-declared, no accounts."**
 - Full **accounts/auth** (MPG-028) arriving → extend these tables with an `account_id` and a
   token→account claim path (planned in ADR 0004), not a new store.
 - A hard **compliance** requirement (real PII, SSO) → revisit retention, encryption, region.
+
+---
+
+## As-built addendum (MPG-055, landed 2026-09-07)
+
+The implementation took every recommendation above. Recording the concrete choices so the
+ADR matches the code:
+
+- **ORM/driver:** Drizzle (the recommended option) with `postgres` (postgres.js) —
+  ESM-native, no native bindings. TS-native migrations under
+  `apps/server/drizzle/migrations/`.
+- **Ports:** `apps/server/src/store/ports.ts` defines four repositories — `SessionRepo`,
+  `ResultRepo`, `LeaderboardRepo`, `ShareLinkRepo` — bundled as a `Store`.
+- **Adapters:** `store/pg/` (production) and `store/memory/` (dev + Vitest). Selection is
+  by environment: `DATABASE_URL` set → Postgres, absent → in-memory. No config file.
+  Vitest always gets in-memory, so **CI needs no database** — enforced by a shared
+  contract test (`store/__tests__/store.contract.test.ts`) run against both adapters.
+- **Tables:** `sessions`, `game_results`, `leaderboard_entries` (with the `metric`
+  discriminator, composite upsert key `(gameId, eventId, timeBucket, ownerToken)`),
+  `share_links`.
+- **Ownership:** `owner_token` FK → `sessions.token`; "forget me" cascades through it.
+- **Idempotency:** unique `run_id` per result write; leaderboard upserts reference it so
+  replays can't double-count.
+- **`event_id` is nullable** — global when null, event-scoped when set (additive for the
+  event use case, now secondary per PRD §12).
+- **Retention:** 90-day rolling delete of results + expired share links; event purge;
+  per-session "forget me" (`apps/server/src/retention/`).
+- **Local dev** needs Docker for Postgres, or falls back to in-memory with no persistence
+  across restarts.

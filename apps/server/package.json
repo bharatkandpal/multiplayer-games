@@ -8,10 +8,26 @@
   "scripts": {
     "build": "echo \"[@mpg/server] bundling configured later\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run --passWithNoTests",
-    "dev": "echo \"[@mpg/server] dev server configured in MPG-011\""
+    "test": "vitest run",
+    "dev": "tsx watch src/index.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@mpg/engine": "workspace:*"
+    "@mpg/engine": "workspace:*",
+    "cors": "^2.8.5",
+    "drizzle-orm": "^0.44.0",
+    "express": "^5.2.1",
+    "nanoid": "^5.1.6",
+    "postgres": "^3.4.0",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "drizzle-kit": "^0.30.0",
+    "socket.io-client": "^4.8.3",
+    "tsx": "^4.20.6"
   }
 }

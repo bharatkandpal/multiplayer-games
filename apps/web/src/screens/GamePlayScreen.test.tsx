@@ -3,9 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Result } from "@mpg/engine";
+import { ticTacToe } from "@mpg/engine";
 import { TicTacToeRoute } from "./games";
-import { resultTone } from "./GamePlayScreen";
+import { GamePlayScreen, resultTone } from "./GamePlayScreen";
+import type { OnlineRematchProps } from "./GamePlayScreen";
 import type { SeatsConfig } from "../game";
+import { TicTacToeBoard } from "../components/board";
 import boardStyles from "../components/board/TicTacToeBoard.module.css";
 
 /** Finds the SeatCard for "Player N" and returns its root element. */
@@ -132,6 +135,96 @@ describe("GamePlayScreen — local play-through (via TicTacToeRoute)", () => {
     const homeButton = screen.getByRole("button", { name: "Home" });
     await user.click(homeButton);
     expect(onExit).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("GamePlayScreen — online rematch (MPG-015)", () => {
+  function makeOnline(overrides: Partial<OnlineRematchProps> = {}): OnlineRematchProps {
+    return {
+      isRoomFinished: true,
+      rematchProposed: false,
+      opponentProposed: false,
+      rematchAccepted: false,
+      proposeRematch: vi.fn(),
+      declineRematch: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  async function playToWin(online: OnlineRematchProps): Promise<void> {
+    const user = userEvent.setup();
+    const seats: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
+    render(
+      <GamePlayScreen
+        game={ticTacToe}
+        gameTitle="Tic-Tac-Toe"
+        seats={seats}
+        describeMove={(move: { cell: number }, player) => `p${player} cell ${move.cell}`}
+        onExit={vi.fn()}
+        online={online}
+        renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
+          <TicTacToeBoard
+            state={state}
+            onMove={onMove}
+            disabled={disabled}
+            lastMove={lastMove}
+            winningLine={winningLine}
+            winningLineTone={winningLineTone ?? "win"}
+          />
+        )}
+      />,
+    );
+
+    // X: 0, 1, 2 (top row) — O: 3, 4 — X wins.
+    for (const name of [
+      "Row 1, column 1, empty",
+      "Row 2, column 1, empty",
+      "Row 1, column 2, empty",
+      "Row 2, column 2, empty",
+      "Row 1, column 3, empty",
+    ]) {
+      await user.click(screen.getByRole("gridcell", { name }));
+    }
+    await screen.findByRole("button", { name: "Rematch" });
+  }
+
+  it("clicking Rematch calls proposeRematch (not the local rematch)", async () => {
+    const online = makeOnline();
+    await playToWin(online);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Rematch" }));
+
+    expect(online.proposeRematch).toHaveBeenCalledTimes(1);
+    // The board must NOT have reset locally — only a server `rematch:start`
+    // (via the `online` prop's state, not a local click handler) should do that.
+    expect(screen.queryByText("Player 1's turn")).not.toBeInTheDocument();
+  });
+
+  it("shows a waiting state once this seat has proposed, and disables the button", async () => {
+    const online = makeOnline({ rematchProposed: true });
+    await playToWin(online);
+
+    expect(screen.getByText("Rematch proposed — waiting for opponent…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rematch" })).toBeDisabled();
+  });
+
+  it("shows an accept/decline state once the opponent has proposed", async () => {
+    const online = makeOnline({ opponentProposed: true });
+    await playToWin(online);
+
+    expect(screen.getByText("Opponent wants a rematch!")).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "No thanks" }));
+    expect(online.declineRematch).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a starting state once the rematch is accepted", async () => {
+    const online = makeOnline({ rematchAccepted: true });
+    await playToWin(online);
+
+    expect(screen.getByText("Rematch starting…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rematch" })).toBeDisabled();
   });
 });
 
