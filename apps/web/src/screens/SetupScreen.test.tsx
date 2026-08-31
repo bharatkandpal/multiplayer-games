@@ -128,4 +128,89 @@ describe("SetupScreen", () => {
     await user.click(screen.getByRole("button", { name: "← Back to games" }));
     expect(onBack).toHaveBeenCalledOnce();
   });
+
+  describe("MPG-025: online routing threads the real seat config through", () => {
+    it("the primary 'Play online' button always sends an all-human config, regardless of Customize state", async () => {
+      const user = userEvent.setup();
+      const onPlayOnline = vi.fn();
+      render(
+        <SetupScreen
+          gameId="tictactoe"
+          onStart={vi.fn()}
+          onBack={vi.fn()}
+          onPlayOnline={onPlayOnline}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: /^Play online/ }));
+
+      expect(onPlayOnline).toHaveBeenCalledExactlyOnceWith([
+        { kind: "human" },
+        { kind: "human" },
+      ] satisfies SeatsConfig);
+    });
+
+    it("Customize's online action sends the current per-seat editor state, including a mixed human/bot config", async () => {
+      const user = userEvent.setup();
+      const onPlayOnline = vi.fn();
+      render(
+        <SetupScreen
+          gameId="tictactoe"
+          onStart={vi.fn()}
+          onBack={vi.fn()}
+          onPlayOnline={onPlayOnline}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Customize seats" }));
+      await user.selectOptions(screen.getByRole("combobox", { name: "Difficulty" }), "hard");
+      await user.click(screen.getByRole("button", { name: "Play online — this setup" }));
+
+      expect(onPlayOnline).toHaveBeenCalledExactlyOnceWith([
+        { kind: "human" },
+        { kind: "bot", difficulty: "hard" },
+      ] satisfies SeatsConfig);
+    });
+
+    it("configuring every seat as a bot swaps the online action to a 'Watch online' label, with a plain-language hint", async () => {
+      const user = userEvent.setup();
+      const onPlayOnline = vi.fn();
+      render(
+        <SetupScreen
+          gameId="tictactoe"
+          onStart={vi.fn()}
+          onBack={vi.fn()}
+          onPlayOnline={onPlayOnline}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Customize seats" }));
+      const player1Group = screen.getByRole("radiogroup", { name: "Player 1 type" });
+      await user.click(within(player1Group).getByRole("radio", { name: "Bot" }));
+
+      expect(
+        screen.queryByRole("button", { name: /^Play online — this setup/ }),
+      ).not.toBeInTheDocument();
+      const watchButton = screen.getByRole("button", { name: /^Watch online/ });
+      expect(screen.getByText(/nobody takes a turn here/i)).toBeInTheDocument();
+
+      await user.click(watchButton);
+
+      expect(onPlayOnline).toHaveBeenCalledExactlyOnceWith([
+        { kind: "bot", difficulty: "medium" },
+        { kind: "bot", difficulty: "medium" },
+      ] satisfies SeatsConfig);
+    });
+
+    it("no online action is shown when onPlayOnline is omitted", async () => {
+      const user = userEvent.setup();
+      render(<SetupScreen gameId="tictactoe" onStart={vi.fn()} onBack={vi.fn()} />);
+
+      expect(screen.queryByRole("button", { name: /Play online/ })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Customize seats" }));
+      expect(
+        screen.queryByRole("button", { name: /Play online|Watch online/ }),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

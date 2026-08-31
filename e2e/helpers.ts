@@ -1,0 +1,116 @@
+/**
+ * Shared Playwright helpers for the online (room-backed) flows (MPG-017).
+ *
+ * Kept deliberately thin and behavior-focused — every helper drives the app
+ * exactly the way a player would (role/label selectors, no reaching into
+ * internals), per the "prefer public interfaces" testing guidance in
+ * `docs/TDD.md` §10.
+ */
+
+import { expect, type Page } from "@playwright/test";
+
+/** Row/column label the TicTacToeBoard cells use — 1-based, matches `cellLabel()`. */
+export interface CellPos {
+  row: number;
+  col: number;
+}
+
+/** Navigates Home → Setup for a given game title (e.g. "Tic-Tac-Toe"). */
+export async function goToSetup(page: Page, gameTitle: string): Promise<void> {
+  await page.goto("/");
+  await page.getByRole("button", { name: gameTitle, exact: true }).click();
+  await expect(page.getByRole("heading", { name: `Set up ${gameTitle}` })).toBeVisible();
+}
+
+/**
+ * Fills and submits the first-run username picker if it's open (MPG-077 —
+ * "Play online" and joining an invite link are both gated behind having a
+ * name for this browser). Local-first by design: submitting dismisses the
+ * modal immediately, no network wait involved. No-ops if the picker isn't
+ * showing (e.g. this browser context already has a stored username).
+ */
+export async function fillUsernameIfPrompted(page: Page, name: string): Promise<void> {
+  const input = page.locator("#username-input");
+  // The modal only ever appears once, right after the gated action — a short
+  // window is enough; a genuinely ungated flow just times out and no-ops.
+  if (await input.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await input.fill(name);
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(input).not.toBeVisible();
+  }
+}
+
+/**
+ * A username unique to this process/run — usernames are globally unique
+ * server-side (MPG-077), and the local dev server persists across repeated
+ * local `playwright test` invocations (`reuseExistingServer`), so a fixed
+ * literal would 409-collide with itself on the second run.
+ */
+function uniqueUsername(role: "creator" | "joiner"): string {
+  return `${role}${Date.now().toString(36)}${Math.floor(Math.random() * 1000)}`.slice(0, 20);
+}
+
+/** Clicks "Play online" on the Setup screen and waits for the invite link to appear. */
+export async function playOnlineAndGetInviteUrl(
+  page: Page,
+  username = uniqueUsername("creator"),
+): Promise<string> {
+  await page.getByRole("button", { name: "Play online" }).click();
+  await fillUsernameIfPrompted(page, username);
+  const linkInput = page.locator("#invite-url");
+  await expect(linkInput).toBeVisible();
+  // The input starts empty an instant before `room:create` resolves — wait
+  // for the real URL rather than racing it.
+  await expect(linkInput).not.toHaveValue("");
+  return linkInput.inputValue();
+}
+
+/** Opens an invite URL in a fresh page (own context) and waits for the board to appear. */
+export async function joinViaInvite(
+  page: Page,
+  inviteUrl: string,
+  username = uniqueUsername("joiner"),
+): Promise<void> {
+  await page.goto(inviteUrl);
+  await fillUsernameIfPrompted(page, username);
+  // JoinScreen ("Joining…") resolves into the board once seated.
+  await expect(page.getByRole("grid")).toBeVisible({ timeout: 10_000 });
+}
+
+/** Waits until the game board is visible (creator side, once the room fills). */
+export async function waitForBoard(page: Page): Promise<void> {
+  await expect(page.getByRole("grid")).toBeVisible({ timeout: 10_000 });
+}
+
+/** Clicks a Tic-Tac-Toe cell by its 1-based row/column. */
+export async function clickCell(page: Page, { row, col }: CellPos): Promise<void> {
+  await page
+    .getByRole("gridcell", { name: new RegExp(`^Row ${row}, column ${col}, `) })
+    .click();
+}
+
+/** Reads a Tic-Tac-Toe cell's mark ("X" | "O" | "empty") from its accessible label. */
+export async function cellMark(page: Page, { row, col }: CellPos): Promise<string> {
+  const label = await page
+    .getByRole("gridcell", { name: new RegExp(`^Row ${row}, column ${col}, `) })
+    .getAttribute("aria-label");
+  return label?.split(", ").pop() ?? "";
+}
+
+/** Waits until the aria-live status region announces the game is over, and returns its text. */
+export async function waitForGameOver(page: Page): Promise<string> {
+  const status = page.locator('[role="status"]');
+  await expect(status).toContainText(/wins!|draw/i, { timeout: 10_000 });
+  return status.innerText();
+}
+
+/** True once this client's board is disabled for input (opponent's turn / game over). */
+export async function isBoardDisabled(page: Page): Promise<boolean> {
+  const value = await page.getByRole("grid").getAttribute("aria-disabled");
+  return value === "true";
+}
+
+/** Clicks Rematch and returns once this side has proposed one. */
+export async function clickRematch(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Rematch" }).click();
+}

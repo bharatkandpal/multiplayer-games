@@ -1,0 +1,21 @@
+.main {
+  max-width: var(--container-md);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+
+.heading {
+  font-size: var(--font-size-600);
+  font-weight: var(--font-weight-bold);
+  margin: 0 0 var(--space-6);
+}
+
+.joiningBlock,
+.errorBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-8) 0;
+}

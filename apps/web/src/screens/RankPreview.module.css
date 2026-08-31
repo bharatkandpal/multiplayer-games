@@ -1,0 +1,12 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  font-size: var(--font-size-200);
+  color: var(--color-text-muted);
+}
+
+.rank {
+  color: var(--color-text);
+}

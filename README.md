@@ -23,19 +23,22 @@ live task board.
 
 ## Getting started
 
-**Prerequisites:** Node.js **22+** and **pnpm 11+** (this repo pins pnpm via the
-`packageManager` field; `corepack enable` will pick it up automatically).
+**Prerequisites:** Node.js **22+**, **pnpm 11+** (`corepack enable`), and optionally
+**Docker** (for local Postgres).
 
 ```bash
 pnpm install                 # install all workspace dependencies
+pnpm --filter @mpg/web dev   # start the web dev server → http://localhost:5173
 
-pnpm --filter @mpg/web dev   # start the web dev server (Vite, ~http://localhost:5173)
+# Optional: local Postgres for durable persistence
+docker compose up -d         # Postgres 17 on localhost:5432
+cp .env.example .env         # pre-filled DATABASE_URL
+pnpm --filter @mpg/server db:generate   # generate migration SQL from schema
+pnpm --filter @mpg/server db:migrate    # apply migrations
 ```
 
-> **What you'll see today:** the web app renders the **design-system gallery**
-> (buttons, toast, modal, skeleton, a light/dark theme toggle) plus the engine-backed
-> games list. **Playable boards are not built yet** (MPG-009/010) — and there is **no
-> server to run yet** (`apps/server` is a stub until Phase 2).
+> Without Docker, the server falls back to **in-memory storage** automatically — no
+> setup needed for local play or running tests.
 
 ### Common commands (run from the repo root)
 
@@ -50,8 +53,12 @@ pnpm --filter @mpg/web dev   # start the web dev server (Vite, ~http://localhost
 | `pnpm typecheck`                    | Strict TypeScript check across the repo      |
 | `pnpm lint` / `pnpm lint:fix`       | ESLint                                       |
 | `pnpm format` / `pnpm format:check` | Prettier                                     |
+| `docker compose up -d`              | Start local Postgres (optional)              |
+| `pnpm --filter @mpg/server db:studio` | Open Drizzle Studio (visual DB browser)    |
 
-New to the codebase? Start with the **[Developer Guide](docs/DEVELOPER_GUIDE.md)**.
+New to the codebase? Start with the **[Developer Guide](docs/DEVELOPER_GUIDE.md)** — it
+covers the [Quickstart](docs/DEVELOPER_GUIDE.md#quickstart), store/persistence setup,
+schema, retention, and production hosting options.
 
 ## Repository layout
 
@@ -78,3 +85,4 @@ multiplayer-games/
 | [docs/ROADMAP.md](docs/ROADMAP.md)                                 | Milestones & phased delivery                                                   |
 | [docs/adr/0001-tech-stack.md](docs/adr/0001-tech-stack.md)         | ADR: core tech stack decision (TypeScript both ends)                           |
 | [docs/adr/0002-realtime-games.md](docs/adr/0002-realtime-games.md) | ADR (Accepted): real-time arcade games alongside turn-based (`RealtimeModule`) |
+| [docs/adr/0003-durable-persistence.md](docs/adr/0003-durable-persistence.md) | ADR (Accepted): Postgres + Drizzle durable persistence foundation             |

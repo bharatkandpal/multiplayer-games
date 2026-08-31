@@ -127,6 +127,18 @@
   gap: var(--space-2);
 }
 
+/* MPG-015: online rematch negotiation state, shown under the Rematch button
+   while waiting on / responding to the other seat(s). */
+.rematchStatus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-200);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
 /* ------------------------------------------------------------------ */
 /* WIN — sole local human: green flash + confetti burst over the board. */
 /* ------------------------------------------------------------------ */

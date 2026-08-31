@@ -1,0 +1,16 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.watchNotice {
+  padding: var(--space-3) var(--space-4) 0;
+  display: flex;
+  justify-content: center;
+}
+
+.connectingWrap {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+}

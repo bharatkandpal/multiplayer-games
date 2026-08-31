@@ -6,11 +6,33 @@ For product/architecture context see [PRD.md](PRD.md), [TDD.md](TDD.md), and
 
 ---
 
+## Quickstart
+
+```bash
+# 1. Install deps
+pnpm install
+
+# 2. Start the web dev server (play local games right away)
+pnpm --filter @mpg/web dev          # → http://localhost:5173
+
+# 3. (Optional) Start a local Postgres for durable persistence
+docker compose up -d                # Postgres 17 on localhost:5432
+cp .env.example .env                # DATABASE_URL pre-filled for the container
+pnpm --filter @mpg/server db:generate  # generate migration SQL from schema
+pnpm --filter @mpg/server db:migrate   # apply migrations
+
+# Without Docker, the server falls back to in-memory storage automatically.
+```
+
+---
+
 ## 1. Prerequisites
 
 - **Node.js 22+** (see `.nvmrc` → `nvm use`).
 - **pnpm 11+** — pinned via the `packageManager` field in `package.json`. Run
   `corepack enable` once and pnpm will match automatically.
+- **Docker** (optional) — for local Postgres. Not required for the web app or
+  running tests.
 
 ```bash
 pnpm install
@@ -24,7 +46,7 @@ pnpm workspaces (`pnpm-workspace.yaml`): `packages/*` + `apps/*`.
 | ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/engine` | `@mpg/engine` | **Pure, shared** game rules + minimax AI. No I/O, no DOM, no clock, no randomness in the rules. Runs on both client and server. |
 | `apps/web`        | `@mpg/web`    | React + Vite client — design system, board renderers, screens. Depends on `@mpg/engine` via `workspace:*`.                      |
-| `apps/server`     | `@mpg/server` | Node + Socket.IO backend (authoritative). **Stub today** — built in Phase 2.                                                    |
+| `apps/server`     | `@mpg/server` | Node + Socket.IO backend (authoritative). Persistence layer landed (Postgres + in-memory); HTTP/WS built in Phase 2.            |
 
 The apps import the engine as a normal package (`import { ... } from "@mpg/engine"`);
 pnpm symlinks it, so engine edits are picked up with no build step.
@@ -44,9 +66,13 @@ Run from the repo root. `pnpm -r` fans a script out across all workspaces.
 | `pnpm lint` / `pnpm lint:fix`       | ESLint (flat config)                                                    |
 | `pnpm format` / `pnpm format:check` | Prettier                                                                |
 | `pnpm --filter @mpg/engine test`    | Test just the engine                                                    |
+| `pnpm --filter @mpg/server test`   | Test just the server (in-memory store, no DB needed)                    |
+| `pnpm --filter @mpg/server db:generate` | Generate Drizzle migration SQL from schema changes                 |
+| `pnpm --filter @mpg/server db:migrate`  | Apply pending migrations to your local Postgres                    |
+| `pnpm --filter @mpg/server db:studio`   | Open Drizzle Studio (visual DB browser)                            |
 
-**What runs today:** `pnpm --filter @mpg/web dev` shows the design-system gallery +
-engine-backed games list. Boards/screens are MPG-009; there is no server yet.
+**What runs today:** `pnpm --filter @mpg/web dev` shows the full game catalog with local
+play (vs bot, vs friend, watch). The server has the persistence layer but no HTTP/WS yet.
 
 ## 4. Toolchain notes
 
@@ -126,16 +152,110 @@ column-major `board[col][row]` with `row 0 = bottom` and gravity to the lowest e
   recoverable errors, full a11y/AA, responsive, meaningful motion, tokens-only). Run the
   `ux-review` skill / `ux-reviewer` agent before merging UI work.
 
-## 7. Testing conventions
+## 7. The server & persistence (`@mpg/server`)
+
+### Architecture
+
+Postgres is the **single durable system-of-record** ([ADR 0003](adr/0003-durable-persistence.md)).
+Redis stays ephemeral-only (room state, pub/sub). The engine (`packages/engine`) has
+**zero I/O** — all persistence lives in `apps/server`.
+
+### Store pattern
+
+Four repository interfaces in `apps/server/src/store/ports.ts`, bundled as `Store`:
+
+| Repo | Purpose |
+|------|---------|
+| `SessionRepo` | Lightweight, no-PII identity tokens |
+| `ResultRepo` | Durable record of every completed/abandoned game |
+| `LeaderboardRepo` | Per-game standings (`score` for arcade, `wld` for turn-based) |
+| `ShareLinkRepo` | Unguessable tokens → result / replay / leaderboard view |
+
+Two adapters implement every port:
+
+| Adapter | When | How |
+|---------|------|-----|
+| **Postgres** (`store/pg/`) | `DATABASE_URL` is set | Drizzle ORM + postgres.js |
+| **In-memory** (`store/memory/`) | No `DATABASE_URL` | Plain `Map`s; zero deps |
+
+Selection is automatic — if `DATABASE_URL` is present the server uses Postgres;
+otherwise it falls back to in-memory (no persistence between restarts, but perfect
+for dev iteration and tests).
+
+### Local Postgres setup
+
+```bash
+docker compose up -d                          # start Postgres 17 on :5432
+cp .env.example .env                          # pre-filled DATABASE_URL
+pnpm --filter @mpg/server db:generate         # generate migration SQL from schema
+pnpm --filter @mpg/server db:migrate          # apply migrations
+```
+
+The container stores data in a named Docker volume (`pgdata`), so it survives
+`docker compose down`. To nuke everything: `docker compose down -v`.
+
+**Don't have Docker?** Skip these steps. The server will start in in-memory mode.
+
+### Schema & migrations
+
+The schema is defined in TypeScript via Drizzle's `pgTable` builder
+(`apps/server/src/db/schema.ts`). When you change the schema:
+
+```bash
+pnpm --filter @mpg/server db:generate   # creates a new SQL migration in drizzle/migrations/
+pnpm --filter @mpg/server db:migrate    # applies it
+```
+
+Drizzle Studio (`pnpm --filter @mpg/server db:studio`) gives you a visual DB browser
+for inspecting data.
+
+### Key schema concepts
+
+- **`owner_token`** — every row ties back to a session token via FK. "Forget me"
+  cascades through this key to delete all of a user's data.
+- **`run_id`** — unique idempotency key on game results. Prevents double-writes on
+  retry. Leaderboard upserts reference it to avoid double-counting.
+- **`event_id`** — nullable. Scopes data to a company event when present; global when
+  null. Additive for the north-star event mode.
+- **`metric` discriminator** — leaderboard entries carry `"score"` (arcade high score)
+  or `"wld"` (turn-based win/loss/draw), with different sort orders.
+
+### Retention & privacy
+
+Three lifecycle operations in `apps/server/src/retention/retention.ts`:
+
+| Function | What it does |
+|----------|--------------|
+| `rollingRetention(store)` | Delete game results older than 90 days + expired share links |
+| `purgeEvent(store, eventId)` | Delete all leaderboard entries for a specific event |
+| `forgetMe(store, ownerToken)` | Delete **everything** for a session token across all repos |
+
+These are called programmatically today (no HTTP endpoint yet). They run against both
+adapters.
+
+### Production hosting
+
+The code is `DATABASE_URL`-driven, so any managed Postgres works:
+
+- **Supabase** — generous free tier, dashboard, optional auth
+- **Neon** — serverless Postgres (scales to zero), branch previews
+- **Railway** — simple deploy, pairs Postgres + server
+
+Swap the connection string and you're done.
+
+## 8. Testing conventions
 
 - Colocate tests next to source as `*.test.ts(x)`.
 - Deterministic and fast — **no `sleep`s**, seed all randomness (engine tests use a
   seeded PRNG). Test through public interfaces, not internals.
+- **Server tests use the in-memory adapter** — no Docker or Postgres needed for
+  `vitest run`. Contract tests in `store/__tests__/store.contract.test.ts` verify
+  that both adapters satisfy the same interface.
 - Engine correctness bars (enforced by tests): win/draw detection exhaustive; illegal
   moves rejected; TTT Hard never loses; C4 Hard beats random ≥95%; strength monotonic
   (Hard ≥ Medium ≥ Easy).
 
-## 8. Git & CI workflow
+## 9. Git & CI workflow
 
 - Work on a feature branch per task (e.g. `mpg-009-board`), not on `main`.
 - Keep it green before merging: `pnpm typecheck && pnpm lint && pnpm format:check && pnpm test`.
@@ -144,13 +264,13 @@ column-major `board[col][row]` with `row 0 = bottom` and gravity to the lowest e
 - Commit messages end with the project's Co-Authored-By / session trailer (see existing
   history).
 
-## 9. Task board
+## 10. Task board
 
 Lightweight file-based Kanban in [`tasks/`](../tasks) — `backlog.md` → `refine.md` →
 `active.md` → `archive.md`, IDs prefixed `MPG-`. WIP limit 3 on Active. Large tasks are
 sliced into `MPG-00X-a/-b/-c` children and the parent archived as `Sliced`.
 
-## 10. Adding a new game
+## 11. Adding a new game
 
 The platform is game-agnostic — a new game is a `GameModule` + a renderer, with **no
 changes to the room manager, transport, or AI runner**. Follow the `add-game` skill; in

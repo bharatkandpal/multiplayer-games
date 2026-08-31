@@ -13,6 +13,9 @@ export type { ToastProps, ToastVariant } from "./Toast";
 export { Modal } from "./Modal";
 export type { ModalProps } from "./Modal";
 
+export { UsernamePrompt } from "./UsernamePrompt";
+export type { UsernamePromptProps } from "./UsernamePrompt";
+
 export { Skeleton, SkeletonGroup } from "./Skeleton";
 export type { SkeletonProps, SkeletonVariant, SkeletonGroupProps } from "./Skeleton";
 
@@ -21,5 +24,5 @@ export { Spinner } from "./Spinner";
 export { VisuallyHidden } from "./VisuallyHidden";
 export type { VisuallyHiddenProps } from "./VisuallyHidden";
 
-export { BackArrowIcon, HomeIcon } from "./icons";
+export { BackArrowIcon, GearIcon, HomeIcon } from "./icons";
 export type { IconProps } from "./icons";
