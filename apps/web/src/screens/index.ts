@@ -20,7 +20,7 @@ export type {
   TouchAction,
 } from "./RealtimePlayScreen";
 
-export { TicTacToeRoute, TicTacToeMoveRoute, ConnectFourRoute } from "./games";
+export { TicTacToeRoute, TicTacToeMoveRoute, ConnectFourRoute, NimRoute } from "./games";
 export type { GameRouteProps } from "./games";
 
 export { RealtimeGameRoute, REALTIME_GAMES } from "./realtimeGames";

@@ -57,6 +57,9 @@ export type {
   ConnectFourLine,
 } from "./connect4";
 
+export { nim, DEFAULT_PILES } from "./nim";
+export type { NimState, NimMove, NimLine } from "./nim";
+
 export { builtInGames, registerBuiltInGames } from "./games";
 
 export { minimax, searchBestMove } from "./ai/minimax";
@@ -69,3 +72,5 @@ export {
   DEFAULT_DIFFICULTY,
 } from "./ai/difficulty";
 export type { Rng, DifficultyConfig } from "./ai/difficulty";
+
+export { pickNimMove, optimalNimMove, nimSum } from "./ai/heuristics/nim";

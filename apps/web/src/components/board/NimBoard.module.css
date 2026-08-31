@@ -1,0 +1,221 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+/* Visible step prompt ("Select a pile…" / "Choose how many…"). A
+   screen-reader-only live region mirrors this text (see NimBoard.tsx) so
+   assistive tech hears it without a second, competing announcement racing
+   the parent screen's move/result live region. */
+.prompt {
+  margin: 0;
+  text-align: center;
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+
+.warning {
+  margin: 0;
+  text-align: center;
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-danger-text);
+}
+
+.piles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.pile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: var(--size-touch-target);
+  min-height: calc(var(--size-touch-target) * 2);
+  flex: 1 1 5.5rem;
+  max-width: 8rem;
+  padding: var(--space-3) var(--space-2);
+  border: var(--border-width-thick) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-raised);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.pile:hover:not([aria-disabled="true"]) {
+  background-color: var(--color-bg-subtle);
+}
+
+.pile:active:not([aria-disabled="true"]) {
+  transform: scale(0.97);
+}
+
+.pile:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.pile[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.pile.empty {
+  opacity: 0.6;
+}
+
+.pileName {
+  font-size: var(--font-size-100);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+
+.tokenRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  min-height: 1.25rem;
+}
+
+.token {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-accent);
+  transition:
+    opacity var(--duration-slow) var(--ease-standard),
+    transform var(--duration-slow) var(--ease-standard);
+}
+
+/* A token that was just taken: fades and shrinks out in place rather than
+   simply vanishing — the "objects visually being removed" cue. Purely
+   additive/ephemeral (see NimBoard.tsx `fading` state); never leaves
+   permanent extra layout behind. */
+.tokenGhost {
+  opacity: 0;
+  transform: scale(0.4) translateY(4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .token {
+    transition: none;
+  }
+  .tokenGhost {
+    display: none;
+  }
+}
+
+.emptyMark {
+  font-size: var(--font-size-200);
+  color: var(--color-text-disabled);
+}
+
+.pileCount {
+  font-size: var(--font-size-500);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Step 1 of the select-then-confirm flow: the pile currently picked up,
+   awaiting a count. Dashed ring — distinct shape, not just a color swap —
+   from the solid `.winning` ring. */
+.selected {
+  border-color: var(--color-accent);
+  border-style: dashed;
+  box-shadow: 0 0 0 3px var(--color-accent) inset;
+}
+
+/* The pile a move was just taken from — a brief highlight pulse (shape +
+   color), independent of whose turn it now is. */
+.justTaken {
+  border-color: var(--color-accent);
+  animation: takenPulse var(--duration-slow) var(--ease-emphasized);
+}
+
+@keyframes takenPulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .justTaken {
+    animation: none;
+  }
+}
+
+.winning {
+  border-color: var(--color-success);
+  background-color: var(--color-success-bg);
+  box-shadow: 0 0 0 3px var(--color-success) inset;
+  animation: winPulse var(--duration-slow) var(--ease-emphasized);
+}
+
+@keyframes winPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .winning {
+    animation: none;
+  }
+}
+
+.winningLoss {
+  border-color: var(--color-danger);
+  background-color: var(--color-danger-bg);
+  box-shadow: 0 0 0 3px var(--color-danger) inset;
+  animation: winPulse var(--duration-slow) var(--ease-emphasized);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .winningLoss {
+    animation: none;
+  }
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.stepperCount {
+  min-width: 2ch;
+  text-align: center;
+  font-size: var(--font-size-400);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}

@@ -1,4 +1,4 @@
-import { ENGINE_VERSION, connectFour, ticTacToe, ticTacToeMove } from "@mpg/engine";
+import { ENGINE_VERSION, connectFour, nim, ticTacToe, ticTacToeMove } from "@mpg/engine";
 import type { GameId, RealtimeGameId } from "@mpg/engine";
 import { Button } from "../components/ui";
 import { GameThumbnail } from "./gameThumbnails";
@@ -51,6 +51,14 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
     description:
       "Only 3 pieces each — place them, then move one to any empty square per turn. Get three in a row to win (no draws by filling up, but repeating the same position three times is a draw).",
     playerCount: ticTacToeMove.playerCount,
+    kind: "turn-based",
+  },
+  nim: {
+    id: "nim",
+    title: "Nim",
+    description:
+      "Take turns removing objects from piles — whoever takes the last object wins. Simple rules, deep strategy.",
+    playerCount: nim.playerCount,
     kind: "turn-based",
   },
 };
