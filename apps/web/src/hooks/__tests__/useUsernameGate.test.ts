@@ -20,7 +20,10 @@ describe("useUsernameGate", () => {
   });
 
   it("calls onReady immediately when a username is already cached, without opening the picker", () => {
-    window.localStorage.setItem("mpg_username", JSON.stringify({ name: "bharat_k", confirmed: true }));
+    window.localStorage.setItem(
+      "mpg_username",
+      JSON.stringify({ name: "bharat_k", confirmed: true }),
+    );
     const { result } = renderHook(() => useUsernameGate());
     const onReady = vi.fn();
 

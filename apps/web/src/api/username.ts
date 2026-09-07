@@ -65,8 +65,7 @@ export function isValidUsernameFormat(name: string): boolean {
 }
 
 export type UsernameSyncResult =
-  | { ok: true; username: string }
-  | { ok: false; reason: "taken" | "invalid" | "offline" };
+  { ok: true; username: string } | { ok: false; reason: "taken" | "invalid" | "offline" };
 
 type CollisionListener = () => void;
 const collisionListeners = new Set<CollisionListener>();

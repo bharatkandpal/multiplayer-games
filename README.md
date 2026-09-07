@@ -81,4 +81,4 @@ multiplayer-games/
 | [docs/adr/0003-durable-persistence.md](docs/adr/0003-durable-persistence.md)                 | ADR (Accepted): durable persistence & data store (Postgres; adapter boundary)            |
 | [docs/adr/0004-identity-and-social-writes.md](docs/adr/0004-identity-and-social-writes.md)   | ADR (Accepted): lightweight identity, durable sessions & social write model              |
 | [docs/adr/0005-realtime-chat-and-reactions.md](docs/adr/0005-realtime-chat-and-reactions.md) | ADR (Accepted): in-game realtime chat & emoji reactions (ephemeral; fan-out; moderation) |
-| [docs/adr/0006-in-game-voice-chat.md](docs/adr/0006-in-game-voice-chat.md)                   | ADR (Accepted): in-game voice chat (vendor-abstracted SFU; opt-in; audio only)            |
+| [docs/adr/0006-in-game-voice-chat.md](docs/adr/0006-in-game-voice-chat.md)                   | ADR (Accepted): in-game voice chat (vendor-abstracted SFU; opt-in; audio only)           |

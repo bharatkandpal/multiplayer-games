@@ -24,8 +24,7 @@ export function createMemoryShareLinkRepo(): ShareLinkRepo {
       const link = store.get(token);
       if (!link) return undefined;
       if (link.revoked) return undefined;
-      if (link.expiresAt && link.expiresAt.getTime() < Date.now())
-        return undefined;
+      if (link.expiresAt && link.expiresAt.getTime() < Date.now()) return undefined;
       return link;
     },
 

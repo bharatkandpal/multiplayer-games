@@ -1,9 +1,4 @@
-import type {
-  GameResult,
-  NewGameResult,
-  PaginationOpts,
-  ResultRepo,
-} from "../ports.js";
+import type { GameResult, NewGameResult, PaginationOpts, ResultRepo } from "../ports.js";
 
 export function createMemoryResultRepo(): ResultRepo {
   const store = new Map<string, GameResult>();

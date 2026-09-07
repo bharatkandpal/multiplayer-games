@@ -2,12 +2,7 @@ import { and, desc, eq, lt } from "drizzle-orm";
 
 import type { Database } from "../../db/drizzle.js";
 import { gameResults } from "../../db/schema.js";
-import type {
-  GameResult,
-  NewGameResult,
-  PaginationOpts,
-  ResultRepo,
-} from "../ports.js";
+import type { GameResult, NewGameResult, PaginationOpts, ResultRepo } from "../ports.js";
 
 function toGameResult(row: typeof gameResults.$inferSelect): GameResult {
   return {

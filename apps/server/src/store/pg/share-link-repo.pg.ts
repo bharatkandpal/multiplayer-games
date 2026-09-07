@@ -39,19 +39,13 @@ export function createPgShareLinkRepo(db: Database): ShareLinkRepo {
       const [row] = await db
         .select()
         .from(shareLinks)
-        .where(
-          and(
-            eq(shareLinks.token, token),
-            eq(shareLinks.revoked, false),
-          ),
-        )
+        .where(and(eq(shareLinks.token, token), eq(shareLinks.revoked, false)))
         .limit(1);
 
       if (!row) return undefined;
 
       // Check expiry
-      if (row.expiresAt && row.expiresAt.getTime() < Date.now())
-        return undefined;
+      if (row.expiresAt && row.expiresAt.getTime() < Date.now()) return undefined;
 
       return toShareLink(row);
     },
@@ -60,12 +54,7 @@ export function createPgShareLinkRepo(db: Database): ShareLinkRepo {
       const rows = await db
         .update(shareLinks)
         .set({ revoked: true })
-        .where(
-          and(
-            eq(shareLinks.token, token),
-            eq(shareLinks.ownerToken, ownerToken),
-          ),
-        )
+        .where(and(eq(shareLinks.token, token), eq(shareLinks.ownerToken, ownerToken)))
         .returning({ id: shareLinks.id });
       return rows.length > 0;
     },

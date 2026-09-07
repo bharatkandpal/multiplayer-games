@@ -84,9 +84,7 @@ export async function waitForBoard(page: Page): Promise<void> {
 
 /** Clicks a Tic-Tac-Toe cell by its 1-based row/column. */
 export async function clickCell(page: Page, { row, col }: CellPos): Promise<void> {
-  await page
-    .getByRole("gridcell", { name: new RegExp(`^Row ${row}, column ${col}, `) })
-    .click();
+  await page.getByRole("gridcell", { name: new RegExp(`^Row ${row}, column ${col}, `) }).click();
 }
 
 /** Reads a Tic-Tac-Toe cell's mark ("X" | "O" | "empty") from its accessible label. */

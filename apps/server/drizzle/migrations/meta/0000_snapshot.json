@@ -148,12 +148,8 @@
           "name": "game_results_owner_token_sessions_token_fk",
           "tableFrom": "game_results",
           "tableTo": "sessions",
-          "columnsFrom": [
-            "owner_token"
-          ],
-          "columnsTo": [
-            "token"
-          ],
+          "columnsFrom": ["owner_token"],
+          "columnsTo": ["token"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -163,9 +159,7 @@
         "game_results_run_id_unique": {
           "name": "game_results_run_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "run_id"
-          ]
+          "columns": ["run_id"]
         }
       },
       "policies": {},
@@ -295,12 +289,8 @@
           "name": "leaderboard_entries_owner_token_sessions_token_fk",
           "tableFrom": "leaderboard_entries",
           "tableTo": "sessions",
-          "columnsFrom": [
-            "owner_token"
-          ],
-          "columnsTo": [
-            "token"
-          ],
+          "columnsFrom": ["owner_token"],
+          "columnsTo": ["token"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -310,12 +300,7 @@
         "leaderboard_upsert_key": {
           "name": "leaderboard_upsert_key",
           "nullsNotDistinct": false,
-          "columns": [
-            "game_id",
-            "event_id",
-            "time_bucket",
-            "owner_token"
-          ]
+          "columns": ["game_id", "event_id", "time_bucket", "owner_token"]
         }
       },
       "policies": {},
@@ -389,9 +374,7 @@
         "sessions_token_unique": {
           "name": "sessions_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -482,12 +465,8 @@
           "name": "share_links_owner_token_sessions_token_fk",
           "tableFrom": "share_links",
           "tableTo": "sessions",
-          "columnsFrom": [
-            "owner_token"
-          ],
-          "columnsTo": [
-            "token"
-          ],
+          "columnsFrom": ["owner_token"],
+          "columnsTo": ["token"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -497,9 +476,7 @@
         "share_links_token_unique": {
           "name": "share_links_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},

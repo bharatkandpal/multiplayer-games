@@ -55,21 +55,21 @@ pnpm symlinks it, so engine edits are picked up with no build step.
 
 Run from the repo root. `pnpm -r` fans a script out across all workspaces.
 
-| Command                             | What it does                                                            |
-| ----------------------------------- | ----------------------------------------------------------------------- |
-| `pnpm --filter @mpg/web dev`        | Web dev server (Vite, hot reload, ~`http://localhost:5173`)             |
-| `pnpm --filter @mpg/web build`      | Production build of the web app                                         |
-| `pnpm build`                        | Build every workspace                                                   |
-| `pnpm test`                         | Full test suite (Vitest, all packages)                                  |
-| `pnpm test:fast`                    | Faster subset — excludes the heavy Connect Four AI strength simulations |
-| `pnpm typecheck`                    | Strict `tsc --noEmit` across all packages                               |
-| `pnpm lint` / `pnpm lint:fix`       | ESLint (flat config)                                                    |
-| `pnpm format` / `pnpm format:check` | Prettier                                                                |
-| `pnpm --filter @mpg/engine test`    | Test just the engine                                                    |
-| `pnpm --filter @mpg/server test`   | Test just the server (in-memory store, no DB needed)                    |
-| `pnpm --filter @mpg/server db:generate` | Generate Drizzle migration SQL from schema changes                 |
-| `pnpm --filter @mpg/server db:migrate`  | Apply pending migrations to your local Postgres                    |
-| `pnpm --filter @mpg/server db:studio`   | Open Drizzle Studio (visual DB browser)                            |
+| Command                                 | What it does                                                            |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| `pnpm --filter @mpg/web dev`            | Web dev server (Vite, hot reload, ~`http://localhost:5173`)             |
+| `pnpm --filter @mpg/web build`          | Production build of the web app                                         |
+| `pnpm build`                            | Build every workspace                                                   |
+| `pnpm test`                             | Full test suite (Vitest, all packages)                                  |
+| `pnpm test:fast`                        | Faster subset — excludes the heavy Connect Four AI strength simulations |
+| `pnpm typecheck`                        | Strict `tsc --noEmit` across all packages                               |
+| `pnpm lint` / `pnpm lint:fix`           | ESLint (flat config)                                                    |
+| `pnpm format` / `pnpm format:check`     | Prettier                                                                |
+| `pnpm --filter @mpg/engine test`        | Test just the engine                                                    |
+| `pnpm --filter @mpg/server test`        | Test just the server (in-memory store, no DB needed)                    |
+| `pnpm --filter @mpg/server db:generate` | Generate Drizzle migration SQL from schema changes                      |
+| `pnpm --filter @mpg/server db:migrate`  | Apply pending migrations to your local Postgres                         |
+| `pnpm --filter @mpg/server db:studio`   | Open Drizzle Studio (visual DB browser)                                 |
 
 **What runs today:** `pnpm --filter @mpg/web dev` shows the full game catalog with local
 play (vs bot, vs friend, watch). The server has the persistence layer but no HTTP/WS yet.
@@ -164,19 +164,19 @@ Redis stays ephemeral-only (room state, pub/sub). The engine (`packages/engine`)
 
 Four repository interfaces in `apps/server/src/store/ports.ts`, bundled as `Store`:
 
-| Repo | Purpose |
-|------|---------|
-| `SessionRepo` | Lightweight, no-PII identity tokens |
-| `ResultRepo` | Durable record of every completed/abandoned game |
+| Repo              | Purpose                                                       |
+| ----------------- | ------------------------------------------------------------- |
+| `SessionRepo`     | Lightweight, no-PII identity tokens                           |
+| `ResultRepo`      | Durable record of every completed/abandoned game              |
 | `LeaderboardRepo` | Per-game standings (`score` for arcade, `wld` for turn-based) |
-| `ShareLinkRepo` | Unguessable tokens → result / replay / leaderboard view |
+| `ShareLinkRepo`   | Unguessable tokens → result / replay / leaderboard view       |
 
 Two adapters implement every port:
 
-| Adapter | When | How |
-|---------|------|-----|
-| **Postgres** (`store/pg/`) | `DATABASE_URL` is set | Drizzle ORM + postgres.js |
-| **In-memory** (`store/memory/`) | No `DATABASE_URL` | Plain `Map`s; zero deps |
+| Adapter                         | When                  | How                       |
+| ------------------------------- | --------------------- | ------------------------- |
+| **Postgres** (`store/pg/`)      | `DATABASE_URL` is set | Drizzle ORM + postgres.js |
+| **In-memory** (`store/memory/`) | No `DATABASE_URL`     | Plain `Map`s; zero deps   |
 
 Selection is automatic — if `DATABASE_URL` is present the server uses Postgres;
 otherwise it falls back to in-memory (no persistence between restarts, but perfect
@@ -224,11 +224,11 @@ for inspecting data.
 
 Three lifecycle operations in `apps/server/src/retention/retention.ts`:
 
-| Function | What it does |
-|----------|--------------|
-| `rollingRetention(store)` | Delete game results older than 90 days + expired share links |
-| `purgeEvent(store, eventId)` | Delete all leaderboard entries for a specific event |
-| `forgetMe(store, ownerToken)` | Delete **everything** for a session token across all repos |
+| Function                      | What it does                                                 |
+| ----------------------------- | ------------------------------------------------------------ |
+| `rollingRetention(store)`     | Delete game results older than 90 days + expired share links |
+| `purgeEvent(store, eventId)`  | Delete all leaderboard entries for a specific event          |
+| `forgetMe(store, ownerToken)` | Delete **everything** for a session token across all repos   |
 
 These are called programmatically today (no HTTP endpoint yet). They run against both
 adapters.

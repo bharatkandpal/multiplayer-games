@@ -282,49 +282,45 @@ describe("All-bot watch mode (MPG-025)", () => {
     expect(created.sessionToken).toBeUndefined();
   });
 
-  it(
-    "the creator receives game:start/game:update/game:over as the bots play through",
-    async () => {
-      // Register listeners *before* emitting `room:create`: for an all-bot room,
-      // `game:start` broadcasts synchronously inside the server's `room:create`
-      // handling — before it even replies with `room:created` — so a real client
-      // must have these bound ahead of time (matches how a client would normally
-      // wire up its socket).
-      const createdPromise = once<{
-        room: { roomId: string };
-        creatorToken: string;
-      }>(hostSocket, "room:created");
-      const startPromise = once<{ room: { status: string } }>(hostSocket, "game:start");
-      const updatePromise = once<{ room: { turn: number }; lastMove: { slot: number } }>(
-        hostSocket,
-        "game:update",
-      );
-      const gameOverPromise = once<{ result: { status: string } }>(hostSocket, "game:over");
+  it("the creator receives game:start/game:update/game:over as the bots play through", async () => {
+    // Register listeners *before* emitting `room:create`: for an all-bot room,
+    // `game:start` broadcasts synchronously inside the server's `room:create`
+    // handling — before it even replies with `room:created` — so a real client
+    // must have these bound ahead of time (matches how a client would normally
+    // wire up its socket).
+    const createdPromise = once<{
+      room: { roomId: string };
+      creatorToken: string;
+    }>(hostSocket, "room:created");
+    const startPromise = once<{ room: { status: string } }>(hostSocket, "game:start");
+    const updatePromise = once<{ room: { turn: number }; lastMove: { slot: number } }>(
+      hostSocket,
+      "game:update",
+    );
+    const gameOverPromise = once<{ result: { status: string } }>(hostSocket, "game:over");
 
-      hostSocket.emit("room:create", {
-        gameId: "tictactoe",
-        seats: [
-          { slot: 1, kind: "bot", difficulty: "easy" },
-          { slot: 2, kind: "bot", difficulty: "easy" },
-        ],
-      });
+    hostSocket.emit("room:create", {
+      gameId: "tictactoe",
+      seats: [
+        { slot: 1, kind: "bot", difficulty: "easy" },
+        { slot: 2, kind: "bot", difficulty: "easy" },
+      ],
+    });
 
-      const created = await createdPromise;
-      expect(created.creatorToken).toBeTruthy();
+    const created = await createdPromise;
+    expect(created.creatorToken).toBeTruthy();
 
-      // The creator's own socket auto-joined on `room:create` — it sees the game
-      // start immediately (no separate `room:join`/`room:watch` call needed).
-      const start = await startPromise;
-      expect(start.room.status).toBe("active");
+    // The creator's own socket auto-joined on `room:create` — it sees the game
+    // start immediately (no separate `room:join`/`room:watch` call needed).
+    const start = await startPromise;
+    expect(start.room.status).toBe("active");
 
-      const update = await updatePromise;
-      expect(typeof update.lastMove.slot).toBe("number");
+    const update = await updatePromise;
+    expect(typeof update.lastMove.slot).toBe("number");
 
-      const over = await gameOverPromise;
-      expect(["win", "draw"]).toContain(over.result.status);
-    },
-    15000,
-  );
+    const over = await gameOverPromise;
+    expect(["win", "draw"]).toContain(over.result.status);
+  }, 15000);
 
   it("rejects a watch-join attempt from an unrelated session/creator token", async () => {
     const createdPromise = once<{ room: { roomId: string } }>(hostSocket, "room:created");

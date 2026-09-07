@@ -34,10 +34,7 @@ export async function rollingRetention(store: Store): Promise<RetentionStats> {
 }
 
 /** Delete all data scoped to a specific event. */
-export async function purgeEvent(
-  store: Store,
-  eventId: string,
-): Promise<RetentionStats> {
+export async function purgeEvent(store: Store, eventId: string): Promise<RetentionStats> {
   const leaderboard = await store.leaderboard.deleteByEvent(eventId);
   // Game results and share links don't have a dedicated deleteByEvent,
   // but they cascade from session deletion. For event-specific cleanup
@@ -46,10 +43,7 @@ export async function purgeEvent(
 }
 
 /** Delete all traces of a session token across every repo. */
-export async function forgetMe(
-  store: Store,
-  ownerToken: string,
-): Promise<RetentionStats> {
+export async function forgetMe(store: Store, ownerToken: string): Promise<RetentionStats> {
   // Order matters: delete dependent records before the session (FK cascade
   // would handle it, but explicit is clearer and works with the memory adapter).
   const results = await store.results.deleteByOwner(ownerToken);

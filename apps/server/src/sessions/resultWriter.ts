@@ -24,10 +24,7 @@ export interface GameOverData {
 }
 
 /** Persist a game-over result. Idempotent on `runId`. */
-export async function writeGameResult(
-  store: Store,
-  data: GameOverData,
-): Promise<GameResult> {
+export async function writeGameResult(store: Store, data: GameOverData): Promise<GameResult> {
   const input: NewGameResult = {
     runId: data.runId,
     gameId: data.gameId,

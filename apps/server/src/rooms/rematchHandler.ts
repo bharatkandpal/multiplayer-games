@@ -74,8 +74,10 @@ export function registerRematchHandlers(io: Server, roomManager: RoomManager): v
   // never received it and hung on "Connecting…" forever (found via
   // MPG-017's e2e rematch step).
   roomManager.on("rematch:matched", ({ room, newRoom }: { room: Room; newRoom: Room }) => {
-    const rebinding: { seatSessionToken: string; socket: ReturnType<typeof io.sockets.sockets.get> }[] =
-      [];
+    const rebinding: {
+      seatSessionToken: string;
+      socket: ReturnType<typeof io.sockets.sockets.get>;
+    }[] = [];
     for (const seat of room.seats) {
       if (seat.kind !== "human" || !seat.sessionToken || !seat.socketId) continue;
       const socket = io.sockets.sockets.get(seat.socketId);

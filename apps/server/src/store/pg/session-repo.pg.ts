@@ -42,19 +42,12 @@ export function createPgSessionRepo(db: Database): SessionRepo {
     },
 
     async findByToken(token) {
-      const [row] = await db
-        .select()
-        .from(sessions)
-        .where(eq(sessions.token, token))
-        .limit(1);
+      const [row] = await db.select().from(sessions).where(eq(sessions.token, token)).limit(1);
       return row ? toSession(row) : undefined;
     },
 
     async touch(token) {
-      await db
-        .update(sessions)
-        .set({ lastSeenAt: new Date() })
-        .where(eq(sessions.token, token));
+      await db.update(sessions).set({ lastSeenAt: new Date() }).where(eq(sessions.token, token));
     },
 
     async delete(token) {
@@ -72,10 +65,7 @@ export function createPgSessionRepo(db: Database): SessionRepo {
         .select({ token: sessions.token })
         .from(sessions)
         .where(
-          and(
-            sql`lower(${sessions.username}) = lower(${username})`,
-            ne(sessions.token, token),
-          ),
+          and(sql`lower(${sessions.username}) = lower(${username})`, ne(sessions.token, token)),
         )
         .limit(1);
 

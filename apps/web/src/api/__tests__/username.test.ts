@@ -38,11 +38,9 @@ describe("username client", () => {
     });
 
     it("falls back to null when storage is unavailable", () => {
-      const spy = vi
-        .spyOn(window.localStorage.__proto__, "getItem")
-        .mockImplementation(() => {
-          throw new Error("storage disabled");
-        });
+      const spy = vi.spyOn(window.localStorage.__proto__, "getItem").mockImplementation(() => {
+        throw new Error("storage disabled");
+      });
       expect(getStoredUsername()).toBeNull();
       spy.mockRestore();
     });
@@ -53,11 +51,9 @@ describe("username client", () => {
     });
 
     it("does not throw when storage.setItem throws", () => {
-      const spy = vi
-        .spyOn(window.localStorage.__proto__, "setItem")
-        .mockImplementation(() => {
-          throw new Error("storage disabled");
-        });
+      const spy = vi.spyOn(window.localStorage.__proto__, "setItem").mockImplementation(() => {
+        throw new Error("storage disabled");
+      });
       expect(() => setStoredUsername("bharat_k")).not.toThrow();
       spy.mockRestore();
     });

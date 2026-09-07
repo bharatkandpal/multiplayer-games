@@ -21,11 +21,7 @@ function isValidUsername(value: unknown): value is string {
   return typeof value === "string" && USERNAME_PATTERN.test(value);
 }
 
-function parseNonNegativeInt(
-  raw: unknown,
-  fallback: number,
-  max?: number,
-): number {
+function parseNonNegativeInt(raw: unknown, fallback: number, max?: number): number {
   const value = Array.isArray(raw) ? raw[0] : raw;
   const parsed = typeof value === "string" ? Number.parseInt(value, 10) : NaN;
   if (!Number.isFinite(parsed) || parsed < 0) return fallback;
@@ -98,11 +94,7 @@ export function createSessionRouter(store: Store): Router {
       return;
     }
 
-    const limit = parseNonNegativeInt(
-      req.query["limit"],
-      DEFAULT_HISTORY_LIMIT,
-      MAX_HISTORY_LIMIT,
-    );
+    const limit = parseNonNegativeInt(req.query["limit"], DEFAULT_HISTORY_LIMIT, MAX_HISTORY_LIMIT);
     const offset = parseNonNegativeInt(req.query["offset"], 0);
 
     const results = await store.results.findByOwner(token, { limit, offset });

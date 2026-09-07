@@ -153,7 +153,10 @@ describe("LeaderboardScreen", () => {
 
   it("shows the real username on the current player's row when one is set", async () => {
     window.localStorage.setItem(STORAGE_KEY, "tok-me");
-    window.localStorage.setItem("mpg_username", JSON.stringify({ name: "bharat_k", confirmed: true }));
+    window.localStorage.setItem(
+      "mpg_username",
+      JSON.stringify({ name: "bharat_k", confirmed: true }),
+    );
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(

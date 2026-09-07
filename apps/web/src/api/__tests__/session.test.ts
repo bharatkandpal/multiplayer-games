@@ -89,10 +89,7 @@ describe("session client", () => {
 
     it("clears local state even if the network call fails", async () => {
       window.localStorage.setItem(STORAGE_KEY, "to-delete");
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockRejectedValue(new Error("network down")),
-      );
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
 
       await clearSession();
 

@@ -17,18 +17,10 @@ function compositeKey(
 export function createMemoryLeaderboardRepo(): LeaderboardRepo {
   const store = new Map<string, LeaderboardEntry>();
 
-  function matchesFilter(
-    entry: LeaderboardEntry,
-    filter?: LeaderboardFilter,
-  ): boolean {
+  function matchesFilter(entry: LeaderboardEntry, filter?: LeaderboardFilter): boolean {
     if (!filter) return true;
-    if (filter.eventId !== undefined && entry.eventId !== filter.eventId)
-      return false;
-    if (
-      filter.timeBucket !== undefined &&
-      entry.timeBucket !== filter.timeBucket
-    )
-      return false;
+    if (filter.eventId !== undefined && entry.eventId !== filter.eventId) return false;
+    if (filter.timeBucket !== undefined && entry.timeBucket !== filter.timeBucket) return false;
     return true;
   }
 
@@ -44,12 +36,7 @@ export function createMemoryLeaderboardRepo(): LeaderboardRepo {
 
   return {
     async upsert(input: UpsertLeaderboardEntry) {
-      const key = compositeKey(
-        input.gameId,
-        input.eventId,
-        input.timeBucket,
-        input.ownerToken,
-      );
+      const key = compositeKey(input.gameId, input.eventId, input.timeBucket, input.ownerToken);
       const existing = store.get(key);
 
       const entry: LeaderboardEntry = {
@@ -76,20 +63,14 @@ export function createMemoryLeaderboardRepo(): LeaderboardRepo {
 
     async topN(gameId, metric, n, filter) {
       return [...store.values()]
-        .filter(
-          (e) =>
-            e.gameId === gameId && e.metric === metric && matchesFilter(e, filter),
-        )
+        .filter((e) => e.gameId === gameId && e.metric === metric && matchesFilter(e, filter))
         .sort(rankSort)
         .slice(0, n);
     },
 
     async rankOf(gameId, metric, ownerToken, filter) {
       const sorted = [...store.values()]
-        .filter(
-          (e) =>
-            e.gameId === gameId && e.metric === metric && matchesFilter(e, filter),
-        )
+        .filter((e) => e.gameId === gameId && e.metric === metric && matchesFilter(e, filter))
         .sort(rankSort);
 
       const idx = sorted.findIndex((e) => e.ownerToken === ownerToken);

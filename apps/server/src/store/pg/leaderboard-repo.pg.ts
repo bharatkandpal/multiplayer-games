@@ -9,9 +9,7 @@ import type {
   UpsertLeaderboardEntry,
 } from "../ports.js";
 
-function toEntry(
-  row: typeof leaderboardEntries.$inferSelect,
-): LeaderboardEntry {
+function toEntry(row: typeof leaderboardEntries.$inferSelect): LeaderboardEntry {
   return {
     id: row.id,
     gameId: row.gameId,
@@ -29,15 +27,8 @@ function toEntry(
   };
 }
 
-function filterConditions(
-  gameId: string,
-  metric: string,
-  filter?: LeaderboardFilter,
-) {
-  const conds = [
-    eq(leaderboardEntries.gameId, gameId),
-    eq(leaderboardEntries.metric, metric),
-  ];
+function filterConditions(gameId: string, metric: string, filter?: LeaderboardFilter) {
+  const conds = [eq(leaderboardEntries.gameId, gameId), eq(leaderboardEntries.metric, metric)];
   if (filter?.eventId !== undefined) {
     conds.push(
       filter.eventId === null
@@ -99,9 +90,7 @@ export function createPgLeaderboardRepo(db: Database): LeaderboardRepo {
 
     async topN(gameId, metric, n, filter) {
       const orderCol =
-        metric === "score"
-          ? desc(leaderboardEntries.bestScore)
-          : desc(leaderboardEntries.wins);
+        metric === "score" ? desc(leaderboardEntries.bestScore) : desc(leaderboardEntries.wins);
 
       const rows = await db
         .select()

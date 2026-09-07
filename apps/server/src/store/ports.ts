@@ -99,10 +99,7 @@ export interface ResultRepo {
   findByRunId(runId: string): Promise<GameResult | undefined>;
 
   /** All results owned by a session token, newest first. */
-  findByOwner(
-    ownerToken: string,
-    opts?: PaginationOpts,
-  ): Promise<GameResult[]>;
+  findByOwner(ownerToken: string, opts?: PaginationOpts): Promise<GameResult[]>;
 
   /** Results for a game + optional event scope, newest first. */
   findByGameAndEvent(

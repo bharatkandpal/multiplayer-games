@@ -37,17 +37,11 @@ export const sessions = pgTable(
     // Nullable — most sessions have never picked a username (MPG-077).
     // Uniqueness is case-insensitive, enforced via the functional index below.
     username: text("username"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
     metadata: jsonb("metadata"),
   },
-  (t) => [
-    uniqueIndex("sessions_username_lower_idx").on(sql`lower(${t.username})`),
-  ],
+  (t) => [uniqueIndex("sessions_username_lower_idx").on(sql`lower(${t.username})`)],
 );
 
 // ---------------------------------------------------------------------------
@@ -71,9 +65,7 @@ export const gameResults = pgTable(
     seatsSnapshot: jsonb("seats_snapshot").notNull(),
     durationMs: integer("duration_ms"),
     moveLog: jsonb("move_log"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("game_results_owner_idx").on(t.ownerToken),
@@ -103,17 +95,10 @@ export const leaderboardEntries = pgTable(
     bestScore: integer("best_score"),
     totalGames: integer("total_games").notNull().default(0),
     runId: text("run_id"), // latest contributing run (idempotency)
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    unique("leaderboard_upsert_key").on(
-      t.gameId,
-      t.eventId,
-      t.timeBucket,
-      t.ownerToken,
-    ),
+    unique("leaderboard_upsert_key").on(t.gameId, t.eventId, t.timeBucket, t.ownerToken),
     index("leaderboard_rank_idx").on(t.gameId, t.metric, t.bestScore),
   ],
 );
@@ -135,9 +120,7 @@ export const shareLinks = pgTable(
     eventId: text("event_id"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     revoked: boolean("revoked").notNull().default(false),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("share_links_owner_idx").on(t.ownerToken)],
 );
