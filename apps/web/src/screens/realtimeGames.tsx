@@ -31,6 +31,8 @@ import {
   type RealtimeSceneProps,
 } from "./RealtimePlayScreen";
 import { REALTIME_CATALOG } from "./HomeScreen";
+import { submitRealtimeScore } from "../api/leaderboard";
+import type { RunComplete } from "../game/useRealtimeLoop";
 
 /**
  * One row of real-time wiring — the behavioral half (module + renderer +
@@ -109,6 +111,39 @@ function makeSeed(): number {
   return Date.now() & 0xffff || 1;
 }
 
+/**
+ * A client-generated id for one finished run. The submit route no-ops on a
+ * `runId` it has already persisted, so retrying a failed submission with the
+ * SAME id can never double-write — which is why the id is minted per run here
+ * rather than server-side.
+ */
+function makeRunId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * Sends a finished run to the leaderboard for server-side re-simulation
+ * (MPG-093). Deliberately fire-and-forget: the server is the authority on the
+ * score, so there is nothing for the player to act on here, and a leaderboard
+ * write must never block, delay, or interrupt the game-over surface. Failures
+ * (offline, 4xx, a 422 `SCORE_MISMATCH`) are logged for debugging and otherwise
+ * swallowed. Rank is surfaced separately by the leaderboard screen, which reads
+ * the server's own view rather than anything we could optimistically assume here.
+ */
+function submitRun(result: RunComplete<unknown>): void {
+  void submitRealtimeScore(result.gameId, {
+    runId: makeRunId(),
+    seed: result.seed,
+    score: result.score,
+    inputLog: result.inputLog,
+  }).catch((error: unknown) => {
+    console.warn("[leaderboard] score submission failed", error);
+  });
+}
+
 export interface RealtimeGameRouteProps {
   gameId: RealtimeGameId;
   onExit: () => void;
@@ -151,6 +186,7 @@ export function RealtimeGameRoute({
           controls={drunkWalkControls}
           renderScene={(props) => <DrunkWalkScene {...props} character={character} />}
           onExit={onExit}
+          onRunComplete={submitRun}
           surfaceExtra={
             <Button
               variant="ghost"
@@ -180,6 +216,7 @@ export function RealtimeGameRoute({
       controls={wiring.controls}
       renderScene={wiring.renderScene}
       onExit={onExit}
+      onRunComplete={submitRun}
     />
   );
 }

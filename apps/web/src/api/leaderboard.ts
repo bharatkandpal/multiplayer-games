@@ -1,8 +1,10 @@
 /**
- * Client-side leaderboard fetch helpers (MPG-055).
+ * Client-side leaderboard fetch helpers (MPG-055) and the real-time score
+ * submission call (MPG-093).
  *
- * Wraps `GET /api/leaderboard/:gameId` and `GET /api/leaderboard/:gameId/rank`
- * — see docs/API_SPEC.md. All requests are session-scoped via `apiFetch`.
+ * Wraps `GET /api/leaderboard/:gameId`, `GET /api/leaderboard/:gameId/rank`, and
+ * `POST /api/leaderboard/:gameId/submit` — see docs/API_SPEC.md. All requests are
+ * session-scoped via `apiFetch`.
  */
 
 import { apiFetch } from "./session";
@@ -72,4 +74,51 @@ export async function fetchYourRank(
     throw new Error(`Failed to fetch rank: ${res.status}`);
   }
   return (await res.json()) as RankResponse;
+}
+
+/**
+ * A finished real-time run, as submitted for leaderboard scoring.
+ *
+ * The server never trusts `score`: it re-simulates `{seed, inputLog}` through the
+ * same shared `RealtimeModule` and rejects the submission with 422
+ * `SCORE_MISMATCH` unless the replay independently reaches game over with the
+ * same score. `runId` is client-generated so a retry after a network blip is
+ * idempotent rather than a second entry.
+ */
+export interface ScoreSubmission {
+  readonly runId: string;
+  readonly seed: number;
+  readonly score: number;
+  readonly inputLog: readonly unknown[];
+  readonly eventId?: string;
+  readonly timeBucket?: string;
+}
+
+export interface SubmitScoreResponse {
+  readonly ok: true;
+  /** Present when this `runId` had already been persisted — the write was a no-op. */
+  readonly duplicate?: boolean;
+  readonly entry: LeaderboardEntry | null;
+}
+
+/**
+ * Submits a completed real-time run for server-side re-simulation and scoring.
+ *
+ * Throws on any non-2xx (including a 422 `SCORE_MISMATCH`) so callers can decide
+ * how loud to be; the game-over UI treats a failure as non-fatal and silent —
+ * a leaderboard write is never worth blocking or interrupting a finished run.
+ */
+export async function submitRealtimeScore(
+  gameId: string,
+  submission: ScoreSubmission,
+): Promise<SubmitScoreResponse> {
+  const res = await apiFetch(`/api/leaderboard/${encodeURIComponent(gameId)}/submit`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(submission),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to submit score: ${res.status}`);
+  }
+  return (await res.json()) as SubmitScoreResponse;
 }
