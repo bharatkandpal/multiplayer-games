@@ -10,6 +10,13 @@ export default tseslint.config(
       "**/coverage/**",
       "**/playwright-report/**",
       "**/test-results/**",
+      // Agent-managed git worktrees (`Agent` tool's `isolation: "worktree"`,
+      // or a manual `EnterWorktree`) live inside the repo tree and carry
+      // their own tsconfig — left unignored, ESLint's TS project service
+      // sees two candidate tsconfigRootDirs and refuses to parse anything
+      // ("multiple candidate TSConfigRootDirs"), breaking `pnpm lint`
+      // repo-wide for everyone until the worktree is cleaned up.
+      ".claude/worktrees/**",
     ],
   },
   js.configs.recommended,

@@ -1,0 +1,63 @@
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Headline "how it looks now" preview — the current full combo, larger than
+   the per-option previews below. */
+.preview {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-sunken, var(--color-surface));
+}
+
+.section {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.sectionLabel {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.optionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Each option is a mini preview of the WHOLE character wearing it (see
+   `DrunkWalkCharacterGlyph`), not a name or a bare color chip. */
+.option {
+  display: grid;
+  place-items: center;
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-border, transparent);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.option:hover {
+  border-color: var(--color-border-strong, currentColor);
+}
+
+.option:focus-visible {
+  outline: var(--focus-ring-width, 3px) solid var(--color-focus, var(--color-primary));
+  outline-offset: 2px;
+}
+
+.option[data-selected] {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
+}

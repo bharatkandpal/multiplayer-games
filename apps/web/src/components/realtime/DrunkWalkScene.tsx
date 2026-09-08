@@ -1,11 +1,34 @@
 import { useEffect, useRef } from "react";
 import { DRUNK_WALK_WORLD, type DrunkWalkState, type SteppingLeg } from "@mpg/engine";
 import type { RealtimeSceneProps } from "../../screens/RealtimePlayScreen";
+import {
+  DEFAULT_DRUNK_WALK_CHARACTER,
+  findClothesColor,
+  findHairColor,
+  findShoeColor,
+  findSkinTone,
+  type DrunkWalkAccessory,
+  type DrunkWalkBeard,
+  type DrunkWalkCharacter,
+  type DrunkWalkHair,
+  type DrunkWalkHat,
+} from "./drunkWalkCharacter";
 import styles from "./DrunkWalkScene.module.css";
 
 /** How close to the fail threshold the lean is, 0 (upright) → 1 (about to fall). */
 function dangerFraction(angle: number): number {
   return Math.min(1, Math.abs(angle) / DRUNK_WALK_WORLD.failAngleDeg);
+}
+
+/**
+ * Overshoot-then-settle easing for the post-fall flourish (0 → 1 in,
+ * momentarily > 1 out, back to 1): a real body toppling over doesn't stop
+ * dead at "lying down", it rocks past it a little first. https://easings.net/#easeOutBack
+ */
+function easeOutBack(x: number): number {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * (x - 1) ** 3 + c1 * (x - 1) ** 2;
 }
 
 /**
@@ -17,14 +40,12 @@ function dangerFraction(angle: number): number {
  *
  * Pseudo-3D via 2D Canvas only (no WebGL/three.js, ADR 0002 §5 / the parked
  * three.js decision): a foreshortened trapezoid ground plane converging toward
- * a horizon, gradient shading on the figure, and perspective-spaced "rungs"
- * scrolling toward the viewer to sell forward motion — all cheap 2D tricks.
- * The figure and rungs stay purely procedural (imperative Canvas draw calls);
- * the roadside trees and the asphalt ground texture are instead small
- * hand-authored inline SVG "sprites" (see `TREE_SVGS`/`GROUND_TEXTURE_SVG`
- * below), preloaded once into `Image` objects at module scope and painted via
- * `ctx.drawImage` — same placeholder-art complexity as the code they replace,
- * just asset-based instead of drawn shape-by-shape every frame.
+ * a horizon, gradient shading on the figure, and a scrolling asphalt texture +
+ * roadside trees to sell forward motion — all cheap 2D tricks. The figure
+ * stays purely procedural (imperative Canvas draw calls); the roadside trees
+ * and the asphalt ground texture are instead small hand-authored inline SVG
+ * "sprites" (see `TREE_SVGS`/`GROUND_TEXTURE_SVG` below), preloaded once into
+ * `Image` objects at module scope and painted via `ctx.drawImage`.
  *
  * `aria-hidden`: same convention as Floppy Birds — the accessible state (score
  * text, live-region announcements, tap-zone hint) lives on the screen; this
@@ -38,6 +59,24 @@ const HORIZON_Y = RES * 0.38;
 const GROUND_TOP_HALF_WIDTH = RES * 0.06; // walkway width AT the horizon (vanishing)
 const GROUND_BOTTOM_HALF_WIDTH = RES * 0.62; // walkway width at the viewer's feet
 
+// Every scrolling layer (trees, ground texture) is driven off
+// `state.distance * VISUAL_SCROLL_SCALE` rather than raw `state.distance` —
+// decoupled from the engine's forward speed (which also drives score, see
+// WORLD.forwardSpeedPerTick). Scaling it down here is purely a rendering
+// choice (a slower-feeling walkway) and never touches
+// `DrunkWalkState`/scoring/the replay log, so it can't affect the server-side
+// re-simulation anti-cheat check (MPG-065). Tuned down per playtest feedback
+// that the world scrolled by too fast to read.
+const VISUAL_SCROLL_SCALE = 0.45;
+
+// How long (ms) the fall-and-settle flourish runs once `state.over` flips
+// true, before the character comes to rest lying down. Purely decorative —
+// see the `fallProgress` plumbing in `draw()` below. Held for a couple of
+// seconds (rather than a quick beat) so the fall — and the overlay's matching
+// reveal delay in `RealtimePlayScreen.module.css` — actually reads before
+// "Play again" covers the scene.
+const FALL_SETTLE_MS = 2000;
+
 interface Palette {
   sky: string;
   skyDeep: string;
@@ -45,7 +84,6 @@ interface Palette {
   asphalt: string;
   /** Asphalt at the horizon (top of the ground trapezoid) — darker, blends with the sky. */
   asphaltFar: string;
-  rung: string;
   left: string;
   right: string;
   figure: string;
@@ -61,14 +99,13 @@ function readPalette(el: HTMLElement): Palette {
   return {
     sky: v("--color-bg-inset", "#0b1020"),
     skyDeep: v("--color-bg", "#05070f"),
-    // Dedicated (currently un-themed) tokens rather than reusing --color-text-muted /
-    // --color-bg-inset: those are shared, semantically-neutral tokens already assigned
-    // elsewhere in this palette (bg-inset backs `sky`), so borrowing them here would
-    // either couple the road color to the sky's or drift with unrelated text-contrast
-    // tuning. Dark asphalt charcoal, lightening slightly toward the viewer.
+    // Dedicated tokens rather than reusing --color-text-muted/--color-bg-inset: those
+    // are shared, semantically-neutral tokens already assigned elsewhere in this
+    // palette, so borrowing them here would either couple the road color to the sky's
+    // or drift with unrelated text-contrast tuning. Dark asphalt charcoal, lightening
+    // slightly toward the viewer.
     asphalt: v("--color-asphalt", "#3f4045"),
     asphaltFar: v("--color-asphalt-far", "#2a2b2f"),
-    rung: v("--color-border-strong", "#4a5060"),
     left: v("--color-player-1", "#0072b2"),
     right: v("--color-player-2", "#b34700"),
     figure: v("--color-warning", "#ffd23f"),
@@ -99,6 +136,7 @@ function drawPlantedLeg(
   legW: number,
   tone: string,
   shade: string,
+  shoeTone: string,
 ): void {
   const x = legAnchorX(leg, hipHalf);
   // Knee sits roughly midway down the leg, nudged slightly forward — a subtle joint,
@@ -130,6 +168,9 @@ function drawPlantedLeg(
   ctx.closePath();
   ctx.fill();
 
+  // Foot/shoe — its own flat color (the player's shoe pick), not the leg's
+  // tone/shade gradient, so shoes read as a distinct customizable part.
+  ctx.fillStyle = shoeTone;
   ctx.beginPath();
   ctx.ellipse(x, 0, legW * 0.55, legW * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -152,6 +193,7 @@ function drawSwingingLeg(
   progress: number,
   tone: string,
   shade: string,
+  shoeTone: string,
 ): void {
   const x = legAnchorX(leg, hipHalf);
   // Lift: 0 (grounded) at the step boundaries, peaks at mid-stride — sells the knee
@@ -192,6 +234,8 @@ function drawSwingingLeg(
   ctx.closePath();
   ctx.fill();
 
+  // Foot/shoe — its own flat color, same convention as the planted leg above.
+  ctx.fillStyle = shoeTone;
   ctx.beginPath();
   ctx.ellipse(footX, footY, legW * 0.5, legW * 0.2, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -215,6 +259,7 @@ function drawArm(
   swingRad: number,
   tone: string,
   shade: string,
+  skinTone: string,
 ): void {
   const x = side === "left" ? -shoulderHalf : shoulderHalf;
   ctx.save();
@@ -232,11 +277,351 @@ function drawArm(
   ctx.lineTo(-armW * 0.32, armLen);
   ctx.closePath();
   ctx.fill();
-  // Hand.
+  // Hand — skin-toned rather than sleeve-toned, so it reads as skin peeking
+  // out of a sleeve instead of a same-colored mitten.
+  ctx.fillStyle = skinTone;
   ctx.beginPath();
   ctx.ellipse(0, armLen, armW * 0.42, armW * 0.18, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+}
+
+/**
+ * The chosen hat, drawn on/above the head in the figure's already-rotated
+ * local frame (same convention as the arms/legs) so it leans with the whole
+ * body. Purely decorative — never read by the engine. `tone`/`shade` are the
+ * clothes color (hats aren't independently colored — one fewer picker, and
+ * it keeps the hat visually coordinated with the outfit).
+ */
+function drawHat(
+  ctx: CanvasRenderingContext2D,
+  hat: DrunkWalkHat,
+  headR: number,
+  headY: number,
+  tone: string,
+  shade: string,
+): void {
+  if (hat === "none") return;
+
+  if (hat === "cap") {
+    // A simple baseball-style cap: a dome over the top half of the head plus
+    // a brim poking out toward the "front" (the same side the character's
+    // face implicitly points, +x in this local frame).
+    const domeGrad = ctx.createLinearGradient(-headR, headY - headR, headR, headY - headR * 0.3);
+    domeGrad.addColorStop(0, shade);
+    domeGrad.addColorStop(1, tone);
+    ctx.fillStyle = domeGrad;
+    ctx.beginPath();
+    ctx.arc(0, headY - headR * 0.15, headR * 1.05, Math.PI, 0);
+    ctx.closePath();
+    ctx.fill();
+    // Brim.
+    ctx.fillStyle = shade;
+    ctx.beginPath();
+    ctx.ellipse(headR * 0.75, headY - headR * 0.15, headR * 0.55, headR * 0.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  if (hat === "party-hat") {
+    const grad = ctx.createLinearGradient(0, headY - headR * 2.2, 0, headY - headR * 0.7);
+    grad.addColorStop(0, shade);
+    grad.addColorStop(1, tone);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(-headR * 0.7, headY - headR * 0.7);
+    ctx.lineTo(headR * 0.7, headY - headR * 0.7);
+    ctx.lineTo(0, headY - headR * 2.2);
+    ctx.closePath();
+    ctx.fill();
+    // Pom-pom.
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.ellipse(0, headY - headR * 2.2, headR * 0.22, headR * 0.22, 0, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  // Halo: a tilted ring hovering above the head, plus a twinkle — a little
+  // whimsical, deliberately not a "realistic" object.
+  ctx.strokeStyle = tone;
+  ctx.lineWidth = headR * 0.16;
+  ctx.beginPath();
+  ctx.ellipse(0, headY - headR * 1.7, headR * 0.85, headR * 0.28, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = tone;
+  ctx.font = `${headR * 0.6}px system-ui, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("✦", headR * 1.3, headY - headR * 0.6);
+}
+
+/**
+ * The chosen hairstyle, drawn on the head BEFORE the face/beard/hat/accessory
+ * (same local frame as `drawHat`) so a hat or headphones band can naturally
+ * sit on top of it and a beard still reads as separate from head hair. A
+ * hat's brim/dome is drawn over whatever hair is here regardless of style —
+ * a known simplification (no "hair peeking out from under a cap"), same
+ * spirit as the hat always using the clothes color rather than growing its
+ * own render branch per hair+hat combination.
+ */
+function drawHair(
+  ctx: CanvasRenderingContext2D,
+  hair: DrunkWalkHair,
+  headR: number,
+  headY: number,
+  tone: string,
+  shade: string,
+): void {
+  if (hair === "none") return;
+
+  if (hair === "short") {
+    ctx.fillStyle = shade;
+    ctx.beginPath();
+    ctx.arc(0, headY - headR * 0.1, headR * 1.04, Math.PI * 1.08, Math.PI * 1.92);
+    ctx.fill();
+    return;
+  }
+
+  if (hair === "long") {
+    // Short cap on top plus two drooping "wings" down past the shoulders on
+    // either side — reads as long hair even at glyph-menu sizes.
+    ctx.fillStyle = shade;
+    ctx.beginPath();
+    ctx.arc(0, headY - headR * 0.1, headR * 1.04, Math.PI * 1.08, Math.PI * 1.92);
+    ctx.fill();
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(side * headR * 0.95, headY - headR * 0.2);
+      ctx.quadraticCurveTo(
+        side * headR * 1.35,
+        headY + headR * 0.9,
+        side * headR * 0.75,
+        headY + headR * 1.7,
+      );
+      ctx.lineTo(side * headR * 0.35, headY + headR * 1.6);
+      ctx.quadraticCurveTo(side * headR * 0.75, headY + headR * 0.7, side * headR * 0.55, headY);
+      ctx.closePath();
+      ctx.fill();
+    }
+    return;
+  }
+
+  if (hair === "bun") {
+    ctx.fillStyle = shade;
+    ctx.beginPath();
+    ctx.arc(0, headY - headR * 0.1, headR * 1.04, Math.PI * 1.08, Math.PI * 1.92);
+    ctx.fill();
+    // The bun itself, toward the back of the head (-x, "away" from the
+    // implicit +x face direction).
+    ctx.beginPath();
+    ctx.ellipse(-headR * 0.65, headY - headR * 0.75, headR * 0.34, headR * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  // Mohawk: a jagged center strip front-to-back, using `tone` for the
+  // brighter tips so it pops against the `shade` base — the one hairstyle
+  // that's meant to look loud rather than natural.
+  ctx.fillStyle = shade;
+  const tipCount = 5;
+  const startX = -headR * 0.8;
+  const stepX = (headR * 1.6) / (tipCount - 1);
+  for (let i = 0; i < tipCount; i++) {
+    const cx = startX + i * stepX;
+    const spikeH = headR * (i % 2 === 0 ? 0.85 : 0.6);
+    ctx.beginPath();
+    ctx.moveTo(cx - stepX * 0.4, headY - headR * 0.5);
+    ctx.lineTo(cx, headY - headR * 0.5 - spikeH);
+    ctx.lineTo(cx + stepX * 0.4, headY - headR * 0.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = tone;
+    ctx.beginPath();
+    ctx.ellipse(cx, headY - headR * 0.5 - spikeH, headR * 0.08, headR * 0.08, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = shade;
+  }
+}
+
+/**
+ * The chosen accessory, drawn AFTER the face/beard so glasses sit visibly on
+ * top of the eyes, but before the hat so a hat can still sit above/overlap
+ * headphones the way it would in life. Fixed neutral colors regardless of
+ * outfit — same "not outfit, always reads as itself" reasoning as the beard.
+ */
+function drawAccessory(
+  ctx: CanvasRenderingContext2D,
+  accessory: DrunkWalkAccessory,
+  headR: number,
+  headY: number,
+): void {
+  if (accessory === "none") return;
+
+  const eyeY = headY - headR * 0.08;
+  const eyeOffsetX = headR * 0.38;
+
+  if (accessory === "glasses" || accessory === "sunglasses") {
+    const lensR = headR * 0.22;
+    ctx.save();
+    ctx.strokeStyle = "#20242b";
+    ctx.lineWidth = headR * 0.06;
+    ctx.fillStyle = accessory === "sunglasses" ? "#20242bcc" : "#bfe0ff55";
+    for (const ex of [-eyeOffsetX, eyeOffsetX]) {
+      ctx.beginPath();
+      ctx.ellipse(ex, eyeY, lensR, lensR * 0.82, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    // Bridge between the lenses.
+    ctx.beginPath();
+    ctx.moveTo(-eyeOffsetX + lensR, eyeY);
+    ctx.lineTo(eyeOffsetX - lensR, eyeY);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  // Headphones: a band arcing over the top of the head plus two ear cups at
+  // roughly eye height on either side.
+  ctx.save();
+  ctx.strokeStyle = "#2b2b30";
+  ctx.lineWidth = headR * 0.16;
+  ctx.beginPath();
+  ctx.arc(0, headY, headR * 1.1, Math.PI * 1.12, Math.PI * 1.88);
+  ctx.stroke();
+  ctx.fillStyle = "#2b2b30";
+  for (const ex of [-headR * 1.02, headR * 1.02]) {
+    ctx.beginPath();
+    ctx.ellipse(ex, eyeY, headR * 0.22, headR * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** The face's expression — driven by gameplay state (see call site), not a
+ * customizable part: eyes + mouth read the character's current state
+ * (`"calm"` normally, `"worried"` once the lean is getting dangerous,
+ * `"dizzy"` once actually fallen), the same "state stays legible" spirit as
+ * the body-color danger tint. */
+export type DrunkWalkFaceExpression = "calm" | "worried" | "dizzy";
+
+/**
+ * Eyes + mouth, drawn on the head in the figure's already-rotated local
+ * frame, BEFORE the beard (so a full beard can naturally cover the mouth,
+ * same as a real beard would) and before the hat. Purely decorative.
+ */
+function drawFace(
+  ctx: CanvasRenderingContext2D,
+  headR: number,
+  headY: number,
+  expression: DrunkWalkFaceExpression,
+): void {
+  const eyeY = headY - headR * 0.08;
+  const eyeOffsetX = headR * 0.38;
+  const mouthY = headY + headR * 0.35;
+
+  ctx.save();
+  ctx.strokeStyle = "#1a1a1a";
+  ctx.fillStyle = "#1a1a1a";
+  ctx.lineWidth = headR * 0.09;
+  ctx.lineCap = "round";
+
+  // Eyes: two dots normally, an "X_X" knocked-out look once fallen.
+  if (expression === "dizzy") {
+    const armLen = headR * 0.13;
+    for (const ex of [-eyeOffsetX, eyeOffsetX]) {
+      ctx.beginPath();
+      ctx.moveTo(ex - armLen, eyeY - armLen);
+      ctx.lineTo(ex + armLen, eyeY + armLen);
+      ctx.moveTo(ex - armLen, eyeY + armLen);
+      ctx.lineTo(ex + armLen, eyeY - armLen);
+      ctx.stroke();
+    }
+  } else {
+    const eyeR = headR * 0.11;
+    ctx.beginPath();
+    ctx.ellipse(-eyeOffsetX, eyeY, eyeR, eyeR, 0, 0, Math.PI * 2);
+    ctx.ellipse(eyeOffsetX, eyeY, eyeR, eyeR, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Mouth: a downward-curving smile when calm, a flat concerned line once the
+  // lean is getting dangerous, a small round "o" of surprise once fallen.
+  if (expression === "dizzy") {
+    ctx.beginPath();
+    ctx.ellipse(0, mouthY, headR * 0.15, headR * 0.19, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (expression === "worried") {
+    ctx.beginPath();
+    ctx.moveTo(-headR * 0.22, mouthY);
+    ctx.lineTo(headR * 0.22, mouthY);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    // The bottom arc of a circle centered slightly above the mouth line —
+    // same "sweep through the bottom" trick as the full-beard arc below.
+    ctx.arc(0, mouthY - headR * 0.18, headR * 0.28, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * The chosen beard/facial-hair style, drawn on the lower half of the head in
+ * the same rotated local frame as `drawHat`. Always a fixed dark hair color
+ * (not the clothes color) — facial hair isn't "outfit", so it doesn't need
+ * its own color picker to still read as intentional. Purely decorative.
+ */
+function drawBeard(
+  ctx: CanvasRenderingContext2D,
+  beard: DrunkWalkBeard,
+  headR: number,
+  headY: number,
+): void {
+  if (beard === "none") return;
+  ctx.fillStyle = "#3a2a1a";
+
+  if (beard === "mustache") {
+    ctx.beginPath();
+    ctx.ellipse(
+      -headR * 0.3,
+      headY + headR * 0.15,
+      headR * 0.28,
+      headR * 0.12,
+      0.3,
+      0,
+      Math.PI * 2,
+    );
+    ctx.ellipse(
+      headR * 0.3,
+      headY + headR * 0.15,
+      headR * 0.28,
+      headR * 0.12,
+      -0.3,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+    return;
+  }
+
+  if (beard === "goatee") {
+    ctx.beginPath();
+    ctx.moveTo(-headR * 0.35, headY + headR * 0.25);
+    ctx.lineTo(headR * 0.35, headY + headR * 0.25);
+    ctx.lineTo(headR * 0.2, headY + headR * 0.85);
+    ctx.lineTo(-headR * 0.2, headY + headR * 0.85);
+    ctx.closePath();
+    ctx.fill();
+    return;
+  }
+
+  // Full beard: covers the whole lower half of the head, following its curve.
+  ctx.beginPath();
+  ctx.arc(0, headY, headR * 1.02, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.closePath();
+  ctx.fill();
 }
 
 /** Linear-interpolated half-width of the walkway at a given depth (0 = horizon, 1 = feet). */
@@ -262,8 +647,7 @@ function yAt(depth: number): number {
  * and, worse, snapping back to the top of its band once per cycle. Because every
  * slot shares the same `f`, that snap lands slot `i` almost exactly where slot
  * `i - 1` sat a moment earlier — read as two sprites popping in on top of each
- * other, most visible on large distinct sprites like trees (present but harder to
- * notice on the plain rung lines / speckle texture, which have the same bug).
+ * other, most visible on large distinct sprites like trees.
  *
  * This formula avoids that: `depth` for each slot increases monotonically and
  * continuously with `distance` (via `%1` wraparound, not a per-cycle reset), and
@@ -284,12 +668,10 @@ function recycledDepth(
 
 // ---------------------------------------------------------------------------
 // Scenery assets — hand-authored inline SVGs, preloaded once (module scope)
-// into `Image` objects and painted per-frame via `ctx.drawImage`, replacing
-// the tree/speckle procedural draw calls that used to live here. Colors are
+// into `Image` objects and painted per-frame via `ctx.drawImage`. Colors are
 // baked directly into the SVG markup rather than threaded from the live
-// theme (a real limitation vs. the old procedural version, which read CSS
-// custom properties) — picked to read reasonably against both the light and
-// dark `sky`/`skyDeep` tokens in `readPalette` above.
+// theme — picked to read reasonably against both the light and dark
+// `sky`/`skyDeep` tokens in `readPalette` above.
 // ---------------------------------------------------------------------------
 
 /** Wrap raw SVG markup as a `data:` URI Canvas can `drawImage` once loaded
@@ -375,15 +757,23 @@ const GROUND_TEXTURE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0
 </svg>`;
 const GROUND_TEXTURE_IMAGE = loadSvgImage(GROUND_TEXTURE_SVG);
 
-const TREE_SPACING_UNITS = 14; // world "distance" per tree slot, sparser than the rungs
+// World "distance" per tree slot — deliberately much sparser than the ground
+// texture (10): trees are large, high-contrast sprites whose size ramps up
+// as they near the viewer (see `scale` in `drawTree` below), so the same
+// positional speed as the road reads as visibly faster than the road (the
+// "looming" effect dominates perceived speed more for a big sprite than for
+// a small speckle). Set well above the road layer so trees read as moving at
+// a pace RELATIVE TO the walking character — a background detail, not a
+// competing motion — rather than racing past it.
+const TREE_SPACING_UNITS = 50;
 const TREE_SLOTS_PER_SIDE = 3; // recycled slots -> ~6 trees on screen at once
 
 // Ground texture is tiled in horizontal "bands" recycled the same way the
 // trees' slots are, rather than per-speckle — a full asphalt-texture image
 // is harder to recycle seamlessly per-dot than discrete sprites, so instead
-// of computing individual speckle positions in JS each frame (the old
-// approach) we scroll a handful of stretched copies of one small tile up
-// the ground plane, clipped to the trapezoid so nothing spills onto the sky.
+// of computing individual speckle positions in JS each frame we scroll a
+// handful of stretched copies of one small tile up the ground plane, clipped
+// to the trapezoid so nothing spills onto the sky.
 const GROUND_TEXTURE_ROWS = 8;
 const GROUND_TEXTURE_SPACING_UNITS = 10;
 
@@ -404,14 +794,27 @@ function drawTree(
   if (!img || !img.complete || img.naturalWidth === 0) return;
 
   const y = yAt(depth);
-  const scale = 0.4 + depth * 1.4;
+  // Gentler size ramp than the old 0.4 -> 1.8 (a 4.5x grow toward the
+  // viewer): that steep a "looming" curve read as trees rushing past faster
+  // than the road even at a slower positional speed (see `TREE_SPACING_UNITS`
+  // above) — perceived approach speed is dominated by rate-of-size-change as
+  // much as by position.
+  const scale = 0.55 + depth * 0.85;
   const drawH = 46 * scale;
   const drawW = (40 / 60) * drawH; // preserve the sprite's 40:60 viewBox aspect
   const margin = 6 * scale;
   const x = sideX + outward * margin;
 
+  // Fade a tree out just before it reaches the viewer edge (depth -> 1) and
+  // fade the next lap's tree in just after it appears at the horizon
+  // (depth -> 0), rather than leaving it fully opaque right up to the
+  // recycle point. Without this, a tree at max size/opacity one frame
+  // instantly resets to tiny/far the next — a visible "pop" that reads as
+  // the tree suddenly moving backward/away instead of smoothly recycling.
+  const EDGE = 0.1;
+  const edgeFade = Math.min(1, depth / EDGE, (1 - depth) / EDGE);
   ctx.save();
-  ctx.globalAlpha = 0.35 + depth * 0.65;
+  ctx.globalAlpha = (0.35 + depth * 0.65) * Math.max(0, edgeFade);
   // Trunk base flush with the ground line at `y`, matching where the old
   // procedural trunk's `fillRect` bottom edge sat.
   ctx.drawImage(img, x - drawW / 2, y - drawH, drawW, drawH);
@@ -424,16 +827,31 @@ function draw(
   score: number,
   reducedMotion: boolean,
   palette: Palette,
+  character: DrunkWalkCharacter,
+  /** 0 (the instant the character falls) → 1 (settled lying down). Always 0
+   * while `!state.over`, and stays 0 under reduced motion (see the component
+   * below) — every use of it is guarded on `state.over && fallProgress > 0`,
+   * so it's a pure no-op addition to the otherwise-unchanged draw. */
+  fallProgress: number,
 ): void {
   // Clear the full frame first. The sky fill below only covers the strip above the
   // horizon, and the ground fill only covers the walkway trapezoid — but trees are
   // deliberately drawn OUTSIDE that trapezoid, in the side margins below the horizon.
   // Without an explicit clear, that side-margin region is never repainted between
-  // frames, so every previous frame's tree draws (at every position they ever
-  // scrolled through) just accumulate — reads as trees piling up/rendering on top of
-  // each other as they move. Same risk applies to anything else ever drawn outside
-  // the sky/ground fills, so clear unconditionally rather than patching per-element.
+  // frames, so every previous frame's tree draws just accumulate — reads as trees
+  // piling up/rendering on top of each other as they move.
   ctx.clearRect(0, 0, RES, RES);
+
+  // The world-distance signal every scrolling layer below is driven off —
+  // decoupled from the raw engine distance per `VISUAL_SCROLL_SCALE` above.
+  // Negated: `recycledDepth`'s depth normally INCREASES with distance (an
+  // object starts at the horizon and approaches the viewer), which reads as
+  // the camera chasing behind the character, walking AWAY into the screen.
+  // Negating the input instead makes depth DECREASE with distance (an object
+  // starts near the viewer and recedes toward the horizon) — the scenery
+  // moving away sells the character advancing TOWARD a camera planted ahead
+  // of it, rather than the camera following from behind.
+  const scrollDistance = -(state.distance * VISUAL_SCROLL_SCALE);
 
   // Sky.
   const sky = ctx.createLinearGradient(0, 0, 0, HORIZON_Y);
@@ -442,17 +860,16 @@ function draw(
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, RES, HORIZON_Y);
 
-  // Roadside trees, scrolling toward the viewer via `state.distance` exactly like the
-  // rungs below (a fixed set of recycled "slots" whose depth cycles). Drawn BEFORE the
+  // Roadside trees, receding away from the viewer via `scrollDistance` (a fixed set of
+  // recycled "slots" whose depth cycles — see the sign note above). Drawn BEFORE the
   // ground plane fill so the asphalt correctly overlaps/grounds their trunk bases at the
   // roadside edge, rather than floating on top of it — far-depth trees first, near-depth
   // last, so nearer trees correctly occlude farther ones. Purely decorative scenery, so
-  // frozen (statically placed, not removed) under reduced motion, same treatment as the
-  // rung scroll.
+  // frozen (statically placed, not removed) under reduced motion.
   const treeDepths: number[] = [];
   for (let i = 0; i < TREE_SLOTS_PER_SIDE; i++) {
     treeDepths.push(
-      recycledDepth(i, TREE_SLOTS_PER_SIDE, state.distance, TREE_SPACING_UNITS, reducedMotion),
+      recycledDepth(i, TREE_SLOTS_PER_SIDE, scrollDistance, TREE_SPACING_UNITS, reducedMotion),
     );
   }
   // Far first (small index in the sorted-by-depth-ascending sense is "far"; depth itself
@@ -486,9 +903,7 @@ function draw(
   // Asphalt speckle texture: the `GROUND_TEXTURE_IMAGE` SVG tile stretched across
   // recycled horizontal "bands" up the ground plane (same recycled-slot scroll
   // pattern the trees use above), clipped to the ground trapezoid so nothing spills
-  // onto the sky. This replaces the old per-frame loop that computed each speckle
-  // dot's position individually — a full-width tiled image is simpler to recycle
-  // seamlessly than trying to scroll dozens of discrete dots.
+  // onto the sky.
   if (GROUND_TEXTURE_IMAGE.complete && GROUND_TEXTURE_IMAGE.naturalWidth > 0) {
     ctx.save();
     ctx.beginPath();
@@ -503,7 +918,7 @@ function draw(
       const depth = recycledDepth(
         i,
         GROUND_TEXTURE_ROWS,
-        state.distance,
+        scrollDistance,
         GROUND_TEXTURE_SPACING_UNITS,
         reducedMotion,
       );
@@ -517,27 +932,6 @@ function draw(
     ctx.globalAlpha = 1;
     ctx.restore();
   }
-
-  // Perspective "rungs" scrolling toward the viewer as distance increases —
-  // sells forward motion (endless-runner framing). Purely decorative, so
-  // frozen under reduced motion (no non-essential motion, ADR §5) — the score
-  // readout already carries distance as text.
-  const RUNG_COUNT = 7;
-  const SPACING_UNITS = 6; // world "distance" per rung, tuned to a readable cadence
-  ctx.strokeStyle = palette.rung;
-  ctx.lineWidth = 1.5;
-  for (let i = 0; i < RUNG_COUNT; i++) {
-    const depth = recycledDepth(i, RUNG_COUNT, state.distance, SPACING_UNITS, reducedMotion);
-    if (depth <= 0 || depth > 1) continue;
-    const y = yAt(depth);
-    const hw = halfWidthAt(depth);
-    ctx.globalAlpha = 0.3 + depth * 0.4;
-    ctx.beginPath();
-    ctx.moveTo(RES / 2 - hw, y);
-    ctx.lineTo(RES / 2 + hw, y);
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
 
   // Tap-zone divider: a subtle dashed centerline down the full surface, with a
   // small L/R glyph in each half — not color-only (shape + text), obvious on
@@ -564,19 +958,50 @@ function draw(
   ctx.fillText("R ▶", RES * 0.78, RES * 0.86);
   ctx.restore();
 
-  // The figure: a simple pivoting body — the ground pivot at the walkway's
-  // near edge is the foot line the legs plant on, hips/torso/head stacked
-  // above it, leaning by `state.angle`. Rotation here is the CORE gameplay
-  // signal (not decorative), so it is always drawn at the true angle,
-  // reduced-motion or not — only the ambient scroll above (and, per its own
-  // comment below, the leg swing) is dropped, per ADR §5 ("swap animation for
-  // instant state change" applies to decorative motion, not to essential
-  // state feedback).
+  // The figure: a simple pivoting body — the ground pivot sits partway UP the
+  // walkway (not at the viewer's own feet), so the character reads as a
+  // small figure walking away down the road, with open asphalt in the
+  // foreground — an establishing "at a distance" framing rather than filling
+  // the frame. Hips/torso/head stack above the pivot, leaning by
+  // `state.angle`. Rotation here is the CORE gameplay signal (not
+  // decorative), so it is always drawn at the true angle, reduced-motion or
+  // not — only the ambient scroll above (and, per its own comment below, the
+  // leg swing) is dropped, per ADR §5 ("swap animation for instant state
+  // change" applies to decorative motion, not to essential state feedback).
   const pivotX = RES / 2;
-  const pivotY = RES * 0.94;
-  const bodyH = RES * 0.34;
-  const bodyW = RES * 0.09;
-  const angleRad = (state.angle * Math.PI) / 180;
+  const pivotY = RES * 0.72;
+  const bodyH = RES * 0.22;
+  const bodyW = RES * 0.065;
+
+  // The fall flourish: once over, keep rotating past the fail angle toward
+  // lying flat (~100°, a touch past horizontal), overshooting and rocking
+  // back per `easeOutBack` — a little comedic "thud" rather than freezing
+  // dead at whatever angle crossed the threshold. `state.angle` itself never
+  // changes after `over` (frozen, per the engine contract); this is a purely
+  // additive rendering rotation on top of it.
+  let angleRad = (state.angle * Math.PI) / 180;
+  if (state.over && fallProgress > 0) {
+    const fallDir = state.angle >= 0 ? 1 : -1;
+    const settledDeg = fallDir * 100;
+    const eased = easeOutBack(Math.min(1, fallProgress));
+    angleRad = ((state.angle + (settledDeg - state.angle) * eased) * Math.PI) / 180;
+  }
+
+  // A brief jolt on impact, decaying over the first half of the settle —
+  // sells the "thud" alongside the rotation. Sine-driven (not random) to stay
+  // a pure function of `fallProgress`.
+  let shakeX = 0;
+  if (state.over && fallProgress > 0 && fallProgress < 0.5) {
+    shakeX = Math.sin(fallProgress * 60) * (1 - fallProgress / 0.5) * bodyW * 0.5;
+  }
+
+  const clothesColor = findClothesColor(character.clothesId);
+  const shoeColor = findShoeColor(character.shoesId);
+  const skinColor = findSkinTone(character.skinId);
+  const hairColor = findHairColor(character.hairColorId);
+  const figureTone = clothesColor.id === "classic" ? palette.figure : clothesColor.tone;
+  const figureShade = clothesColor.id === "classic" ? palette.figureShade : clothesColor.shade;
+  const shoeTone = shoeColor.tone;
 
   // Gait: `steppingLeg` is whichever leg is currently planted/weight-bearing (see
   // DrunkWalkState doc); the other leg is mid-swing. Stride phase (0 → 1) is derived
@@ -599,10 +1024,10 @@ function draw(
   const danger = dangerFraction(state.angle);
 
   ctx.save();
-  ctx.translate(pivotX, pivotY);
+  ctx.translate(pivotX + shakeX, pivotY);
   ctx.rotate(angleRad);
 
-  const bodyTone = danger > 0.6 ? palette.danger : palette.figure;
+  const bodyTone = danger > 0.6 ? palette.danger : figureTone;
 
   // Legs, drawn first so the torso's hem overlaps their tops. Both anchor at the hip
   // line (`hipY`) and rotate as one rigid piece with the torso/head (they're drawn in
@@ -610,11 +1035,11 @@ function draw(
   // as one coherent leaning-while-walking body.
   if (reducedMotion) {
     // Neutral standing stance — no per-tick swing, consistent with freezing the
-    // decorative rung-scroll above under reduced motion.
-    drawPlantedLeg(ctx, "left", hipY, hipHalf, legW, bodyTone, palette.figureShade);
-    drawPlantedLeg(ctx, "right", hipY, hipHalf, legW, bodyTone, palette.figureShade);
+    // decorative scroll above under reduced motion.
+    drawPlantedLeg(ctx, "left", hipY, hipHalf, legW, bodyTone, figureShade, shoeTone);
+    drawPlantedLeg(ctx, "right", hipY, hipHalf, legW, bodyTone, figureShade, shoeTone);
   } else {
-    drawPlantedLeg(ctx, plantedLeg, hipY, hipHalf, legW, bodyTone, palette.figureShade);
+    drawPlantedLeg(ctx, plantedLeg, hipY, hipHalf, legW, bodyTone, figureShade, shoeTone);
     drawSwingingLeg(
       ctx,
       swingingLeg,
@@ -624,7 +1049,8 @@ function draw(
       legW,
       strideProgress,
       bodyTone,
-      palette.figureShade,
+      figureShade,
+      shoeTone,
     );
   }
 
@@ -632,9 +1058,9 @@ function draw(
   // (cylindrical) shading, independent of the lean color-coding above. Tints
   // toward the danger color as the lean nears the fail threshold.
   const torsoGrad = ctx.createLinearGradient(-bodyW / 2, 0, bodyW / 2, 0);
-  torsoGrad.addColorStop(0, palette.figureShade);
+  torsoGrad.addColorStop(0, figureShade);
   torsoGrad.addColorStop(0.5, bodyTone);
-  torsoGrad.addColorStop(1, palette.figureShade);
+  torsoGrad.addColorStop(1, figureShade);
   ctx.fillStyle = torsoGrad;
   ctx.beginPath();
   ctx.moveTo(-bodyW / 2, hipY);
@@ -674,7 +1100,8 @@ function draw(
     armW,
     plantedArmRad,
     bodyTone,
-    palette.figureShade,
+    figureShade,
+    skinColor.tone,
   );
   drawArm(
     ctx,
@@ -685,7 +1112,8 @@ function draw(
     armW,
     swingingArmRad,
     bodyTone,
-    palette.figureShade,
+    figureShade,
+    skinColor.tone,
   );
 
   // Head.
@@ -699,13 +1127,84 @@ function draw(
     headY,
     headR,
   );
-  headGrad.addColorStop(0, palette.figure);
-  headGrad.addColorStop(1, palette.figureShade);
+  headGrad.addColorStop(0, skinColor.tone);
+  headGrad.addColorStop(1, skinColor.shade);
   ctx.fillStyle = headGrad;
   ctx.beginPath();
   ctx.arc(0, headY, headR, 0, Math.PI * 2);
   ctx.fill();
+
+  // Hair, then face, then beard, then accessory, then hat — drawn last, in
+  // the same rotated frame, so they all lean with the head/body as one
+  // piece. Hair under everything else so a hat/headphones band sits on top
+  // of it; face under the beard so a full beard naturally covers the mouth;
+  // accessory under the hat so a hat brim can still overlap it, matching how
+  // a real hat would sit on top.
+  const faceExpression: DrunkWalkFaceExpression =
+    state.over && fallProgress > 0.3 ? "dizzy" : danger > 0.6 ? "worried" : "calm";
+  drawHair(ctx, character.hair, headR, headY, hairColor.tone, hairColor.shade);
+  drawFace(ctx, headR, headY, faceExpression);
+  drawBeard(ctx, character.beard, headR, headY);
+  drawAccessory(ctx, character.accessory, headR, headY);
+  drawHat(ctx, character.hat, headR, headY, figureTone, figureShade);
+
   ctx.restore();
+
+  // A comedic little flourish once the character has actually fallen: a
+  // "thud" of dust puffs plus an "Oof!" near the landing spot, both driven
+  // by the same `fallProgress` as the rotation above — ramps in fast, fades
+  // out toward the end of the settle, entirely decorative.
+  if (state.over && fallProgress > 0) {
+    const burstIn = Math.min(1, fallProgress * 2.2);
+    const fadeOut = 1 - Math.max(0, fallProgress - 0.6) / 0.4;
+    const alpha = Math.max(0, Math.min(burstIn, fadeOut));
+    if (alpha > 0) {
+      const fallDir = state.angle >= 0 ? 1 : -1;
+      const impactX = pivotX + fallDir * bodyH * 0.5;
+      const impactY = pivotY - bodyW * 0.4;
+      const rise = fallProgress * bodyH * 0.18;
+
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.55;
+      ctx.fillStyle = palette.ink;
+      for (let i = 0; i < 3; i++) {
+        const spread = (i - 1) * bodyW * 0.9;
+        ctx.beginPath();
+        ctx.ellipse(
+          impactX + spread,
+          impactY - rise,
+          bodyW * (0.5 - i * 0.08),
+          bodyW * 0.3,
+          0,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = bodyTone;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.translate(impactX, impactY - bodyH * 0.32 - rise);
+      ctx.rotate((-fallDir * 8 * Math.PI) / 180);
+      ctx.font = `700 ${RES * 0.045}px system-ui, sans-serif`;
+      ctx.fillText("Oof!", 0, 0);
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = bodyTone;
+      ctx.font = `${RES * 0.03}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("✦", impactX - bodyW * 1.6, impactY - bodyH * 0.4 - rise);
+      ctx.fillText("✦", impactX + bodyW * 1.4, impactY - bodyH * 0.55 - rise * 1.3);
+      ctx.restore();
+    }
+  }
 
   // A short shadow anchored at the (unrotated) pivot — grounds the figure so
   // the lean reads as "about to fall over", not "floating at an angle". Shrinks
@@ -734,11 +1233,42 @@ function draw(
   ctx.fillText(String(score), RES / 2, RES * 0.012);
 }
 
+// Match the raster backing store to the device's pixel density. Without this the
+// canvas's backing store stays a fixed RESxRES raster (CSS device-independent
+// pixels) while the CSS box (`.canvas { width/height: 100% }`, up to 480 CSS px per
+// `RealtimePlayScreen`) is displayed at `devicePixelRatio` physical pixels — on any
+// HiDPI screen (2x/3x, i.e. virtually all modern laptops/phones/tablets) the browser
+// then upscales that raster, softening every edge. That blur is most visible on the
+// head: it's the smallest, tightest-curved shape with the highest-contrast gradient
+// (bright warm center against the dark sky), so the soft edge reads as "color
+// spilling outside the silhouette" — worse at extreme lean angles because the
+// rotated head then overlaps busier, higher-contrast background (the ground/sky
+// seam, dashed centerline, rungs), making the same constant blur ring more visually
+// obvious. Fix: size the backing store in physical pixels and scale the context back
+// down, so all drawing math below still happens in the original RES-unit space.
+function resizeCanvasForDpr(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): void {
+  const dpr = window.devicePixelRatio || 1;
+  const targetW = Math.round(RES * dpr);
+  const targetH = Math.round(RES * dpr);
+  if (canvas.width !== targetW || canvas.height !== targetH) {
+    canvas.width = targetW;
+    canvas.height = targetH;
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+export interface DrunkWalkSceneProps extends RealtimeSceneProps<DrunkWalkState> {
+  /** The player's chosen character (MPG-076 customization). Defaults to the
+   * plain classic look for any caller that doesn't wire one up. */
+  character?: DrunkWalkCharacter;
+}
+
 export function DrunkWalkScene({
   state,
   score,
   reducedMotion,
-}: RealtimeSceneProps<DrunkWalkState>): React.JSX.Element {
+  character = DEFAULT_DRUNK_WALK_CHARACTER,
+}: DrunkWalkSceneProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -747,31 +1277,37 @@ export function DrunkWalkScene({
     // No 2D context (e.g. jsdom) → no-op; the screen's accessible state stands
     // on its own, so the game still "runs", it just isn't painted.
     if (!canvas || !ctx) return;
+    resizeCanvasForDpr(canvas, ctx);
+    draw(ctx, state, score, reducedMotion, readPalette(canvas), character, 0);
+  }, [state, score, reducedMotion, character]);
 
-    // Match the raster backing store to the device's pixel density. Without this the
-    // canvas's backing store stays a fixed RESxRES raster (CSS device-independent
-    // pixels) while the CSS box (`.canvas { width/height: 100% }`, up to 480 CSS px per
-    // `RealtimePlayScreen`) is displayed at `devicePixelRatio` physical pixels — on any
-    // HiDPI screen (2x/3x, i.e. virtually all modern laptops/phones/tablets) the browser
-    // then upscales that raster, softening every edge. That blur is most visible on the
-    // head: it's the smallest, tightest-curved shape with the highest-contrast gradient
-    // (bright warm center against the dark sky), so the soft edge reads as "color
-    // spilling outside the silhouette" — worse at extreme lean angles because the
-    // rotated head then overlaps busier, higher-contrast background (the ground/sky
-    // seam, dashed centerline, rungs), making the same constant blur ring more visually
-    // obvious. Fix: size the backing store in physical pixels and scale the context back
-    // down, so all drawing math below still happens in the original RES-unit space.
-    const dpr = window.devicePixelRatio || 1;
-    const targetW = Math.round(RES * dpr);
-    const targetH = Math.round(RES * dpr);
-    if (canvas.width !== targetW || canvas.height !== targetH) {
-      canvas.width = targetW;
-      canvas.height = targetH;
-    }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // The fall-and-settle flourish: a short, self-contained rAF loop scoped to
+  // just this one decorative sequence — NOT a general clock driving the
+  // scene (everything else above stays a pure snapshot of `DrunkWalkState`,
+  // per the header doc). Starts the instant `state.over` flips true and runs
+  // for `FALL_SETTLE_MS`, redrawing directly; skipped entirely under reduced
+  // motion, so the character just freezes at the raw fail angle (same as
+  // before this feature existed) — "essential state stays, decorative motion
+  // drops", the same treatment already applied to the rung-scroll/gait above.
+  // Keyed only on `state.over` (not `state`/`score`, which are frozen once
+  // `over` anyway) so it doesn't re-fire on every tick while still running.
+  useEffect(() => {
+    if (!state.over || reducedMotion) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
 
-    draw(ctx, state, score, reducedMotion, readPalette(canvas));
-  }, [state, score, reducedMotion]);
+    let raf = 0;
+    const startedAt = performance.now();
+    const palette = readPalette(canvas);
+    const step = (now: number): void => {
+      const progress = Math.min(1, (now - startedAt) / FALL_SETTLE_MS);
+      draw(ctx, state, score, reducedMotion, palette, character, progress);
+      if (progress < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [state.over, reducedMotion, character]);
 
   return (
     <canvas ref={canvasRef} width={RES} height={RES} className={styles.canvas} aria-hidden="true" />

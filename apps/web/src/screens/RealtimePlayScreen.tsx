@@ -99,6 +99,15 @@ export interface RealtimePlayScreenProps<S, I, A extends string = string> {
   nextSeed?: () => number;
   /** Auto-pause when the tab is backgrounded (default true; ADR §5). */
   autoPauseOnBlur?: boolean;
+  /**
+   * Optional extra control overlaid in the play surface's top-right corner —
+   * e.g. Drunk Walk's cog button opening its character-customization menu.
+   * Lives inside the game area (over the canvas) rather than the page's top
+   * bar, and stays available in every phase, stacked above the ready/paused/
+   * game-over scrim so it's never hidden. Omit for games with nothing to
+   * configure.
+   */
+  surfaceExtra?: ReactNode;
 }
 
 const HINT_ID_PREFIX = "rt-hint";
@@ -117,6 +126,7 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
   onRunComplete,
   nextSeed = defaultNextSeed,
   autoPauseOnBlur = true,
+  surfaceExtra,
 }: RealtimePlayScreenProps<S, I, A>): React.JSX.Element {
   const reducedMotion = usePrefersReducedMotion();
 
@@ -184,8 +194,15 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
   const onSurfacePointerDown = useCallback(
     (e: ReactPointerEvent): void => {
       // Only a plain tap on the surface itself triggers gameplay; taps on the
-      // overlay buttons bubble here but are handled by the button.
-      if (e.target instanceof HTMLButtonElement) return;
+      // overlay buttons (Start/Resume/Play again) bubble here but are handled
+      // by the button itself. `e.target` is whatever element
+      // was actually hit, which for a button containing child markup (e.g. an
+      // icon span) is often that child, not the <button> — `instanceof
+      // HTMLButtonElement` alone missed that case, so a tap on a swatch's
+      // inner span fell through to `handlePress` and started/fed the run
+      // instead of triggering the swatch's own onClick. `closest("button")`
+      // catches the button regardless of which descendant was hit.
+      if (e.target instanceof Element && e.target.closest("button")) return;
       if (controls.resolveTapAction) {
         // Tap-zone games (e.g. left/right halves): resolve from the tap's
         // horizontal position within the surface, not a single fixed action.
@@ -265,7 +282,7 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
         {renderScene({ state, phase, score, reducedMotion })}
 
         {phase !== "running" ? (
-          <div className={styles.overlay}>
+          <div className={cx(styles.overlay, phase === "over" && styles.overlayOver)}>
             {phase === "ready" ? (
               <div className={styles.overlayInner}>
                 <p className={styles.overlayText}>{controls.actionHint}</p>
@@ -303,6 +320,8 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
             ) : null}
           </div>
         ) : null}
+
+        {surfaceExtra ? <div className={styles.surfaceExtra}>{surfaceExtra}</div> : null}
       </div>
 
       {/* On-screen touch controls for multi-action games; single-action games

@@ -16,7 +16,15 @@ import {
   type RealtimeModule,
 } from "@mpg/engine";
 import { DrunkWalkScene } from "../components/realtime/DrunkWalkScene";
+import { DrunkWalkCustomizeMenu } from "../components/realtime/DrunkWalkCustomizeMenu";
+import {
+  DEFAULT_DRUNK_WALK_CHARACTER,
+  loadStoredDrunkWalkCharacter,
+  storeDrunkWalkCharacter,
+  type DrunkWalkCharacter,
+} from "../components/realtime/drunkWalkCharacter";
 import { FloppyBirdsScene } from "../components/realtime/FloppyBirdsScene";
+import { Button, GearIcon } from "../components/ui";
 import {
   RealtimePlayScreen,
   type RealtimeControls,
@@ -117,10 +125,53 @@ export function RealtimeGameRoute({
   onExit,
 }: RealtimeGameRouteProps): React.JSX.Element | null {
   const [seed] = useState(makeSeed);
+  // Only meaningful for "drunk-walk" (the one game with a character to
+  // customize), but declared unconditionally so this component's hook
+  // count/order stays stable across `gameId` values.
+  const [character, setCharacter] = useState<DrunkWalkCharacter>(() =>
+    gameId === "drunk-walk" ? loadStoredDrunkWalkCharacter() : DEFAULT_DRUNK_WALK_CHARACTER,
+  );
+  const [menuOpen, setMenuOpen] = useState(false);
   const wiring = REALTIME_GAMES[gameId];
   if (!wiring) return null;
 
   const title = REALTIME_CATALOG[gameId]?.title ?? gameId;
+
+  if (gameId === "drunk-walk") {
+    const handleChangeCharacter = (next: DrunkWalkCharacter): void => {
+      setCharacter(next);
+      storeDrunkWalkCharacter(next);
+    };
+    return (
+      <>
+        <RealtimePlayScreen<DrunkWalkState, DrunkWalkInput, "left" | "right">
+          module={drunkWalk}
+          gameTitle={title}
+          seed={seed}
+          controls={drunkWalkControls}
+          renderScene={(props) => <DrunkWalkScene {...props} character={character} />}
+          onExit={onExit}
+          surfaceExtra={
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Customize character"
+            >
+              <GearIcon />
+            </Button>
+          }
+        />
+        <DrunkWalkCustomizeMenu
+          isOpen={menuOpen}
+          character={character}
+          onChange={handleChangeCharacter}
+          onClose={() => setMenuOpen(false)}
+        />
+      </>
+    );
+  }
+
   return (
     <RealtimePlayScreen
       module={wiring.module}
