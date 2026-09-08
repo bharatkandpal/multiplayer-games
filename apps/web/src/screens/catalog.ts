@@ -7,7 +7,7 @@
 // import cycle. `HomeScreen` re-exports the catalog values so existing importers
 // (and the `vi.mock("./HomeScreen")` in SetupScreen.nSeat.test.tsx) keep working.
 
-import { connectFour, nim, ticTacToe, ticTacToeMove } from "@mpg/engine";
+import { connectFour, gomoku, nim, ticTacToe, ticTacToeMove } from "@mpg/engine";
 import type { GameId, RealtimeGameId } from "@mpg/engine";
 
 /**
@@ -67,6 +67,14 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
     playerCount: nim.playerCount,
     kind: "turn-based",
   },
+  gomoku: {
+    id: "gomoku",
+    title: "Gomoku",
+    description:
+      "Place stones on a 9x9 board and be the first to line up five in a row — across, down, or diagonally.",
+    playerCount: gomoku.playerCount,
+    kind: "turn-based",
+  },
 };
 
 // Sibling of GAME_CATALOG for the real-time family (ADR 0002 §3). Also Partial —
@@ -99,9 +107,10 @@ export type GameItem =
  * exists). Turn-based first, then real-time.
  *
  * This one ordering backs both the Home grid and the prev/next controls, so a
- * game can never appear in one and not the other — the failure mode that made
- * Gomoku silently unreachable (it's in `builtInGames` but has no catalog entry,
- * so it's correctly filtered out here too).
+ * game can never appear in one and not the other. The filter is what kept
+ * Gomoku unreachable while its engine was on the trunk without a catalog entry
+ * (MPG-107, since fixed) — a game still in `builtInGames` but absent from
+ * `GAME_CATALOG` is correctly hidden rather than half-shown.
  */
 export function buildGameItems(games: GameId[], realtimeGames: RealtimeGameId[] = []): GameItem[] {
   return [

@@ -1,0 +1,134 @@
+/* 9x9 Gomoku board. Wider than the 3x3 boards, so it uses the tighter --space-1
+   gap and a larger max-width; cells scale with the board rather than holding a
+   fixed touch-target floor (see the sizing note in GomokuBoard.tsx). */
+.board {
+  display: grid;
+  grid-template-rows: repeat(9, 1fr);
+  gap: var(--space-1);
+  width: 100%;
+  max-width: 32rem;
+  margin: 0 auto;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: var(--space-1);
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  /* Raised (not flat surface) so empty cells lift off the page background —
+     matters most in dark mode, where surface sits very close to --color-bg. */
+  background-color: var(--color-surface-raised);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.cell:hover:not([aria-disabled="true"]) {
+  background-color: var(--color-bg-subtle);
+}
+
+.cell:active:not([aria-disabled="true"]) {
+  transform: scale(0.92);
+}
+
+.cell:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+  /* Keep the focus ring above neighbouring cells at this grid density. */
+  z-index: 1;
+}
+
+.cell[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.lastMove {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent) inset;
+}
+
+/* Winning line (MPG-035): success ring + tint, not color-only — the winning
+   stones (shapes) remain the primary signal. AA-safe non-text contrast. */
+.winning {
+  border-color: var(--color-success);
+  background-color: var(--color-success-bg);
+  box-shadow: 0 0 0 2px var(--color-success) inset;
+  animation: winPulse var(--duration-slow) var(--ease-emphasized);
+}
+
+/* Loss variant (MPG-046): same ring/glow shape, red/danger hue — used when the
+   sole local human loses, so the board itself carries the outcome. */
+.winningLoss {
+  border-color: var(--color-danger);
+  background-color: var(--color-danger-bg);
+  box-shadow: 0 0 0 2px var(--color-danger) inset;
+  animation: winPulse var(--duration-slow) var(--ease-emphasized);
+}
+
+@keyframes winPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .winning,
+  .winningLoss {
+    animation: none;
+  }
+}
+
+.stone {
+  width: 78%;
+  height: 78%;
+  animation: pop var(--duration-base) var(--ease-emphasized);
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stone {
+    animation: none;
+  }
+}
+
+/* Player 1: solid disc. Player 2: hollow ring. Shape carries the distinction,
+   colour only reinforces it. */
+.stoneP1 {
+  fill: var(--color-player-1);
+  stroke: var(--color-player-1);
+  stroke-width: 1;
+}
+
+.stoneP2 {
+  fill: none;
+  stroke: var(--color-player-2);
+  stroke-width: 3.5;
+}

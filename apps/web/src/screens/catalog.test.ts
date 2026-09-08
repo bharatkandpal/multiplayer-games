@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { GameId } from "@mpg/engine";
 import { buildGameItems, indexOfGame, nextGame, prevGame, type GameItem } from "./catalog";
 
 describe("catalog — buildGameItems", () => {
@@ -11,12 +12,16 @@ describe("catalog — buildGameItems", () => {
     ]);
   });
 
-  // Gomoku is in the engine's `builtInGames` but has no catalog entry, so it is
-  // deliberately unreachable in the UI until MPG-107 adds one. Filtering here
-  // (rather than in each consumer) is what keeps Home and the prev/next
-  // switcher from disagreeing about which games exist.
+  // Filtering here (rather than in each consumer) is what keeps Home and the
+  // prev/next switcher from disagreeing about which games exist. This used to be
+  // demonstrated with Gomoku, which sat in the engine's `builtInGames` with no
+  // catalog entry and was therefore silently unreachable; MPG-107 gave it one, so
+  // every real GameId is now catalogued and the case needs a synthetic id. The
+  // invariant still matters: the next engine-first game must stay hidden, not
+  // half-appear.
   it("drops registered ids that have no catalog entry", () => {
-    const items = buildGameItems(["connect4", "gomoku"], []);
+    const uncatalogued = "not-in-catalog" as GameId;
+    const items = buildGameItems(["connect4", uncatalogued], []);
     expect(items.map((item) => item.id)).toEqual(["connect4"]);
   });
 

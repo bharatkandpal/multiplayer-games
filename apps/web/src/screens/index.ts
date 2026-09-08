@@ -49,6 +49,7 @@ export {
   TicTacToeMoveRoute,
   ConnectFourRoute,
   NimRoute,
+  GomokuRoute,
   TicTacToeOnlineRoute,
   TicTacToeMoveOnlineRoute,
   ConnectFourOnlineRoute,
