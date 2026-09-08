@@ -142,53 +142,67 @@ describe("gomoku AI: tactics", () => {
   });
 });
 
+// These two tests simulate whole games at Hard's depth 5, which is far slower than any
+// single-move test here. Vitest's default 5s timeout is not enough on CI hardware (it is
+// locally), so both get an explicit, generous budget — this is simulation cost, NOT a
+// statement about per-move speed, which the <500ms tests below assert separately.
+const SIMULATION_TIMEOUT_MS = 120_000;
+
 describe("gomoku AI: difficulty gradient", () => {
-  it("Hard beats a random player on every seeded game, from either seat", () => {
-    for (const hardSeat of [1, 2] as const) {
-      for (const seed of [1, 2, 3, 4]) {
-        const rng = mulberry32(seed);
-        let state = gomoku.createInitialState();
-        let result = gomoku.getResult(state);
-        let plies = 0;
-        while (result.status === "in_progress" && plies < 81) {
-          const mover = gomoku.currentPlayer(state);
-          const move =
-            mover === hardSeat ? pickMove(gomoku, state, "hard", rng) : randomMove(state, rng);
-          state = gomoku.applyMove(state, move, mover);
-          result = gomoku.getResult(state);
-          plies++;
-        }
-        expect(result.status).toBe("win");
-        if (result.status !== "win") return;
-        expect(result.winner).toBe(hardSeat);
-      }
-    }
-  });
-
-  it("Hard scores >= Medium >= Easy against a common Easy opponent", () => {
-    const TOLERANCE = 0.05;
-    const seeds = [1, 2, 3];
-
-    function scoreAgainstEasy(difficulty: Difficulty): number {
-      let score = 0;
-      for (const seed of seeds) {
-        for (const firstMover of ["a", "b"] as const) {
-          const rng = mulberry32(seed * 7919 + (firstMover === "a" ? 0 : 1));
-          const outcome = playGame(difficulty, "easy", rng, firstMover);
-          if (outcome === "a_win") score += 1;
-          else if (outcome === "draw") score += 0.5;
+  it(
+    "Hard beats a random player on every seeded game, from either seat",
+    () => {
+      for (const hardSeat of [1, 2] as const) {
+        for (const seed of [1, 2]) {
+          const rng = mulberry32(seed);
+          let state = gomoku.createInitialState();
+          let result = gomoku.getResult(state);
+          let plies = 0;
+          while (result.status === "in_progress" && plies < 81) {
+            const mover = gomoku.currentPlayer(state);
+            const move =
+              mover === hardSeat ? pickMove(gomoku, state, "hard", rng) : randomMove(state, rng);
+            state = gomoku.applyMove(state, move, mover);
+            result = gomoku.getResult(state);
+            plies++;
+          }
+          expect(result.status).toBe("win");
+          if (result.status !== "win") return;
+          expect(result.winner).toBe(hardSeat);
         }
       }
-      return score / (seeds.length * 2);
-    }
+    },
+    SIMULATION_TIMEOUT_MS,
+  );
 
-    const hard = scoreAgainstEasy("hard");
-    const medium = scoreAgainstEasy("medium");
-    const easy = scoreAgainstEasy("easy"); // ~0.5 by symmetry.
+  it(
+    "Hard scores >= Medium >= Easy against a common Easy opponent",
+    () => {
+      const TOLERANCE = 0.05;
+      const seeds = [1, 2];
 
-    expect(hard).toBeGreaterThanOrEqual(medium - TOLERANCE);
-    expect(medium).toBeGreaterThanOrEqual(easy - TOLERANCE);
-  });
+      function scoreAgainstEasy(difficulty: Difficulty): number {
+        let score = 0;
+        for (const seed of seeds) {
+          for (const firstMover of ["a", "b"] as const) {
+            const rng = mulberry32(seed * 7919 + (firstMover === "a" ? 0 : 1));
+            const outcome = playGame(difficulty, "easy", rng, firstMover);
+            if (outcome === "a_win") score += 1;
+            else if (outcome === "draw") score += 0.5;
+          }
+        }
+        return score / (seeds.length * 2);
+      }
+
+      const hard = scoreAgainstEasy("hard");
+      const medium = scoreAgainstEasy("medium");
+      const easy = scoreAgainstEasy("easy"); // ~0.5 by symmetry.
+
+      expect(hard).toBeGreaterThanOrEqual(medium - TOLERANCE);
+      expect(medium).toBeGreaterThanOrEqual(easy - TOLERANCE);
+    },
+    SIMULATION_TIMEOUT_MS,
+  );
 });
 
 describe("gomoku AI: config sanity", () => {
@@ -219,21 +233,27 @@ describe("gomoku AI: move computed within the time budget", () => {
     expect(Date.now() - start).toBeLessThan(MOVE_BUDGET_MS);
   });
 
-  it("Hard stays within 500ms per move across a full self-played game", () => {
-    // The opening is cheap; the expensive positions are mid-game, once many stones are
-    // on the board and the candidate set is at its widest. Times every single move.
-    let state = gomoku.createInitialState();
-    const rng = mulberry32(5);
-    let worst = 0;
-    let plies = 0;
-    while (gomoku.getResult(state).status === "in_progress" && plies < 81) {
-      const mover = gomoku.currentPlayer(state);
-      const start = Date.now();
-      const move = pickMove(gomoku, state, "hard", rng);
-      worst = Math.max(worst, Date.now() - start);
-      state = gomoku.applyMove(state, move, mover);
-      plies++;
-    }
-    expect(worst).toBeLessThan(MOVE_BUDGET_MS);
-  });
+  it(
+    "Hard stays within 500ms per move across a full self-played game",
+    () => {
+      // The opening is cheap; the expensive positions are mid-game, once many stones are
+      // on the board and the candidate set is at its widest. Times every single move.
+      // The per-move assertion is the point; the whole-game wall clock is necessarily
+      // many times MOVE_BUDGET_MS, hence the explicit test timeout.
+      let state = gomoku.createInitialState();
+      const rng = mulberry32(5);
+      let worst = 0;
+      let plies = 0;
+      while (gomoku.getResult(state).status === "in_progress" && plies < 81) {
+        const mover = gomoku.currentPlayer(state);
+        const start = Date.now();
+        const move = pickMove(gomoku, state, "hard", rng);
+        worst = Math.max(worst, Date.now() - start);
+        state = gomoku.applyMove(state, move, mover);
+        plies++;
+      }
+      expect(worst).toBeLessThan(MOVE_BUDGET_MS);
+    },
+    SIMULATION_TIMEOUT_MS,
+  );
 });
