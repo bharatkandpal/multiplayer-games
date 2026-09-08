@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, MouseEvent } from "react";
 import type { NimLine, NimMove, NimState } from "@mpg/engine";
 import type { AppliedMove } from "../../game";
 import { Button, VisuallyHidden } from "../ui";
@@ -50,6 +50,15 @@ function pileLabel(index: number, size: number, selected: boolean): string {
  * navigation. Selection and the "just taken" highlight are never color-only
  * (dashed ring / pulse + text), and activating an empty pile gives an
  * explicit, self-clearing warning instead of silently doing nothing.
+ *
+ * On top of that fully keyboard/AT-operable flow, individual tokens are a
+ * mouse/touch-only enhancement: clicking a token directly selects its pile
+ * AND sets the count in one motion ("take from here to the end" — clicking
+ * deeper into the pile takes more), and hovering previews that count on the
+ * tokens before committing to the click. Tokens stay `aria-hidden` and
+ * un-tabbable — this is strictly additive convenience layered over the
+ * stepper, never a replacement for it, so nothing here can leave a
+ * keyboard/AT user with less than the base flow above.
  */
 export function NimBoard({
   state,
@@ -63,6 +72,11 @@ export function NimBoard({
   const [selected, setSelected] = useState<number | null>(null);
   const [count, setCount] = useState(1);
   const [warning, setWarning] = useState<string | null>(null);
+  // Live "if you click here, this many will go" preview — set on token
+  // hover, cleared on leaving the pile. Mouse/touch-only enhancement; never
+  // the only way to see the pending count (the stepper readout below always
+  // shows it too).
+  const [hoverPreview, setHoverPreview] = useState<{ pile: number; count: number } | null>(null);
   const pileRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const winningPiles = winningLine ? new Set<number>(winningLine) : null;
 
@@ -74,6 +88,7 @@ export function NimBoard({
   useEffect(() => {
     setSelected(null);
     setCount(1);
+    setHoverPreview(null);
   }, [lastMove]);
 
   // Ephemeral "ghost" tokens fading out of the pile that was just taken from —
@@ -150,6 +165,31 @@ export function NimBoard({
 
   const selectedSize = selected !== null ? (state.piles[selected] ?? 0) : 0;
 
+  /**
+   * Clicking a specific token selects its pile and sets the count to "take
+   * from here through the end" in one motion — `tokenIndex` counts from the
+   * kept end, so the count taken is everything from that token onward.
+   * `stopPropagation` keeps this from ALSO bubbling to the pile button's own
+   * `onClick` (`activatePile`), which has different toggle-select semantics.
+   */
+  const handleTokenClick = (
+    event: MouseEvent,
+    pileIndex: number,
+    tokenIndex: number,
+    size: number,
+  ): void => {
+    event.stopPropagation();
+    if (disabled || size === 0) return;
+    setWarning(null);
+    setSelected(pileIndex);
+    setCount(size - tokenIndex);
+  };
+
+  const previewCountFor = (pileIndex: number, isSelected: boolean): number => {
+    if (hoverPreview?.pile === pileIndex) return hoverPreview.count;
+    return isSelected ? count : 0;
+  };
+
   const confirmTake = (): void => {
     if (selected === null || disabled) return;
     onMove({ pile: selected, count });
@@ -190,6 +230,8 @@ export function NimBoard({
           const isWinning = winningPiles?.has(index) ?? false;
           const ghostCount = fading && fading.pile === index ? fading.count : 0;
           const slots = size + ghostCount;
+          const previewCount = previewCountFor(index, isSelected);
+          const isHoverPreview = hoverPreview?.pile === index;
 
           return (
             <button
@@ -213,15 +255,40 @@ export function NimBoard({
               onFocus={() => setFocusIndex(index)}
               onKeyDown={(event) => handleKeyDown(event, index)}
               onClick={() => activatePile(index)}
+              onMouseLeave={() =>
+                setHoverPreview((current) => (current?.pile === index ? null : current))
+              }
             >
               <span className={styles.pileName}>Pile {index + 1}</span>
               <span className={styles.tokenRow} aria-hidden="true">
-                {Array.from({ length: slots }, (_, tokenIndex) => (
-                  <span
-                    key={tokenIndex}
-                    className={cx(styles.token, tokenIndex >= size && styles.tokenGhost)}
-                  />
-                ))}
+                {Array.from({ length: slots }, (_, tokenIndex) => {
+                  // Ghost slots (already-removed, fading out) aren't real
+                  // tokens — they don't get click/hover handlers, and
+                  // `size - tokenIndex` would be <= 0 for one anyway.
+                  const isRealToken = tokenIndex < size;
+                  return (
+                    <span
+                      key={tokenIndex}
+                      className={cx(
+                        styles.token,
+                        !isRealToken && styles.tokenGhost,
+                        isRealToken &&
+                          tokenIndex >= size - previewCount &&
+                          (isHoverPreview ? styles.tokenHoverTake : styles.tokenPendingTake),
+                      )}
+                      onClick={
+                        isActivatable && isRealToken
+                          ? (event) => handleTokenClick(event, index, tokenIndex, size)
+                          : undefined
+                      }
+                      onMouseEnter={
+                        isActivatable && isRealToken
+                          ? () => setHoverPreview({ pile: index, count: size - tokenIndex })
+                          : undefined
+                      }
+                    />
+                  );
+                })}
                 {size === 0 ? <span className={styles.emptyMark}>—</span> : null}
               </span>
               <span className={styles.pileCount}>{size}</span>

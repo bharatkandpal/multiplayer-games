@@ -69,6 +69,33 @@ describe("InviteScreen", () => {
     expect(writeText).toHaveBeenCalledWith("http://localhost/tictactoe/room/room-1");
   });
 
+  it("uses the native share sheet when the platform has one (MPG-087)", async () => {
+    const user = userEvent.setup();
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { value: share, configurable: true, writable: true });
+
+    render(
+      <InviteScreen
+        gameId="tictactoe"
+        room={waitingRoom}
+        inviteUrl="http://localhost/tictactoe/room/room-1"
+        onReady={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    // The label follows the capability, so it never promises a sheet that
+    // won't open.
+    await user.click(screen.getByRole("button", { name: "Share link" }));
+
+    expect(share).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "http://localhost/tictactoe/room/room-1" }),
+    );
+    expect(await screen.findByText("Link shared!")).toBeInTheDocument();
+
+    Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, "share");
+  });
+
   it("calls onReady once the room becomes active", async () => {
     const onReady = vi.fn();
     const { rerender } = render(

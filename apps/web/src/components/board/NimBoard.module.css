@@ -53,11 +53,14 @@
   transition:
     background-color var(--duration-fast) var(--ease-standard),
     transform var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard);
 }
 
 .pile:hover:not([aria-disabled="true"]) {
   background-color: var(--color-bg-subtle);
+  box-shadow: var(--shadow-md, var(--shadow-sm));
+  transform: translateY(-2px);
 }
 
 .pile:active:not([aria-disabled="true"]) {
@@ -88,18 +91,47 @@
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: center;
-  gap: 3px;
-  min-height: 1.25rem;
+  gap: 4px;
+  min-height: 1.6rem;
 }
 
+/* Round "stone" tokens rather than flat squares — reads more like physical
+   objects to pick up, which is the whole point of Nim. Gradient + a small
+   shadow gives them a slight 3D pop instead of a flat color chip. Pop in on
+   mount (fresh pile, or the count going back up) so the row doesn't just
+   silently reflow. */
 .token {
-  width: 0.7rem;
-  height: 0.7rem;
-  border-radius: var(--radius-sm);
-  background-color: var(--color-accent);
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 32% 28%,
+    color-mix(in srgb, var(--color-accent) 60%, white),
+    var(--color-accent)
+  );
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
   transition:
     opacity var(--duration-slow) var(--ease-standard),
-    transform var(--duration-slow) var(--ease-standard);
+    transform var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+  animation: tokenPopIn var(--duration-fast) var(--ease-standard) backwards;
+}
+
+@keyframes tokenPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.token:hover {
+  transform: translateY(-2px) scale(1.12);
+  box-shadow: var(--shadow-md, var(--shadow-sm));
 }
 
 /* A token that was just taken: fades and shrinks out in place rather than
@@ -109,14 +141,53 @@
 .tokenGhost {
   opacity: 0;
   transform: scale(0.4) translateY(4px);
+  cursor: default;
+  animation: none;
+}
+
+/* Committed pending-removal: the top `count` tokens of the currently
+   selected pile, so the stepper's abstract number is visibly tied to actual
+   tokens before confirming — a solid warning ring, distinct from the
+   lighter dashed hover preview below. */
+.tokenPendingTake {
+  box-shadow:
+    0 0 0 2px var(--color-danger),
+    var(--shadow-sm);
+  opacity: 0.65;
+  transform: translateY(-1px) scale(0.94);
+}
+
+/* Live "if you click here" preview on hover, before anything is committed —
+   a lighter dashed treatment so it never reads as already-decided. */
+.tokenHoverTake {
+  box-shadow: 0 0 0 2px var(--color-danger-text, var(--color-danger));
+  opacity: 0.8;
+  transform: scale(1.08);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .token {
     transition: none;
+    animation: none;
+  }
+  .token:hover {
+    transform: none;
   }
   .tokenGhost {
     display: none;
+  }
+  .tokenPendingTake,
+  .tokenHoverTake {
+    transform: none;
+  }
+}
+
+@media (hover: none) {
+  /* No hover on touch — drop the lift-on-hover affordance since it'd just
+     stick after a tap; tap-to-set-count itself still works via onClick. */
+  .token:hover {
+    transform: none;
+    box-shadow: var(--shadow-sm);
   }
 }
 
@@ -210,12 +281,35 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full, var(--radius-md));
+  background-color: var(--color-surface-raised);
+  box-shadow: var(--shadow-sm);
+  animation: stepperIn var(--duration-fast) var(--ease-standard);
+}
+
+@keyframes stepperIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stepper {
+    animation: none;
+  }
 }
 
 .stepperCount {
-  min-width: 2ch;
+  min-width: 2.5ch;
   text-align: center;
-  font-size: var(--font-size-400);
+  font-size: var(--font-size-500);
   font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
+  transition: transform var(--duration-fast) var(--ease-emphasized);
 }
