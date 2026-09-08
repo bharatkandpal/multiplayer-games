@@ -1,15 +1,10 @@
 import { DrunkWalkCharacterGlyph } from "./DrunkWalkCharacterGlyph";
 import {
-  DRUNK_WALK_ACCESSORIES,
-  DRUNK_WALK_BEARDS,
-  DRUNK_WALK_CLOTHES_COLORS,
-  DRUNK_WALK_HAIR_COLORS,
-  DRUNK_WALK_HAIRSTYLES,
-  DRUNK_WALK_HATS,
-  DRUNK_WALK_SHOE_COLORS,
-  DRUNK_WALK_SKIN_TONES,
+  DRUNK_WALK_COSMETICS,
+  characterFromConfig,
   type DrunkWalkCharacter,
 } from "./drunkWalkCharacter";
+import type { CosmeticConfig, CosmeticSlot } from "../../cosmetics";
 import { Modal } from "../ui";
 import styles from "./DrunkWalkCustomizeMenu.module.css";
 
@@ -35,6 +30,13 @@ export interface DrunkWalkCustomizeMenuProps {
  * rather than a name or a bare color chip — "show, don't tell" for a purely
  * visual choice — plus a larger headline preview of the current full combo
  * at the top so picks are visible immediately, not just per-option.
+ *
+ * Since MPG-088-b the sections are DERIVED from the registered schema rather
+ * than hand-listed: adding a slot or an option to `DRUNK_WALK_COSMETICS` shows
+ * up here with no change to this file. The section order is the schema's slot
+ * order, which is why the schema lists skin → hair → hair colour → beard →
+ * accessory → hat → clothes → shoes: roughly bottom-up on the body, and
+ * unchanged from what shipped.
  */
 export function DrunkWalkCustomizeMenu({
   isOpen,
@@ -42,6 +44,12 @@ export function DrunkWalkCustomizeMenu({
   onChange,
   onClose,
 }: DrunkWalkCustomizeMenuProps): React.JSX.Element {
+  const config = character as unknown as CosmeticConfig;
+
+  const selectOption = (slotId: string, optionId: string): void => {
+    onChange(characterFromConfig({ ...config, [slotId]: optionId }));
+  };
+
   return (
     <Modal isOpen={isOpen} title="Customize character" onClose={onClose}>
       <div className={styles.menu}>
@@ -49,94 +57,45 @@ export function DrunkWalkCustomizeMenu({
           <DrunkWalkCharacterGlyph character={character} size={96} />
         </div>
 
-        <PartSection
-          label="Skin tone"
-          options={DRUNK_WALK_SKIN_TONES}
-          selectedId={character.skinId}
-          previewFor={(skinId) => ({ ...character, skinId })}
-          onSelect={(skinId) => onChange({ ...character, skinId })}
-        />
-        <PartSection
-          label="Hair"
-          options={DRUNK_WALK_HAIRSTYLES}
-          selectedId={character.hair}
-          previewFor={(hair) => ({ ...character, hair })}
-          onSelect={(hair) => onChange({ ...character, hair })}
-        />
-        <PartSection
-          label="Hair color"
-          options={DRUNK_WALK_HAIR_COLORS}
-          selectedId={character.hairColorId}
-          previewFor={(hairColorId) => ({ ...character, hairColorId })}
-          onSelect={(hairColorId) => onChange({ ...character, hairColorId })}
-        />
-        <PartSection
-          label="Beard"
-          options={DRUNK_WALK_BEARDS}
-          selectedId={character.beard}
-          previewFor={(beard) => ({ ...character, beard })}
-          onSelect={(beard) => onChange({ ...character, beard })}
-        />
-        <PartSection
-          label="Accessory"
-          options={DRUNK_WALK_ACCESSORIES}
-          selectedId={character.accessory}
-          previewFor={(accessory) => ({ ...character, accessory })}
-          onSelect={(accessory) => onChange({ ...character, accessory })}
-        />
-        <PartSection
-          label="Hat"
-          options={DRUNK_WALK_HATS}
-          selectedId={character.hat}
-          previewFor={(hat) => ({ ...character, hat })}
-          onSelect={(hat) => onChange({ ...character, hat })}
-        />
-        <PartSection
-          label="Clothes"
-          options={DRUNK_WALK_CLOTHES_COLORS}
-          selectedId={character.clothesId}
-          previewFor={(clothesId) => ({ ...character, clothesId })}
-          onSelect={(clothesId) => onChange({ ...character, clothesId })}
-        />
-        <PartSection
-          label="Shoes"
-          options={DRUNK_WALK_SHOE_COLORS}
-          selectedId={character.shoesId}
-          previewFor={(shoesId) => ({ ...character, shoesId })}
-          onSelect={(shoesId) => onChange({ ...character, shoesId })}
-        />
+        {DRUNK_WALK_COSMETICS.slots.map((slot) => (
+          <SlotSection
+            key={slot.id}
+            slot={slot}
+            selectedId={config[slot.id] ?? ""}
+            previewFor={(optionId) => characterFromConfig({ ...config, [slot.id]: optionId })}
+            onSelect={(optionId) => selectOption(slot.id, optionId)}
+          />
+        ))}
       </div>
     </Modal>
   );
 }
 
 /**
- * One customization category, shown as a row of buttons that each render the
- * FULL character with that one option applied (via `previewFor`) — so every
- * button already answers "how would it look", not just the selected one at
- * the top. Generic over the option id type (`DrunkWalkHat`/`DrunkWalkBeard`/
- * plain color-id `string`) so it covers all four categories with one
- * component. `name` is still supplied (as `title`/`aria-label`) so the pick
- * isn't visual-only for assistive tech.
+ * One cosmetic slot, shown as a row of buttons that each render the FULL
+ * character with that one option applied (via `previewFor`) — so every button
+ * already answers "how would it look", not just the selected one at the top.
+ * `name` is still supplied (as `title`/`aria-label`) so the pick isn't
+ * visual-only for assistive tech.
  */
-function PartSection<T extends string>({
-  label,
-  options,
+function SlotSection({
+  slot,
   selectedId,
   previewFor,
   onSelect,
 }: {
-  label: string;
-  options: readonly { readonly id: T; readonly name: string }[];
-  selectedId: T;
-  previewFor: (id: T) => DrunkWalkCharacter;
-  onSelect: (id: T) => void;
+  slot: CosmeticSlot;
+  selectedId: string;
+  previewFor: (optionId: string) => DrunkWalkCharacter;
+  onSelect: (optionId: string) => void;
 }): React.JSX.Element {
   return (
     <fieldset className={styles.section}>
-      <legend className={styles.sectionLabel}>{label}</legend>
-      <div className={styles.optionRow} role="group" aria-label={label}>
-        {options.map((opt) => (
+      <legend className={styles.sectionLabel}>{slot.label}</legend>
+      {/* No `role="group"`/`aria-label` here: the <fieldset> is already a group
+          named by its <legend>, and the pair announced the label twice. */}
+      <div className={styles.optionRow}>
+        {slot.options.map((opt) => (
           <button
             key={opt.id}
             type="button"

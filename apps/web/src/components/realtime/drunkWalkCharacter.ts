@@ -1,32 +1,55 @@
-// Drunk Walk character customization — mix-and-match parts (hat, beard,
-// clothes color, shoe color) rather than a handful of fixed bundled "outfit"
-// presets, opened from the cog menu (`DrunkWalkCustomizeMenu`) instead of the
-// ready overlay. Purely cosmetic: none of this ever reaches the engine (no
-// field on `DrunkWalkState`/`DrunkWalkInput`), so it can't affect physics,
-// scoring, or the server-side re-simulation anti-cheat check (MPG-065) —
-// `DrunkWalkScene` is the only thing that reads it.
+// Drunk Walk character customization, expressed as a registration against the
+// generic cosmetic layer (MPG-088-b) rather than as its own bespoke types +
+// storage. The parts and colours are unchanged — this is the same eight
+// mix-and-match slots (hat, beard, hair, accessory, and four palettes) that
+// shipped before; what changed is that the platform now owns the schema,
+// defaults, validation, resolution and persistence, and this file is just the
+// data plus a typed view of it.
+//
+// Still purely cosmetic: none of this reaches the engine (no field on
+// `DrunkWalkState`/`DrunkWalkInput`), so it cannot affect physics, scoring, or
+// the server-side re-simulation anti-cheat check (MPG-065). That is now
+// enforced rather than asserted — see `cosmetics/__tests__/cosmetics.invariant.test.ts`.
+
+import {
+  defaultConfig,
+  loadCosmetics,
+  registerCosmetics,
+  resolveOption,
+  storeCosmetics,
+  type CosmeticConfig,
+  type CosmeticOption,
+  type CosmeticSchema,
+} from "../../cosmetics";
 
 export type DrunkWalkHat = "none" | "cap" | "party-hat" | "halo";
 export type DrunkWalkBeard = "none" | "full" | "goatee" | "mustache";
 export type DrunkWalkHair = "none" | "short" | "long" | "bun" | "mohawk";
 export type DrunkWalkAccessory = "none" | "glasses" | "sunglasses" | "headphones";
 
+/**
+ * The typed view the two renderers read. Structurally a `CosmeticConfig` whose
+ * slot ids happen to be these field names — which is exactly why the slot ids
+ * below were chosen to match: a stored character from before this migration is
+ * already a valid config, so old saves carry over with no rewriting.
+ */
 export interface DrunkWalkCharacter {
   readonly hat: DrunkWalkHat;
   readonly beard: DrunkWalkBeard;
   readonly hair: DrunkWalkHair;
   readonly accessory: DrunkWalkAccessory;
-  /** Id into `DRUNK_WALK_SKIN_TONES`. */
+  /** Id into the `skinId` slot. */
   readonly skinId: string;
-  /** Id into `DRUNK_WALK_HAIR_COLORS`. Irrelevant while `hair === "none"`, but
-   * always stored so a later hair pick doesn't need a separate default. */
+  /** Id into the `hairColorId` slot. Irrelevant while `hair === "none"`, but
+   * always resolved so a later hair pick doesn't need a separate default. */
   readonly hairColorId: string;
-  /** Id into `DRUNK_WALK_CLOTHES_COLORS`. */
+  /** Id into the `clothesId` slot. */
   readonly clothesId: string;
-  /** Id into `DRUNK_WALK_SHOE_COLORS`. */
+  /** Id into the `shoesId` slot. */
   readonly shoesId: string;
 }
 
+/** What the renderers want from a palette slot: the swatch plus its identity. */
 export interface DrunkWalkColorOption {
   readonly id: string;
   readonly name: string;
@@ -34,152 +57,220 @@ export interface DrunkWalkColorOption {
   readonly shade: string;
 }
 
-export interface DrunkWalkPartOption<T extends string> {
-  readonly id: T;
-  readonly name: string;
-}
-
-export const DRUNK_WALK_HATS: readonly DrunkWalkPartOption<DrunkWalkHat>[] = [
-  { id: "none", name: "None" },
-  { id: "cap", name: "Cap" },
-  { id: "party-hat", name: "Party Hat" },
-  { id: "halo", name: "Halo" },
-] as const;
-
-export const DRUNK_WALK_BEARDS: readonly DrunkWalkPartOption<DrunkWalkBeard>[] = [
-  { id: "none", name: "None" },
-  { id: "full", name: "Full Beard" },
-  { id: "goatee", name: "Goatee" },
-  { id: "mustache", name: "Mustache" },
-] as const;
-
-export const DRUNK_WALK_HAIRSTYLES: readonly DrunkWalkPartOption<DrunkWalkHair>[] = [
-  { id: "none", name: "Bald" },
-  { id: "short", name: "Short" },
-  { id: "long", name: "Long" },
-  { id: "bun", name: "Bun" },
-  { id: "mohawk", name: "Mohawk" },
-] as const;
-
-export const DRUNK_WALK_ACCESSORIES: readonly DrunkWalkPartOption<DrunkWalkAccessory>[] = [
-  { id: "none", name: "None" },
-  { id: "glasses", name: "Glasses" },
-  { id: "sunglasses", name: "Sunglasses" },
-  { id: "headphones", name: "Headphones" },
-] as const;
-
-/** `"classic"` is special-cased in `DrunkWalkScene` to use the live theme's
- * `--color-warning` token instead of `tone`/`shade` here, so the default look
- * still respects light/dark mode; every other color is fixed regardless of
- * theme (a deliberate "costume", not a themed default). */
-export const DRUNK_WALK_CLOTHES_COLORS: readonly DrunkWalkColorOption[] = [
-  { id: "classic", name: "Classic", tone: "#ffd23f", shade: "#9a5b00" },
-  { id: "blue", name: "Blue", tone: "#4fb0ff", shade: "#0a4a80" },
-  { id: "pink", name: "Pink", tone: "#ff5fa2", shade: "#8a1450" },
-  { id: "green", name: "Green", tone: "#5ee6a0", shade: "#106b3f" },
-  { id: "purple", name: "Purple", tone: "#c88bff", shade: "#4a1d80" },
-] as const;
-
-export const DRUNK_WALK_SHOE_COLORS: readonly DrunkWalkColorOption[] = [
-  { id: "black", name: "Black", tone: "#2b2b30", shade: "#141416" },
-  { id: "red", name: "Red", tone: "#e0483f", shade: "#7a201a" },
-  { id: "white", name: "White", tone: "#f2f2f2", shade: "#b8b8b8" },
-  { id: "gold", name: "Gold", tone: "#e0b84a", shade: "#8a6a1a" },
-] as const;
-
-/** Skin tones for the head/hands — independent of clothes color (previously
- * the head just reused the clothes color, which meant re-skinning the
- * outfit re-skinned the person). A spread wide enough that, combined with
- * hair/accessories below, a player can approximate their own look or a
- * caricature of someone else without needing a photo pipeline. */
-export const DRUNK_WALK_SKIN_TONES: readonly DrunkWalkColorOption[] = [
-  { id: "fair", name: "Fair", tone: "#ffe0c2", shade: "#d9a876" },
-  { id: "light", name: "Light", tone: "#f2c9a0", shade: "#c99566" },
-  { id: "tan", name: "Tan", tone: "#c68642", shade: "#8f5a26" },
-  { id: "brown", name: "Brown", tone: "#8d5524", shade: "#5c3413" },
-  { id: "deep", name: "Deep", tone: "#5c3a21", shade: "#3a2213" },
-] as const;
-
-export const DRUNK_WALK_HAIR_COLORS: readonly DrunkWalkColorOption[] = [
-  { id: "black", name: "Black", tone: "#2b2320", shade: "#17110f" },
-  { id: "brown", name: "Brown", tone: "#6b4423", shade: "#402910" },
-  { id: "blonde", name: "Blonde", tone: "#e8c873", shade: "#b89547" },
-  { id: "red", name: "Red", tone: "#b5502f", shade: "#7a3319" },
-  { id: "gray", name: "Gray", tone: "#b5b5ba", shade: "#85858c" },
-  { id: "blue", name: "Blue", tone: "#6fa8ff", shade: "#2c5aa0" },
-] as const;
-
-export const DEFAULT_DRUNK_WALK_CHARACTER: DrunkWalkCharacter = {
-  hat: "none",
-  beard: "none",
-  hair: "short",
-  accessory: "none",
-  skinId: "tan",
-  hairColorId: "brown",
-  clothesId: "classic",
-  shoesId: "black",
+/** `"classic"` is special-cased by both renderers to use the live theme's
+ * `--color-warning` token instead of the `tone`/`shade` here, so the default
+ * look still respects light/dark mode; every other colour is fixed regardless
+ * of theme (a deliberate "costume", not a themed default). */
+export const DRUNK_WALK_COSMETICS: CosmeticSchema = {
+  gameId: "drunk-walk",
+  slots: [
+    {
+      id: "skinId",
+      label: "Skin tone",
+      kind: "palette",
+      defaultOptionId: "tan",
+      // A spread wide enough that, combined with hair and accessories, a player
+      // can approximate their own look or a caricature of someone else's
+      // without needing a photo pipeline.
+      options: [
+        { id: "fair", name: "Fair", palette: { tone: "#ffe0c2", shade: "#d9a876" } },
+        { id: "light", name: "Light", palette: { tone: "#f2c9a0", shade: "#c99566" } },
+        { id: "tan", name: "Tan", palette: { tone: "#c68642", shade: "#8f5a26" } },
+        { id: "brown", name: "Brown", palette: { tone: "#8d5524", shade: "#5c3413" } },
+        { id: "deep", name: "Deep", palette: { tone: "#5c3a21", shade: "#3a2213" } },
+      ],
+    },
+    {
+      id: "hair",
+      label: "Hair",
+      kind: "part",
+      defaultOptionId: "short",
+      options: [
+        { id: "none", name: "Bald" },
+        { id: "short", name: "Short" },
+        { id: "long", name: "Long" },
+        { id: "bun", name: "Bun" },
+        { id: "mohawk", name: "Mohawk" },
+      ],
+    },
+    {
+      id: "hairColorId",
+      label: "Hair color",
+      kind: "palette",
+      defaultOptionId: "brown",
+      options: [
+        { id: "black", name: "Black", palette: { tone: "#2b2320", shade: "#17110f" } },
+        { id: "brown", name: "Brown", palette: { tone: "#6b4423", shade: "#402910" } },
+        { id: "blonde", name: "Blonde", palette: { tone: "#e8c873", shade: "#b89547" } },
+        { id: "red", name: "Red", palette: { tone: "#b5502f", shade: "#7a3319" } },
+        { id: "gray", name: "Gray", palette: { tone: "#b5b5ba", shade: "#85858c" } },
+        { id: "blue", name: "Blue", palette: { tone: "#6fa8ff", shade: "#2c5aa0" } },
+      ],
+    },
+    {
+      id: "beard",
+      label: "Beard",
+      kind: "part",
+      options: [
+        { id: "none", name: "None" },
+        { id: "full", name: "Full Beard" },
+        { id: "goatee", name: "Goatee" },
+        { id: "mustache", name: "Mustache" },
+      ],
+    },
+    {
+      id: "accessory",
+      label: "Accessory",
+      kind: "part",
+      options: [
+        { id: "none", name: "None" },
+        { id: "glasses", name: "Glasses" },
+        { id: "sunglasses", name: "Sunglasses" },
+        { id: "headphones", name: "Headphones" },
+      ],
+    },
+    {
+      id: "hat",
+      label: "Hat",
+      kind: "part",
+      options: [
+        { id: "none", name: "None" },
+        { id: "cap", name: "Cap" },
+        { id: "party-hat", name: "Party Hat" },
+        { id: "halo", name: "Halo" },
+      ],
+    },
+    {
+      id: "clothesId",
+      label: "Clothes",
+      kind: "palette",
+      defaultOptionId: "classic",
+      options: [
+        { id: "classic", name: "Classic", palette: { tone: "#ffd23f", shade: "#9a5b00" } },
+        { id: "blue", name: "Blue", palette: { tone: "#4fb0ff", shade: "#0a4a80" } },
+        { id: "pink", name: "Pink", palette: { tone: "#ff5fa2", shade: "#8a1450" } },
+        { id: "green", name: "Green", palette: { tone: "#5ee6a0", shade: "#106b3f" } },
+        { id: "purple", name: "Purple", palette: { tone: "#c88bff", shade: "#4a1d80" } },
+      ],
+    },
+    {
+      id: "shoesId",
+      label: "Shoes",
+      kind: "palette",
+      defaultOptionId: "black",
+      options: [
+        { id: "black", name: "Black", palette: { tone: "#2b2b30", shade: "#141416" } },
+        { id: "red", name: "Red", palette: { tone: "#e0483f", shade: "#7a201a" } },
+        { id: "white", name: "White", palette: { tone: "#f2f2f2", shade: "#b8b8b8" } },
+        { id: "gold", name: "Gold", palette: { tone: "#e0b84a", shade: "#8a6a1a" } },
+      ],
+    },
+  ],
 };
 
-function findColor(options: readonly DrunkWalkColorOption[], id: string): DrunkWalkColorOption {
-  // Non-null: both color lists above are non-empty at compile time, and the
-  // fallback to slot 0 covers any stored/unknown id (see `loadStoredDrunkWalkCharacter`).
-  return options.find((o) => o.id === id) ?? options[0]!;
+/** Registers Drunk Walk's cosmetics. Called once at startup, next to the
+ * engine's own `registerBuiltIn*` calls. */
+export function registerDrunkWalkCosmetics(): void {
+  registerCosmetics(DRUNK_WALK_COSMETICS);
+}
+
+export const DEFAULT_DRUNK_WALK_CHARACTER = defaultConfig(
+  DRUNK_WALK_COSMETICS,
+) as unknown as DrunkWalkCharacter;
+
+/**
+ * Narrows a generic config into the renderers' typed view.
+ *
+ * The cast is sound because `resolveOption` guarantees the returned id is one
+ * the schema declares — an unknown or retired id resolves to the slot default
+ * — so every field is a real member of its union by construction.
+ */
+export function characterFromConfig(config: CosmeticConfig): DrunkWalkCharacter {
+  const pick = (slotId: string): string =>
+    resolveOption(DRUNK_WALK_COSMETICS, config, slotId)?.id ?? "none";
+  return {
+    hat: pick("hat") as DrunkWalkHat,
+    beard: pick("beard") as DrunkWalkBeard,
+    hair: pick("hair") as DrunkWalkHair,
+    accessory: pick("accessory") as DrunkWalkAccessory,
+    skinId: pick("skinId"),
+    hairColorId: pick("hairColorId"),
+    clothesId: pick("clothesId"),
+    shoesId: pick("shoesId"),
+  };
+}
+
+/** Flattens a palette slot's chosen option into the `{id,name,tone,shade}` the
+ * two renderers already draw with. */
+function colorFor(slotId: string, optionId: string): DrunkWalkColorOption {
+  const option = resolveOption(DRUNK_WALK_COSMETICS, { [slotId]: optionId }, slotId);
+  // Non-null: every slot id passed here is declared above, and `resolveOption`
+  // falls back to the slot default for an unknown option id.
+  const resolved = option as CosmeticOption;
+  return {
+    id: resolved.id,
+    name: resolved.name,
+    tone: resolved.palette?.tone ?? "#000000",
+    shade: resolved.palette?.shade ?? "#000000",
+  };
 }
 
 export function findClothesColor(id: string): DrunkWalkColorOption {
-  return findColor(DRUNK_WALK_CLOTHES_COLORS, id);
+  return colorFor("clothesId", id);
 }
 
 export function findShoeColor(id: string): DrunkWalkColorOption {
-  return findColor(DRUNK_WALK_SHOE_COLORS, id);
+  return colorFor("shoesId", id);
 }
 
 export function findSkinTone(id: string): DrunkWalkColorOption {
-  return findColor(DRUNK_WALK_SKIN_TONES, id);
+  return colorFor("skinId", id);
 }
 
 export function findHairColor(id: string): DrunkWalkColorOption {
-  return findColor(DRUNK_WALK_HAIR_COLORS, id);
+  return colorFor("hairColorId", id);
 }
 
-const CHARACTER_STORAGE_KEY = "mpg:drunk-walk:character";
+/**
+ * Where characters were stored before this migration. The old value's keys are
+ * the new slot ids (that is why the ids above were chosen to match), so a
+ * legacy save is already a valid config and reconciling it is the whole
+ * migration — no field mapping, no version stamp.
+ */
+const LEGACY_STORAGE_KEY = "mpg:drunk-walk:character";
 
-function isValidCharacter(value: unknown): value is DrunkWalkCharacter {
-  if (!value || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  return (
-    DRUNK_WALK_HATS.some((h) => h.id === v.hat) &&
-    DRUNK_WALK_BEARDS.some((b) => b.id === v.beard) &&
-    DRUNK_WALK_HAIRSTYLES.some((h) => h.id === v.hair) &&
-    DRUNK_WALK_ACCESSORIES.some((a) => a.id === v.accessory) &&
-    typeof v.skinId === "string" &&
-    typeof v.hairColorId === "string" &&
-    typeof v.clothesId === "string" &&
-    typeof v.shoesId === "string"
-  );
+/**
+ * Moves a pre-MPG-088-b save onto the generic key, once. Best-effort like
+ * everything else in this path: if storage is unavailable the player just gets
+ * defaults, which is the same outcome they'd have had if the read failed.
+ */
+function migrateLegacyCharacter(): void {
+  try {
+    const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!legacy) return;
+    const parsed: unknown = JSON.parse(legacy);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      storeCosmetics(DRUNK_WALK_COSMETICS.gameId, parsed as CosmeticConfig);
+    }
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch {
+    // Nothing to do — the load below falls back to defaults.
+  }
 }
 
-/** Best-effort read of the player's last-picked character. Falls back to the
- * default on any storage/parse failure (private browsing, disabled storage,
- * corrupt JSON, SSR) — customization is a nice-to-have, never worth breaking
- * the game over. */
+/** The player's stored character, migrating a legacy save on first read. */
 export function loadStoredDrunkWalkCharacter(): DrunkWalkCharacter {
   try {
-    const raw = window.localStorage.getItem(CHARACTER_STORAGE_KEY);
-    if (!raw) return DEFAULT_DRUNK_WALK_CHARACTER;
-    const parsed: unknown = JSON.parse(raw);
-    return isValidCharacter(parsed) ? parsed : DEFAULT_DRUNK_WALK_CHARACTER;
+    if (window.localStorage.getItem(LEGACY_STORAGE_KEY) !== null) {
+      migrateLegacyCharacter();
+    }
   } catch {
-    return DEFAULT_DRUNK_WALK_CHARACTER;
+    // Storage unavailable — `loadCosmetics` degrades to defaults below.
   }
+  return characterFromConfig(loadCosmetics(DRUNK_WALK_COSMETICS));
 }
 
-/** Best-effort persistence of the player's character. Swallows storage
- * errors for the same reason as the loader above. */
+/** Persists the player's character through the generic cosmetic storage. */
 export function storeDrunkWalkCharacter(character: DrunkWalkCharacter): void {
-  try {
-    window.localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(character));
-  } catch {
-    // Best-effort only — a failed write just means the pick won't persist.
-  }
+  storeCosmetics(DRUNK_WALK_COSMETICS.gameId, character as unknown as CosmeticConfig);
 }

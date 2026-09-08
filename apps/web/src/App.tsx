@@ -43,6 +43,8 @@ import { getStoredCreatorToken } from "./api/watchSession";
 import { useRoom } from "./hooks/useRoom";
 import { useUsernameGate } from "./hooks/useUsernameGate";
 import { presetSeats, type SeatsConfig } from "./game";
+import { hasCosmetics } from "./cosmetics";
+import { registerDrunkWalkCosmetics } from "./components/realtime/drunkWalkCharacter";
 import styles from "./App.module.css";
 
 // Registering is idempotent-safe to call once at module scope: React's dev-mode
@@ -52,6 +54,11 @@ if (!hasGame("tictactoe") && !hasGame("connect4")) {
 }
 if (!hasRealtimeGame("floppy-birds")) {
   registerBuiltInRealtimeGames();
+}
+// Cosmetics register separately from the engine modules, and deliberately so:
+// the engine must never learn what a hat is (MPG-088-a).
+if (!hasCosmetics("drunk-walk")) {
+  registerDrunkWalkCosmetics();
 }
 
 type Route =
