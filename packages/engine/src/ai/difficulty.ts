@@ -80,6 +80,19 @@ export const DIFFICULTY_TABLE: Readonly<Partial<Record<GameId, PerDifficulty>>> 
     medium: { maxDepth: 1, blunderRate: 0.2 },
     hard: { maxDepth: 1, blunderRate: 0 },
   },
+  // Gomoku needs a bespoke entry because DEFAULT_DIFFICULTY's depth 6 does NOT fit the
+  // <500ms budget here (MPG-107): measured over 14 self-play positions, depth 6 peaked at
+  // ~1025ms/move (and 634ms in real Hard play from the opening), while depth 5 peaked at
+  // ~124ms and depth 4 at ~38ms. Hard is therefore depth 5 — roughly 4x under budget, the
+  // margin that keeps slower CI/hardware safe, matching the tictactoe-move reasoning above.
+  // What makes even depth 5 affordable is `gomoku.orderMoves`, which restricts the search
+  // to <=12 candidate cells near existing stones rather than all 81 (see gomoku.ts); the
+  // depth here is only meaningful in combination with that restriction.
+  gomoku: {
+    easy: { maxDepth: 1, blunderRate: 0.7 },
+    medium: { maxDepth: 3, blunderRate: 0.15 },
+    hard: { maxDepth: 5, blunderRate: 0 },
+  },
 };
 
 /** Looks up the tuned `{maxDepth, blunderRate}` for `gameId` + `difficulty`, falling back
