@@ -112,6 +112,17 @@ function makeSeed(): number {
 }
 
 /**
+ * What a finished run currently links to when shared (MPG-087): the game's own
+ * URL. There is no durable per-result link yet — MPG-056 adds one, and this is
+ * the single function that changes when it does.
+ */
+function buildShareUrl(gameId: RealtimeGameId): string {
+  const path = `/${gameId}`;
+  if (typeof window === "undefined") return path;
+  return `${window.location.origin}${path}`;
+}
+
+/**
  * A client-generated id for one finished run. The submit route no-ops on a
  * `runId` it has already persisted, so retrying a failed submission with the
  * SAME id can never double-write — which is why the id is minted per run here
@@ -187,6 +198,7 @@ export function RealtimeGameRoute({
           renderScene={(props) => <DrunkWalkScene {...props} character={character} />}
           onExit={onExit}
           onRunComplete={submitRun}
+          shareUrl={buildShareUrl(gameId)}
           surfaceExtra={
             <Button
               variant="ghost"
@@ -217,6 +229,7 @@ export function RealtimeGameRoute({
       renderScene={wiring.renderScene}
       onExit={onExit}
       onRunComplete={submitRun}
+      shareUrl={buildShareUrl(gameId)}
     />
   );
 }

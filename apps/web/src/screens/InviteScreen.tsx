@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { GameId } from "@mpg/engine";
 import { Button, Spinner, StatusBadge, Toast } from "../components/ui";
 import type { PublicRoom } from "../api/roomTypes";
+import { useShareLink } from "../hooks/useShareLink";
 import { GAME_CATALOG } from "./HomeScreen";
 import styles from "./InviteScreen.module.css";
 
@@ -13,28 +14,6 @@ export interface InviteScreenProps {
   /** Fires once the room fills and moves to `active` — the caller transitions to the board. */
   onReady: (room: PublicRoom) => void;
   onCancel: () => void;
-}
-
-/** Resolves once `navigator.clipboard` succeeds; falls back to a legacy copy path. */
-async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    try {
-      const el = document.createElement("textarea");
-      el.value = text;
-      el.style.position = "fixed";
-      el.style.opacity = "0";
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand("copy");
-      document.body.removeChild(el);
-      return true;
-    } catch {
-      return false;
-    }
-  }
 }
 
 /**
@@ -49,22 +28,19 @@ export function InviteScreen({
   onReady,
   onCancel,
 }: InviteScreenProps): React.JSX.Element {
-  const [copied, setCopied] = useState(false);
   const title = GAME_CATALOG[gameId]?.title ?? gameId;
+  const { share, status, canShare, reset } = useShareLink();
 
   useEffect(() => {
     if (room?.status === "active") onReady(room);
   }, [room, onReady]);
 
-  useEffect(() => {
-    if (!copied) return undefined;
-    const timer = window.setTimeout(() => setCopied(false), 2000);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
-
-  const handleCopy = async (): Promise<void> => {
-    const ok = await copyToClipboard(inviteUrl);
-    if (ok) setCopied(true);
+  const handleShare = (): void => {
+    void share({
+      url: inviteUrl,
+      title: `Play ${title} with me`,
+      text: `Join my ${title} game`,
+    });
   };
 
   const filledCount = room?.seats.filter((s) => s.kind !== "human" || s.connected).length ?? 0;
@@ -105,14 +81,26 @@ export function InviteScreen({
             readOnly
             value={inviteUrl}
           />
-          <Button variant="primary" onClick={handleCopy}>
-            Copy link
+          {/* One control, honestly labelled for whichever rung of the ladder
+              this platform will actually reach (MPG-087). */}
+          <Button variant="primary" onClick={handleShare}>
+            {canShare ? "Share link" : "Copy link"}
           </Button>
         </div>
-        {copied ? (
+        {status === "copied" || status === "shared" ? (
           <div className={styles.toastSlot}>
-            <Toast variant="success" onDismiss={() => setCopied(false)} autoDismissMs={2000}>
-              Link copied!
+            <Toast variant="success" onDismiss={reset} autoDismissMs={2000}>
+              {status === "shared" ? "Link shared!" : "Link copied!"}
+            </Toast>
+          </div>
+        ) : null}
+        {status === "unavailable" ? (
+          <div className={styles.toastSlot}>
+            {/* Both automatic paths failed — the URL is already visible and
+                selectable in the field above, so say so rather than leaving
+                the press looking like it did nothing. */}
+            <Toast variant="warning" onDismiss={reset}>
+              Couldn&apos;t share automatically — copy the link above.
             </Toast>
           </div>
         ) : null}

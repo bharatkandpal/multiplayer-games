@@ -407,3 +407,92 @@ describe("RealtimePlayScreen — prefers-reduced-motion (ADR 0002 §5)", () => {
     expect(seen.some((v) => v === true)).toBe(false);
   });
 });
+
+describe("RealtimePlayScreen — game-over share (MPG-087)", () => {
+  /** Drives a run to game over and returns nothing — assertions read the DOM. */
+  function playToGameOver(): void {
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    primeClock();
+    advanceTicks(OVER_TICKS);
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, "share");
+    Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, "clipboard");
+    Reflect.deleteProperty(document as unknown as Record<string, unknown>, "execCommand");
+  });
+
+  it("offers no Share affordance when there is nothing to share", () => {
+    renderScreen();
+    playToGameOver();
+
+    expect(screen.getByText("Game over")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Share|Copy link/ })).not.toBeInTheDocument();
+  });
+
+  it("shares the score brag-first with the URL via the native sheet", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { value: share, configurable: true, writable: true });
+
+    renderScreen({ shareUrl: "https://example.test/floppy-birds" });
+    playToGameOver();
+
+    const button = screen.getByRole("button", { name: "Share score" });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    expect(share).toHaveBeenCalledWith({
+      title: "Floppy Birds",
+      text: "I scored 3 on Floppy Birds",
+      url: "https://example.test/floppy-birds",
+    });
+    expect(screen.getByText("Shared!")).toBeInTheDocument();
+    // Sharing must never displace the state's single primary action.
+    expect(screen.getByRole("button", { name: /Play again/ })).toBeInTheDocument();
+  });
+
+  it("labels itself Copy link and copies when no native share sheet exists", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+      writable: true,
+    });
+
+    renderScreen({ shareUrl: "https://example.test/floppy-birds" });
+    playToGameOver();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
+    });
+
+    expect(writeText).toHaveBeenCalledWith("https://example.test/floppy-birds");
+    expect(screen.getByText("Link copied!")).toBeInTheDocument();
+  });
+
+  it("falls back to a selectable URL — not a dead end — when every path fails", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(document, "execCommand", {
+      value: () => {
+        throw new Error("unsupported");
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    renderScreen({ shareUrl: "https://example.test/floppy-birds" });
+    playToGameOver();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
+    });
+
+    const field = screen.getByLabelText("Link to copy");
+    expect(field).toHaveValue("https://example.test/floppy-birds");
+  });
+});
