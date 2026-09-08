@@ -60,9 +60,10 @@ describe("SetupScreen — N-seat-generic (MPG-024/MPG-049)", () => {
     expect(screen.getByRole("radiogroup", { name: "Player 3 type" })).toBeInTheDocument();
     expect(screen.queryByRole("radiogroup", { name: "Player 4 type" })).not.toBeInTheDocument();
 
-    // Default: seat 1 human, seats 2 & 3 medium bots.
-    expect(screen.getAllByRole("combobox", { name: "Difficulty" })).toHaveLength(2);
+    // Seat editors carry no difficulty control — bot strength is per game.
+    expect(screen.queryByRole("combobox", { name: "Difficulty" })).not.toBeInTheDocument();
 
+    // Default: seat 1 human, seats 2 & 3 bots at tictactoe's capped strength.
     await user.click(screen.getByRole("button", { name: "Start game" }));
     expect(onStart).toHaveBeenCalledExactlyOnceWith([
       { kind: "human" },

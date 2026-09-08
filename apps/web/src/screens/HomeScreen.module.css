@@ -43,9 +43,24 @@
   padding: 0;
 }
 
-/* Stretch the list item and its card to fill the equal-height grid row. */
+/* Stretch the list item and its card to fill the equal-height grid row. The
+   cell is a positioning context so Options can sit inside the card's corner —
+   it can't be a descendant of the card, since that's itself a <button>. */
 .gameGrid > li {
   display: flex;
+  position: relative;
+}
+
+/* Secondary and deliberately quiet: quick-start (the card itself) is the
+   primary path, and Options exists for the minority of sessions that want a
+   friend / online / watch. Pinned to the corner rather than stacked below so
+   every card in the grid keeps the same height and alignment. */
+.gameOptions {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  /* Above the card's ::before sheen, which would otherwise swallow clicks. */
+  z-index: 1;
 }
 
 /* Liquid glass: a frosted, translucent tile — blurred backdrop, a soft sheen

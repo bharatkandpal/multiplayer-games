@@ -19,9 +19,8 @@ export type {
   SeatsConfig,
 } from "./seatConfig";
 export {
-  DEFAULT_DIFFICULTY,
-  DIFFICULTIES,
-  DIFFICULTY_LABEL,
+  DEFAULT_BOT_DIFFICULTY,
+  botDifficultyFor,
   createDefaultSeats,
   describeSeat,
   presetSeats,

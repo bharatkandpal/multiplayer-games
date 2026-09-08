@@ -243,7 +243,7 @@ describe("GamePlayScreen — human vs. bot", () => {
 
     fireEvent.click(screen.getByRole("gridcell", { name: "Row 2, column 2, empty" }));
 
-    const badgeText = screen.getByText("Hard bot (Player 2) is thinking…");
+    const badgeText = screen.getByText("Bot is thinking…");
     expect(badgeText).toBeInTheDocument();
     expect(screen.getByRole("gridcell", { name: "Row 2, column 2, X" })).toBeInTheDocument();
 
@@ -283,10 +283,8 @@ describe("GamePlayScreen — human vs. bot", () => {
 
     // No visible win/lose text banner — the outcome is carried by the
     // aria-live region and the board's own (red) winning-line treatment.
-    expect(
-      screen.queryByText("Hard bot (Player 2) wins!", { selector: "p" }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Hard bot (Player 2) wins!");
+    expect(screen.queryByText("Bot wins!", { selector: "p" })).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Bot wins!");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     // The winning line (middle column: 1, 4, 7) reads red — the sole local
@@ -300,6 +298,43 @@ describe("GamePlayScreen — human vs. bot", () => {
     const rematchButton = screen.getByRole("button", { name: "Rematch" });
     expect(rematchButton).toBeInTheDocument();
     expect(rematchButton).toHaveFocus();
+  });
+});
+
+describe("GamePlayScreen — next game from the game-over surface", () => {
+  /** Plays a human-vs-human game to a decisive finish (P1 takes the top row). */
+  async function playToWin(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 1, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 2, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 2, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
+  }
+
+  const seats: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
+
+  it("offers 'Next game' once the game is over and calls onNextGame", async () => {
+    const user = userEvent.setup();
+    const onNextGame = vi.fn();
+    render(<TicTacToeRoute seats={seats} onExit={vi.fn()} onNextGame={onNextGame} />);
+
+    // Not offered mid-game — it belongs to the game-over actions only.
+    expect(screen.queryByRole("button", { name: /Next game/ })).not.toBeInTheDocument();
+
+    await playToWin(user);
+
+    await user.click(screen.getByRole("button", { name: /Next game/ }));
+    expect(onNextGame).toHaveBeenCalledOnce();
+  });
+
+  it("omits 'Next game' entirely when no handler is wired up", async () => {
+    const user = userEvent.setup();
+    render(<TicTacToeRoute seats={seats} onExit={vi.fn()} />);
+
+    await playToWin(user);
+
+    expect(screen.getByRole("button", { name: "Rematch" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Next game/ })).not.toBeInTheDocument();
   });
 });
 
@@ -550,7 +585,7 @@ describe("GamePlayScreen — winner crown + tone matrix (MPG-051)", () => {
     fireEvent.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
     await advanceBotStep();
 
-    expect(screen.getByRole("status")).toHaveTextContent("Hard bot (Player 2) wins!");
+    expect(screen.getByRole("status")).toHaveTextContent("Bot wins!");
 
     expect(container.querySelector('[class*="loseVeil"]')).not.toBeNull();
     expect(container.querySelector('[class*="ashLayer"]')).not.toBeNull();
@@ -577,7 +612,7 @@ describe("GamePlayScreen — winner crown + tone matrix (MPG-051)", () => {
       await advanceBotStep();
     }
 
-    expect(screen.getByRole("status")).toHaveTextContent("Easy bot (Player 1) wins!");
+    expect(screen.getByRole("status")).toHaveTextContent("Bot (Player 1) wins!");
 
     expect(container.querySelector('[class*="confettiLayer"]')).not.toBeNull();
     expect(container.querySelector('[class*="loseVeil"]')).toBeNull();

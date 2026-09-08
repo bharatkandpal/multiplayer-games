@@ -67,84 +67,6 @@
   opacity: 0.9;
 }
 
-.botOption {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.difficultyToggle {
-  display: flex;
-  gap: var(--space-2);
-}
-
-/* Difficulty chips: color-coded by level (easy=success/green,
-   medium=warning/yellow, hard=danger/red) so the risk ramps visually, not
-   just in the label — reuses the same semantic status tokens StatusBadge
-   draws on. Same visually-hidden-radio + `:has()` pattern as .kindLabel
-   above, so keyboard/AT users get a real radiogroup. */
-.difficultyChip {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--size-touch-target);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  border: var(--border-width-thin) solid var(--color-border-strong);
-  font-size: var(--font-size-100);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
-}
-
-.difficultyChip[data-level="easy"] {
-  border-color: var(--color-success);
-  color: var(--color-success-text);
-}
-
-.difficultyChip[data-level="medium"] {
-  border-color: var(--color-warning);
-  color: var(--color-warning-text);
-}
-
-.difficultyChip[data-level="hard"] {
-  border-color: var(--color-danger);
-  color: var(--color-danger-text);
-}
-
-.difficultyChip[data-level="easy"]:has(input:checked) {
-  background-color: var(--color-success-bg);
-  font-weight: var(--font-weight-bold);
-}
-
-.difficultyChip[data-level="medium"]:has(input:checked) {
-  background-color: var(--color-warning-bg);
-  font-weight: var(--font-weight-bold);
-}
-
-.difficultyChip[data-level="hard"]:has(input:checked) {
-  background-color: var(--color-danger-bg);
-  font-weight: var(--font-weight-bold);
-}
-
-.difficultyChip:has(input:focus-visible) {
-  outline: var(--border-width-thick) solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-
-.difficultyChipInput {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
 .onlineSection {
   margin-bottom: var(--space-6);
 }
@@ -249,32 +171,6 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
-}
-
-.difficultyField {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.difficultyLabel {
-  font-size: var(--font-size-200);
-  color: var(--color-text-muted);
-}
-
-.difficultySelect {
-  min-height: var(--size-touch-target);
-  padding: 0 var(--space-3);
-  border: var(--border-width-thin) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background-color: var(--color-surface);
-  color: var(--color-text);
-  font-size: var(--font-size-200);
-}
-
-.difficultySelect:focus-visible {
-  outline: var(--border-width-thick) solid var(--color-focus-ring);
-  outline-offset: 2px;
 }
 
 .actions {

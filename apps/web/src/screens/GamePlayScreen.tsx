@@ -87,6 +87,12 @@ export interface GamePlayScreenProps<S, M, L = unknown> {
    */
   onPlayAgain?: (seats: SeatsConfig) => void;
   /**
+   * Quick-starts the next game in the catalog. When provided, the game-over
+   * actions show a "Next game" button — the fastest path from a finished game
+   * into a new one, without a detour through Home.
+   */
+  onNextGame?: () => void;
+  /**
    * MPG-015: when set, this is an online (room-backed) game — the Rematch
    * button proposes a server-authoritative rematch instead of restarting the
    * local session, and the negotiation state (waiting / opponent wants a
@@ -121,6 +127,7 @@ export interface GamePlayScreenViewProps<S, M, L = unknown> {
   describeMove: (move: M, player: Player) => string;
   onExit: () => void;
   onPlayAgain?: (seats: SeatsConfig) => void;
+  onNextGame?: () => void;
   online?: OnlineRematchProps;
   gameId?: string;
   onViewLeaderboard?: () => void;
@@ -323,6 +330,7 @@ export function GamePlayScreenView<S, M, L = unknown>({
   describeMove,
   onExit,
   onPlayAgain,
+  onNextGame,
   online,
   gameId,
   onViewLeaderboard,
@@ -570,13 +578,21 @@ export function GamePlayScreenView<S, M, L = unknown>({
                       key={preset}
                       variant="secondary"
                       size="sm"
-                      onClick={() => onPlayAgain(presetSeats(preset, seats.length))}
+                      onClick={() => onPlayAgain(presetSeats(preset, seats.length, gameId))}
                     >
                       <span aria-hidden="true">{icon}</span> {label}
                     </Button>
                   );
                 })}
               </div>
+            </div>
+          ) : null}
+
+          {onNextGame ? (
+            <div className={styles.nextGameRow}>
+              <Button variant="secondary" onClick={onNextGame}>
+                Next game <span aria-hidden="true">›</span>
+              </Button>
             </div>
           ) : null}
 

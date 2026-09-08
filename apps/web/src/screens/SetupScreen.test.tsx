@@ -21,7 +21,7 @@ describe("SetupScreen", () => {
     ).toBeInTheDocument();
   });
 
-  it("Play vs Bot starts immediately with human vs. medium bot", async () => {
+  it("Play vs Bot starts immediately with human vs. bot at the game's tuned strength", async () => {
     const user = userEvent.setup();
     const onStart = vi.fn();
     render(<SetupScreen gameId="tictactoe" onStart={onStart} onBack={vi.fn()} />);
@@ -60,7 +60,8 @@ describe("SetupScreen", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     const player1Group = screen.getByRole("radiogroup", { name: "Player 1 type" });
     expect(within(player1Group).getByRole("radio", { name: "Human" })).toBeChecked();
-    expect(screen.getByRole("combobox", { name: "Difficulty" })).toHaveValue("medium");
+    // The difficulty selector is gone entirely — bot strength is per game now.
+    expect(screen.queryByRole("combobox", { name: "Difficulty" })).not.toBeInTheDocument();
   });
 
   it("customized seats: calls onStart with the current seat configuration", async () => {
@@ -73,30 +74,36 @@ describe("SetupScreen", () => {
 
     expect(onStart).toHaveBeenCalledExactlyOnceWith([
       { kind: "human" },
-      { kind: "bot", difficulty: "medium" },
+      { kind: "bot", difficulty: "hard" },
     ] satisfies SeatsConfig);
   });
 
-  it("switching a seat to Bot reveals a difficulty select, defaulting to medium", async () => {
-    const user = userEvent.setup();
-    render(<SetupScreen gameId="tictactoe" onStart={vi.fn()} onBack={vi.fn()} />);
-
-    await user.click(screen.getByRole("button", { name: "Customize seats" }));
-    const player1Group = screen.getByRole("radiogroup", { name: "Player 1 type" });
-    await user.click(within(player1Group).getByRole("radio", { name: "Bot" }));
-
-    const selects = screen.getAllByRole("combobox", { name: "Difficulty" });
-    expect(selects).toHaveLength(2);
-  });
-
-  it("changing difficulty and starting reflects the chosen level", async () => {
+  it("switching a seat to Bot exposes no difficulty control, and uses the game's tuned strength", async () => {
     const user = userEvent.setup();
     const onStart = vi.fn();
     render(<SetupScreen gameId="tictactoe" onStart={onStart} onBack={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: "Customize seats" }));
-    await user.selectOptions(screen.getByRole("combobox", { name: "Difficulty" }), "hard");
+    const player1Group = screen.getByRole("radiogroup", { name: "Player 1 type" });
+    await user.click(within(player1Group).getByRole("radio", { name: "Bot" }));
+
+    expect(screen.queryByRole("combobox", { name: "Difficulty" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "Bot difficulty" })).not.toBeInTheDocument();
+
     await user.click(screen.getByRole("button", { name: "Start game" }));
+    // Both seats are bots now; tictactoe is capped at medium so it stays winnable.
+    expect(onStart).toHaveBeenCalledExactlyOnceWith([
+      { kind: "bot", difficulty: "medium" },
+      { kind: "bot", difficulty: "medium" },
+    ] satisfies SeatsConfig);
+  });
+
+  it("a game with no override seats its bot at hard", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    render(<SetupScreen gameId="connect4" onStart={onStart} onBack={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /Play vs Bot/ }));
 
     expect(onStart).toHaveBeenCalledExactlyOnceWith([
       { kind: "human" },
@@ -163,12 +170,12 @@ describe("SetupScreen", () => {
       );
 
       await user.click(screen.getByRole("button", { name: "Customize seats" }));
-      await user.selectOptions(screen.getByRole("combobox", { name: "Difficulty" }), "hard");
       await user.click(screen.getByRole("button", { name: "Play online — this setup" }));
 
+      // tictactoe's bot is capped at medium (see `botDifficultyFor`).
       expect(onPlayOnline).toHaveBeenCalledExactlyOnceWith([
         { kind: "human" },
-        { kind: "bot", difficulty: "hard" },
+        { kind: "bot", difficulty: "medium" },
       ] satisfies SeatsConfig);
     });
 

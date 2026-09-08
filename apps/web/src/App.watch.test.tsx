@@ -84,7 +84,7 @@ describe("App — Setup -> online all-bot -> watch routing (MPG-025)", () => {
   it("configuring every seat as a bot and clicking the customize online action creates a watch room, not an invite", async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: /^Tic-Tac-Toe/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Options for Tic-Tac-Toe/ }));
     fireEvent.click(screen.getByRole("button", { name: "Customize seats" }));
 
     const player1Group = screen.getByRole("radiogroup", { name: "Player 1 type" });
@@ -142,7 +142,7 @@ describe("App — Setup -> online all-bot -> watch routing (MPG-025)", () => {
   it("the primary 'Play online' button is unaffected — still creates a normal invite-link room", async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: /^Tic-Tac-Toe/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Options for Tic-Tac-Toe/ }));
     fireEvent.click(screen.getByRole("button", { name: /^Play online/ }));
 
     await waitFor(() =>

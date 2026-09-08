@@ -7,7 +7,7 @@
 // model (docs/PRD.md §2): it only exists to drive the local-play controller
 // before any networking exists.
 
-import type { Difficulty } from "@mpg/engine";
+import type { Difficulty, GameId } from "@mpg/engine";
 
 export interface HumanSeatConfig {
   readonly kind: "human";
@@ -27,18 +27,61 @@ export type SeatConfig = HumanSeatConfig | BotSeatConfig;
  */
 export type SeatsConfig = readonly SeatConfig[];
 
-export const DEFAULT_DIFFICULTY: Difficulty = "medium";
+/**
+ * The strength every bot plays at unless its game overrides it below.
+ *
+ * There is no user-facing difficulty selector any more: a player picks a game
+ * and plays, and the bot is simply "the bot". `Difficulty` survives as an
+ * *engine* concept (`DIFFICULTY_TABLE` in `@mpg/engine`) because the search
+ * depth/blunder tuning still lives there — this module is the one place that
+ * decides which of those tunings each game actually gets.
+ */
+export const DEFAULT_BOT_DIFFICULTY: Difficulty = "hard";
 
 /**
- * A sensible starting configuration for the setup screen: seat 1 is human,
- * every other seat is a bot at `difficulty` (medium by default). `seatCount`
- * should come from the selected game's `playerCount`; defaults to 2 for
- * callers (and tests) that don't need to think about seat count.
+ * Per-game overrides of {@link DEFAULT_BOT_DIFFICULTY}.
+ *
+ * Both entries here exist because their Hard tuning is *unbeatable*, not merely
+ * strong, which makes for a bad first session:
+ *
+ * - `tictactoe` — Hard is `maxDepth: 9`, a full unbounded search of a ≤9-ply
+ *   tree, documented in the engine as "provably never-losing". A human's best
+ *   possible outcome is a draw, every single game.
+ * - `nim` — Hard is the exact nim-sum optimum, and the default pile layout
+ *   `[1,3,5,7]` has nim-sum 0 (a P-position), so the player — who is always
+ *   seated first — is theoretically lost from the opening position with no
+ *   counterplay available (see MPG-083).
+ *
+ * Medium keeps both winnable by carrying a nonzero blunder rate off the same
+ * search. Removing an entry here is a product decision, not a cleanup: it makes
+ * that game unwinnable against its own bot.
  */
-export function createDefaultSeats(
-  seatCount = 2,
-  difficulty: Difficulty = DEFAULT_DIFFICULTY,
-): SeatsConfig {
+const BOT_DIFFICULTY_BY_GAME: Partial<Record<GameId, Difficulty>> = {
+  tictactoe: "medium",
+  nim: "medium",
+};
+
+/**
+ * The difficulty bots play at for `gameId`. Games with no override — and
+ * callers with no game in hand — get {@link DEFAULT_BOT_DIFFICULTY}.
+ *
+ * Takes a plain `string` rather than `GameId` so the play screens (which carry
+ * their game id as a string, for the leaderboard) can call it without a cast.
+ * An id that isn't in the override table simply misses and gets the default,
+ * which is the same answer a genuinely-unlisted game should get.
+ */
+export function botDifficultyFor(gameId?: string): Difficulty {
+  return (gameId ? BOT_DIFFICULTY_BY_GAME[gameId as GameId] : undefined) ?? DEFAULT_BOT_DIFFICULTY;
+}
+
+/**
+ * A sensible starting configuration: seat 1 is human, every other seat is a bot
+ * at `gameId`'s tuned strength. `seatCount` should come from the selected
+ * game's `playerCount`; defaults to 2 for callers (and tests) that don't need
+ * to think about seat count.
+ */
+export function createDefaultSeats(seatCount = 2, gameId?: string): SeatsConfig {
+  const difficulty = botDifficultyFor(gameId);
   return Array.from({ length: seatCount }, (_, index) =>
     index === 0 ? { kind: "human" } : { kind: "bot", difficulty },
   );
@@ -53,17 +96,12 @@ export type OpponentPreset = "bot" | "human";
 
 /**
  * Build a fresh seats config for one of the two quick-start presets:
- * "bot" — seat 1 human, every other seat a bot at `difficulty` (medium by
- * default, same as `createDefaultSeats`); "human" — every seat human (local
- * pass-and-play).
+ * "bot" — seat 1 human, every other seat a bot at `gameId`'s tuned strength;
+ * "human" — every seat human (local pass-and-play).
  */
-export function presetSeats(
-  preset: OpponentPreset,
-  playerCount = 2,
-  difficulty: Difficulty = DEFAULT_DIFFICULTY,
-): SeatsConfig {
+export function presetSeats(preset: OpponentPreset, playerCount = 2, gameId?: string): SeatsConfig {
   return preset === "bot"
-    ? createDefaultSeats(playerCount, difficulty)
+    ? createDefaultSeats(playerCount, gameId)
     : Array.from({ length: playerCount }, () => ({ kind: "human" as const }));
 }
 
@@ -77,19 +115,16 @@ export function sameSeatKinds(a: SeatsConfig, b: SeatsConfig): boolean {
   return a.length === b.length && a.every((seat, i) => seat.kind === b[i]?.kind);
 }
 
-export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
-  easy: "Easy",
-  medium: "Medium",
-  hard: "Hard",
-};
-
-export const DIFFICULTIES: readonly Difficulty[] = ["easy", "medium", "hard"];
-
 /**
  * Display-ready copy for one seat, aware of the other seats so a solo human
  * reads as "You" but a local multi-human game reads as "Player 1"/"Player 2"/…
  * (no seat is privileged over the others on a shared device). Works for any
  * number of seats.
+ *
+ * Bots are described without a strength label: difficulty is no longer a
+ * player-facing concept, so surfacing "Hard bot" here would name a control that
+ * doesn't exist any more (and would read as inconsistent across games, since
+ * `botDifficultyFor` deliberately varies it).
  */
 export function describeSeat(seats: SeatsConfig, seatIndex: number): string {
   const seat = seats[seatIndex];
@@ -97,7 +132,8 @@ export function describeSeat(seats: SeatsConfig, seatIndex: number): string {
     throw new Error(`describeSeat: no seat at index ${seatIndex} (${seats.length} seat(s) total)`);
   }
   if (seat.kind === "bot") {
-    return `${DIFFICULTY_LABEL[seat.difficulty]} bot (Player ${seatIndex + 1})`;
+    const botCount = seats.filter((s) => s.kind === "bot").length;
+    return botCount === 1 ? "Bot" : `Bot (Player ${seatIndex + 1})`;
   }
   const humanCount = seats.filter((s) => s.kind === "human").length;
   return humanCount === 1 ? "You" : `Player ${seatIndex + 1}`;

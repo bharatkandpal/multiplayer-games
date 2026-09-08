@@ -1,133 +1,55 @@
-import { ENGINE_VERSION, connectFour, nim, ticTacToe, ticTacToeMove } from "@mpg/engine";
+import { ENGINE_VERSION } from "@mpg/engine";
 import type { GameId, RealtimeGameId } from "@mpg/engine";
 import { Button } from "../components/ui";
 import { GameThumbnail } from "./gameThumbnails";
+import { buildGameItems } from "./catalog";
 import styles from "./HomeScreen.module.css";
 
-/**
- * The two game families coexist in one catalog (ADR 0002 §2): `turn-based`
- * (seat setup → turns) and `realtime` (solo arcade, no seats). Home shows both
- * in a single grid, tagged by `kind`, and the App router branches on it.
- */
-export type GameKind = "turn-based" | "realtime";
-
-export interface GameCatalogEntry {
-  readonly id: GameId;
-  readonly title: string;
-  readonly description: string;
-  /** Number of seats the game supports (`GameModule.playerCount`) — drives seat setup (MPG-024). */
-  readonly playerCount: number;
-  readonly kind: "turn-based";
-}
-
-export interface RealtimeCatalogEntry {
-  readonly id: RealtimeGameId;
-  readonly title: string;
-  readonly description: string;
-  readonly kind: "realtime";
-}
-
-// Partial, not exhaustive: a game can exist in the engine registry before it's
-// surfaced in the UI (e.g. a new variant whose board/route land in a later task).
-// Home only shows games that have a catalog entry (see filter below).
-export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
-  tictactoe: {
-    id: "tictactoe",
-    title: "Tic-Tac-Toe",
-    description: "Classic 3x3. Quick games, easy to teach a bot to play well.",
-    playerCount: ticTacToe.playerCount,
-    kind: "turn-based",
-  },
-  connect4: {
-    id: "connect4",
-    title: "Connect Four",
-    description: "Drop discs, connect four in a row. 7 columns, 6 rows.",
-    playerCount: connectFour.playerCount,
-    kind: "turn-based",
-  },
-  "tictactoe-move": {
-    id: "tictactoe-move",
-    title: "Move-Mode Tic-Tac-Toe",
-    description:
-      "Only 3 pieces each — place them, then move one to any empty square per turn. Get three in a row to win (no draws by filling up, but repeating the same position three times is a draw).",
-    playerCount: ticTacToeMove.playerCount,
-    kind: "turn-based",
-  },
-  nim: {
-    id: "nim",
-    title: "Nim",
-    description:
-      "Take turns removing objects from piles — whoever takes the last object wins. Simple rules, deep strategy.",
-    playerCount: nim.playerCount,
-    kind: "turn-based",
-  },
-};
-
-// Sibling of GAME_CATALOG for the real-time family (ADR 0002 §3). Also Partial —
-// `RealtimeGameId` includes `lumberjack` (MPG-041), not built yet.
-export const REALTIME_CATALOG: Partial<Record<RealtimeGameId, RealtimeCatalogEntry>> = {
-  "floppy-birds": {
-    id: "floppy-birds",
-    title: "Floppy Birds",
-    description:
-      "Tap to flap and thread the bird through the pipes. One player, one life — chase a high score.",
-    kind: "realtime",
-  },
-  "drunk-walk": {
-    id: "drunk-walk",
-    title: "Drunk Walk",
-    description:
-      "Balance a wobbly walker down an endless path. Tap the side opposite your lean to correct it — the wrong side makes it worse.",
-    kind: "realtime",
-  },
-};
-
-/** A single card in the unified Home grid, discriminated by family. */
-type HomeItem =
-  | { readonly kind: "turn-based"; readonly id: GameId; readonly title: string }
-  | { readonly kind: "realtime"; readonly id: RealtimeGameId; readonly title: string };
+// The catalog itself lives in `./catalog` so the play screens can walk it for
+// prev/next without importing this screen. Re-exported here because App, Invite,
+// Join, Setup, and their tests all import it from this module.
+export type { GameKind, GameCatalogEntry, RealtimeCatalogEntry } from "./catalog";
+export { GAME_CATALOG, REALTIME_CATALOG } from "./catalog";
 
 export interface HomeScreenProps {
   /** Registered turn-based ids (from `listGames()`) — home never hardcodes the catalog. */
   games: GameId[];
   /** Registered real-time ids (from `listRealtimeGames()`). */
   realtimeGames?: RealtimeGameId[];
+  /**
+   * Quick-start: tapping a card starts a game immediately (vs the bot for
+   * turn-based games), rather than routing to seat setup.
+   */
   onSelectGame: (gameId: GameId) => void;
   onSelectRealtimeGame?: (gameId: RealtimeGameId) => void;
+  /** Opens the full seat setup for a turn-based game (play a friend, online, all-bot watch). */
+  onConfigureGame?: (gameId: GameId) => void;
   onShowGallery: () => void;
 }
 
 /**
  * Landing screen: pick a game to play. One clear primary action per card
- * (UX_PRINCIPLES §1.6) — selecting a game moves straight to seat setup.
+ * (UX_PRINCIPLES §1.6) — tapping a card now *starts the game* rather than
+ * opening seat setup, so every game is one tap from playable. Setup is still
+ * reachable per card via a secondary "Options" control for the cases that
+ * genuinely need configuring (play a friend, play online, all-bot watch).
  */
 export function HomeScreen({
   games,
   realtimeGames = [],
   onSelectGame,
   onSelectRealtimeGame,
+  onConfigureGame,
   onShowGallery,
 }: HomeScreenProps): React.JSX.Element {
-  // The unified grid (ADR 0002 §2/§3): both registries, tagged by kind, showing
-  // only ids that have a catalog entry (title/route wiring exists). Turn-based
-  // first so existing card order is unchanged; real-time games follow.
-  const items: HomeItem[] = [
-    ...games.flatMap((id): HomeItem[] => {
-      const entry = GAME_CATALOG[id];
-      return entry ? [{ kind: "turn-based", id, title: entry.title }] : [];
-    }),
-    ...realtimeGames.flatMap((id): HomeItem[] => {
-      const entry = REALTIME_CATALOG[id];
-      return entry ? [{ kind: "realtime", id, title: entry.title }] : [];
-    }),
-  ];
+  const items = buildGameItems(games, realtimeGames);
 
   return (
     <div className={styles.main}>
       <h1 className={styles.heading}>Multiplayer Games</h1>
       <p className={styles.tagline}>
-        Pick a game, choose who&apos;s playing — human or bot, any mix — and start playing right in
-        your browser.
+        Tap a game to start playing straight away — you against the bot. Want a friend instead? Use
+        Options on any game.
       </p>
 
       <h2 className={styles.sectionHeading}>Choose a game</h2>
@@ -139,7 +61,7 @@ export function HomeScreen({
       ) : (
         <ul className={styles.gameGrid} aria-label="Available games">
           {items.map((item) => (
-            <li key={`${item.kind}:${item.id}`}>
+            <li key={`${item.kind}:${item.id}`} className={styles.gameCell}>
               <button
                 type="button"
                 className={styles.gameCard}
@@ -155,6 +77,19 @@ export function HomeScreen({
                   <span className={styles.gameKindTag}>Solo arcade</span>
                 ) : null}
               </button>
+              {/* Real-time games are solo — they have no seats to configure, so
+                  they get no Options control (ADR 0002 §2). */}
+              {item.kind === "turn-based" && onConfigureGame ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={styles.gameOptions}
+                  onClick={() => onConfigureGame(item.id)}
+                  aria-label={`Options for ${item.title} — play a friend, online, or watch bots`}
+                >
+                  Options
+                </Button>
+              ) : null}
             </li>
           ))}
         </ul>

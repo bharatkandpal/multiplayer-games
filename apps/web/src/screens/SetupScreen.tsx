@@ -1,10 +1,8 @@
 import { useId, useState } from "react";
-import type { Difficulty, GameId } from "@mpg/engine";
+import type { GameId } from "@mpg/engine";
 import { Button } from "../components/ui";
 import {
-  DIFFICULTIES,
-  DIFFICULTY_LABEL,
-  DEFAULT_DIFFICULTY,
+  botDifficultyFor,
   createDefaultSeats,
   presetSeats,
   type SeatConfig,
@@ -37,11 +35,19 @@ function updateSeat(seats: SeatsConfig, index: number, seat: SeatConfig): SeatsC
 interface SeatEditorProps {
   index: number;
   seat: SeatConfig;
+  /** The game being configured — decides how strong a bot seat plays. */
+  gameId: GameId;
   onChange: (seat: SeatConfig) => void;
 }
 
-/** One seat's Human/Bot + difficulty controls. Any combination is valid. */
-function SeatEditor({ index, seat, onChange }: SeatEditorProps): React.JSX.Element {
+/**
+ * One seat's Human/Bot toggle. Any combination is valid.
+ *
+ * There is no per-seat difficulty control: bot strength is decided per game by
+ * `botDifficultyFor` and is not player-configurable, so every bot seat in a
+ * given game plays at the same strength.
+ */
+function SeatEditor({ index, seat, gameId, onChange }: SeatEditorProps): React.JSX.Element {
   const groupName = useId();
 
   return (
@@ -68,34 +74,12 @@ function SeatEditor({ index, seat, onChange }: SeatEditorProps): React.JSX.Eleme
               type="radio"
               name={`${groupName}-kind`}
               checked={seat.kind === "bot"}
-              onChange={() => onChange({ kind: "bot", difficulty: DEFAULT_DIFFICULTY })}
+              onChange={() => onChange({ kind: "bot", difficulty: botDifficultyFor(gameId) })}
             />
             Bot
           </label>
         </div>
       </div>
-
-      {seat.kind === "bot" ? (
-        <div className={styles.difficultyField}>
-          <label className={styles.difficultyLabel} htmlFor={`${groupName}-difficulty`}>
-            Difficulty
-          </label>
-          <select
-            id={`${groupName}-difficulty`}
-            className={styles.difficultySelect}
-            value={seat.difficulty}
-            onChange={(event) =>
-              onChange({ kind: "bot", difficulty: event.target.value as Difficulty })
-            }
-          >
-            {DIFFICULTIES.map((difficulty) => (
-              <option key={difficulty} value={difficulty}>
-                {DIFFICULTY_LABEL[difficulty]}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
     </fieldset>
   );
 }
@@ -104,10 +88,13 @@ function SeatEditor({ index, seat, onChange }: SeatEditorProps): React.JSX.Eleme
  * Seat-configuration screen (MPG-009/MPG-024/MPG-049). Leads with two
  * one-tap presets ("Play vs Bot" / "Play a friend") that start the game
  * immediately for the common cases, so most players never touch a control
- * beyond picking one of the two. The full per-seat editor (Human/Bot +
- * difficulty, any seat count) is still reachable behind a "Customize"
- * disclosure for mixed bot levels, local human-vs-human with 3+ seats, or
- * all-bot "watch" games.
+ * beyond picking one of the two. The full per-seat editor (Human/Bot, any seat
+ * count) is still reachable behind a "Customize" disclosure for local
+ * human-vs-human with 3+ seats, or all-bot "watch" games.
+ *
+ * Since Home now quick-starts a game directly, most players never reach this
+ * screen at all — it's the "Options" path for playing a friend, playing online,
+ * or watching bots.
  */
 export function SetupScreen({
   gameId,
@@ -117,12 +104,10 @@ export function SetupScreen({
 }: SetupScreenProps): React.JSX.Element {
   const catalogEntry = GAME_CATALOG[gameId];
   const playerCount = catalogEntry?.playerCount ?? 2;
-  const [seats, setSeats] = useState<SeatsConfig>(() => createDefaultSeats(playerCount));
-  const [botDifficulty, setBotDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
+  const [seats, setSeats] = useState<SeatsConfig>(() => createDefaultSeats(playerCount, gameId));
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const title = catalogEntry?.title ?? gameId;
   const customizeId = useId();
-  const botDifficultyGroupId = useId();
 
   return (
     <div className={styles.main}>
@@ -137,38 +122,19 @@ export function SetupScreen({
       ) : null}
 
       <div className={styles.quickStart}>
-        <div className={styles.botOption}>
-          <Button
-            variant="primary"
-            className={styles.quickOption}
-            onClick={() => onStart(presetSeats("bot", playerCount, botDifficulty))}
-          >
-            <span className={styles.quickContent}>
-              <span className={styles.quickIcon} aria-hidden="true">
-                🤖
-              </span>
-              <span className={styles.quickLabel}>Play vs Bot</span>
-              <span className={styles.quickHint}>
-                You vs a {DIFFICULTY_LABEL[botDifficulty].toLowerCase()} bot — starts right away
-              </span>
+        <Button
+          variant="primary"
+          className={styles.quickOption}
+          onClick={() => onStart(presetSeats("bot", playerCount, gameId))}
+        >
+          <span className={styles.quickContent}>
+            <span className={styles.quickIcon} aria-hidden="true">
+              🤖
             </span>
-          </Button>
-
-          <div className={styles.difficultyToggle} role="radiogroup" aria-label="Bot difficulty">
-            {DIFFICULTIES.map((difficulty) => (
-              <label key={difficulty} className={styles.difficultyChip} data-level={difficulty}>
-                <input
-                  className={styles.difficultyChipInput}
-                  type="radio"
-                  name={`${botDifficultyGroupId}-bot-difficulty`}
-                  checked={botDifficulty === difficulty}
-                  onChange={() => setBotDifficulty(difficulty)}
-                />
-                {DIFFICULTY_LABEL[difficulty]}
-              </label>
-            ))}
-          </div>
-        </div>
+            <span className={styles.quickLabel}>Play vs Bot</span>
+            <span className={styles.quickHint}>You vs the bot — starts right away</span>
+          </span>
+        </Button>
         <Button
           variant="primary"
           className={styles.quickOption}
@@ -233,6 +199,7 @@ export function SetupScreen({
                 key={index}
                 index={index}
                 seat={seat}
+                gameId={gameId}
                 onChange={(nextSeat) => setSeats((prev) => updateSeat(prev, index, nextSeat))}
               />
             ))}

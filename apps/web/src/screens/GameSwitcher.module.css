@@ -1,0 +1,40 @@
+/* Sits above the play screen as a sibling, so it has to reproduce the same
+   container width the screens set for themselves — otherwise the two arrows
+   drift out to the viewport edges on a wide window. */
+.switcher {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: var(--container-md);
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-4) 0;
+}
+
+/* The title is the anchor: prev/next flank it and keep equal width so the
+   title stays optically centred as game names change length. */
+.current {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  /* Long titles ("Move-Mode Tic-Tac-Toe") truncate rather than wrap the row
+     onto two lines and shift the board below it. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.side {
+  flex: 0 0 auto;
+  /* Reserve both slots even when only one is rendered, so the title doesn't
+     jump horizontally between games. */
+  min-width: var(--size-touch-target);
+}
+
+.sideEnd {
+  display: flex;
+  justify-content: flex-end;
+}

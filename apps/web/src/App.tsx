@@ -33,13 +33,15 @@ import {
   type WatchGameRouteProps,
 } from "./screens";
 import { GAME_CATALOG } from "./screens/HomeScreen";
+import { buildGameItems, nextGame, type GameItem } from "./screens/catalog";
+import { GameSwitcher } from "./screens/GameSwitcher";
 import { isAllBotRoom, publicRoomToSeats, toSeatConfigInput } from "./api/roomSeats";
 import { getStoredUsername } from "./api/username";
 import { initSession } from "./api/session";
 import { getStoredCreatorToken } from "./api/watchSession";
 import { useRoom } from "./hooks/useRoom";
 import { useUsernameGate } from "./hooks/useUsernameGate";
-import type { SeatsConfig } from "./game";
+import { presetSeats, type SeatsConfig } from "./game";
 import styles from "./App.module.css";
 
 // Registering is idempotent-safe to call once at module scope: React's dev-mode
@@ -126,6 +128,7 @@ function GameRoute({
   seats,
   onExit,
   onPlayAgain,
+  onNextGame,
   onViewLeaderboard,
 }: { gameId: GameId } & GameRouteProps): React.JSX.Element {
   const Route = GAME_ROUTES[gameId] ?? ConnectFourRoute;
@@ -134,6 +137,7 @@ function GameRoute({
       seats={seats}
       onExit={onExit}
       {...(onPlayAgain ? { onPlayAgain } : {})}
+      {...(onNextGame ? { onNextGame } : {})}
       {...(onViewLeaderboard ? { onViewLeaderboard } : {})}
     />
   );
@@ -217,6 +221,33 @@ export default function App(): React.JSX.Element {
   const goHome = useCallback((): void => {
     setRoute({ screen: "home" });
     if (typeof window !== "undefined") window.history.pushState({}, "", "/");
+  }, []);
+
+  // The one ordered catalog behind both the Home grid and the prev/next game
+  // switcher on the play screens.
+  const gameItems = useMemo(() => buildGameItems(games, realtimeGames), [games, realtimeGames]);
+
+  /**
+   * Quick-start: go straight into a playable game, skipping seat setup. A
+   * turn-based game starts you against the bot at its tuned strength; a
+   * real-time game is solo and has nothing to configure either way.
+   *
+   * `playNonce` is bumped so switching between two turn-based games remounts
+   * the play screen — `useLocalPlayController` only initializes its session on
+   * mount, so without it a switch would keep the previous game's session.
+   */
+  const quickStart = useCallback((item: GameItem): void => {
+    if (item.kind === "realtime") {
+      setRoute({ screen: "realtime", gameId: item.id });
+      return;
+    }
+    const playerCount = GAME_CATALOG[item.id]?.playerCount ?? 2;
+    setPlayNonce((nonce) => nonce + 1);
+    setRoute({
+      screen: "play",
+      gameId: item.id,
+      seats: presetSeats("bot", playerCount, item.id),
+    });
   }, []);
 
   // MPG-077: online play (create or join a room) needs a username; local-only
@@ -306,8 +337,9 @@ export default function App(): React.JSX.Element {
         <HomeScreen
           games={games}
           realtimeGames={realtimeGames}
-          onSelectGame={(gameId) => setRoute({ screen: "setup", gameId })}
+          onSelectGame={(gameId) => quickStart({ kind: "turn-based", id: gameId, title: gameId })}
           onSelectRealtimeGame={(gameId) => setRoute({ screen: "realtime", gameId })}
+          onConfigureGame={(gameId) => setRoute({ screen: "setup", gameId })}
           onShowGallery={() => setRoute({ screen: "gallery" })}
         />
       ) : null}
@@ -407,20 +439,27 @@ export default function App(): React.JSX.Element {
       ) : null}
 
       {route.screen === "play" ? (
-        <GameRoute
-          key={playNonce}
-          gameId={route.gameId}
-          seats={route.seats}
-          onExit={() => {
-            void leaveRoom();
-            goHome();
-          }}
-          onPlayAgain={(seats) => {
-            setPlayNonce((n) => n + 1);
-            setRoute({ screen: "play", gameId: route.gameId, seats });
-          }}
-          onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
-        />
+        <>
+          <GameSwitcher items={gameItems} currentId={route.gameId} onSwitch={quickStart} />
+          <GameRoute
+            key={playNonce}
+            gameId={route.gameId}
+            seats={route.seats}
+            onExit={() => {
+              void leaveRoom();
+              goHome();
+            }}
+            onPlayAgain={(seats) => {
+              setPlayNonce((n) => n + 1);
+              setRoute({ screen: "play", gameId: route.gameId, seats });
+            }}
+            onNextGame={() => {
+              const next = nextGame(gameItems, route.gameId);
+              if (next) quickStart(next);
+            }}
+            onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
+          />
+        </>
       ) : null}
 
       {route.screen === "leaderboard" ? (
@@ -433,7 +472,14 @@ export default function App(): React.JSX.Element {
       ) : null}
 
       {route.screen === "realtime" ? (
-        <RealtimeGameRoute gameId={route.gameId} onExit={() => setRoute({ screen: "home" })} />
+        <>
+          <GameSwitcher items={gameItems} currentId={route.gameId} onSwitch={quickStart} />
+          <RealtimeGameRoute
+            key={route.gameId}
+            gameId={route.gameId}
+            onExit={() => setRoute({ screen: "home" })}
+          />
+        </>
       ) : null}
 
       {route.screen === "gallery" ? (

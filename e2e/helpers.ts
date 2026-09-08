@@ -15,10 +15,16 @@ export interface CellPos {
   col: number;
 }
 
-/** Navigates Home → Setup for a given game title (e.g. "Tic-Tac-Toe"). */
+/**
+ * Navigates Home → Setup for a given game title (e.g. "Tic-Tac-Toe").
+ *
+ * Goes via the card's "Options" control, not the card itself: tapping a card
+ * now quick-starts a game against the bot, so Options is the only route to the
+ * seat-configuration screen the online/PvP flows below depend on.
+ */
 export async function goToSetup(page: Page, gameTitle: string): Promise<void> {
   await page.goto("/");
-  await page.getByRole("button", { name: gameTitle, exact: true }).click();
+  await page.getByRole("button", { name: `Options for ${gameTitle}`, exact: false }).click();
   await expect(page.getByRole("heading", { name: `Set up ${gameTitle}` })).toBeVisible();
 }
 

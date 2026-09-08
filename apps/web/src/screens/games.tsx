@@ -22,6 +22,8 @@ export interface GameRouteProps {
   seats: SeatsConfig;
   onExit: () => void;
   onPlayAgain?: (seats: SeatsConfig) => void;
+  /** Quick-starts the next game in the catalog from the game-over surface. */
+  onNextGame?: () => void;
   /** MPG-055: shows a post-game rank preview on the result screen when provided. */
   onViewLeaderboard?: () => void;
 }
@@ -64,6 +66,7 @@ export function TicTacToeRoute({
   seats,
   onExit,
   onPlayAgain,
+  onNextGame,
   onViewLeaderboard,
 }: GameRouteProps): React.JSX.Element {
   return (
@@ -74,6 +77,7 @@ export function TicTacToeRoute({
       describeMove={describeTicTacToeMove}
       onExit={onExit}
       {...(onPlayAgain ? { onPlayAgain } : {})}
+      {...(onNextGame ? { onNextGame } : {})}
       {...(onViewLeaderboard ? { onViewLeaderboard } : {})}
       renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <TicTacToeBoard
@@ -173,6 +177,7 @@ export function TicTacToeMoveRoute({
   seats,
   onExit,
   onPlayAgain,
+  onNextGame,
   onViewLeaderboard,
 }: GameRouteProps): React.JSX.Element {
   return (
@@ -183,6 +188,7 @@ export function TicTacToeMoveRoute({
       describeMove={describeTicTacToeMoveMove}
       onExit={onExit}
       {...(onPlayAgain ? { onPlayAgain } : {})}
+      {...(onNextGame ? { onNextGame } : {})}
       {...(onViewLeaderboard ? { onViewLeaderboard } : {})}
       renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <TicTacToeMoveBoard
@@ -273,7 +279,12 @@ function describeNimMove(move: NimMove, player: Player): string {
   return `Player ${player} took ${taken} from pile ${move.pile + 1}`;
 }
 
-export function NimRoute({ seats, onExit, onPlayAgain }: GameRouteProps): React.JSX.Element {
+export function NimRoute({
+  seats,
+  onExit,
+  onPlayAgain,
+  onNextGame,
+}: GameRouteProps): React.JSX.Element {
   return (
     <GamePlayScreen
       game={nim}
@@ -282,6 +293,7 @@ export function NimRoute({ seats, onExit, onPlayAgain }: GameRouteProps): React.
       describeMove={describeNimMove}
       onExit={onExit}
       {...(onPlayAgain ? { onPlayAgain } : {})}
+      {...(onNextGame ? { onNextGame } : {})}
       renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <NimBoard
           state={state}
@@ -300,6 +312,7 @@ export function ConnectFourRoute({
   seats,
   onExit,
   onPlayAgain,
+  onNextGame,
   onViewLeaderboard,
 }: GameRouteProps): React.JSX.Element {
   return (
@@ -310,6 +323,7 @@ export function ConnectFourRoute({
       describeMove={describeConnectFourMove}
       onExit={onExit}
       {...(onPlayAgain ? { onPlayAgain } : {})}
+      {...(onNextGame ? { onNextGame } : {})}
       {...(onViewLeaderboard ? { onViewLeaderboard } : {})}
       renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <ConnectFourBoard

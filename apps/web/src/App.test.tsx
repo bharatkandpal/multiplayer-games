@@ -42,14 +42,22 @@ describe("App", () => {
     vi.restoreAllMocks();
   });
 
-  it("a turn-based game still routes through Setup (unchanged)", () => {
+  it("a turn-based game quick-starts straight into play, skipping Setup", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Tic-Tac-Toe/ }));
 
-    // Setup's quick-start presets are present — we did NOT skip Setup.
+    // Setup was skipped: no seat presets, and we're on a live board already.
+    expect(screen.queryByRole("button", { name: /Play vs Bot/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("grid", { name: /Tic-Tac-Toe board/i })).toBeInTheDocument();
+  });
+
+  it("Options on a card opens Setup instead of quick-starting", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Options for Tic-Tac-Toe/ }));
+
     expect(screen.getByRole("button", { name: /Play vs Bot/ })).toBeInTheDocument();
-    expect(screen.queryByRole("application")).not.toBeInTheDocument();
   });
 
   describe("MPG-050: opponent-switch on game-over (full Home -> Setup -> Play flow)", () => {
@@ -64,10 +72,9 @@ describe("App", () => {
     it("'Play a friend' from a finished vs-bot game starts a genuinely fresh human-vs-human game (remounts, no bot auto-move)", async () => {
       render(<App />);
 
-      // Home -> pick Tic-Tac-Toe -> Setup -> "Play vs Bot" quick-start (seat 1
-      // human, seat 2 a medium bot).
+      // Home -> tap Tic-Tac-Toe, which now quick-starts straight into a
+      // vs-bot game (seat 1 human, seat 2 a bot) with no Setup detour.
       fireEvent.click(screen.getByRole("button", { name: /^Tic-Tac-Toe/ }));
-      fireEvent.click(screen.getByRole("button", { name: /Play vs Bot/ }));
 
       expect(screen.getByText("Your turn")).toBeInTheDocument();
 
