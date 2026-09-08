@@ -3,10 +3,11 @@
 // purpose — all the actual orchestration lives in the shared, engine-agnostic
 // pieces (GamePlayScreen, useLocalPlayController).
 
-import { connectFour, nim, ticTacToe, ticTacToeMove } from "@mpg/engine";
-import type { NimMove, Player, TicTacToeMoveMove } from "@mpg/engine";
+import { connectFour, gomoku, nim, ticTacToe, ticTacToeMove } from "@mpg/engine";
+import type { GomokuMove, NimMove, Player, TicTacToeMoveMove } from "@mpg/engine";
 import {
   ConnectFourBoard,
+  GomokuBoard,
   NimBoard,
   TicTacToeBoard,
   TicTacToeMoveBoard,
@@ -296,6 +297,40 @@ export function NimRoute({
       {...(onNextGame ? { onNextGame } : {})}
       renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <NimBoard
+          state={state}
+          onMove={onMove}
+          disabled={disabled}
+          lastMove={lastMove}
+          winningLine={winningLine}
+          winningLineTone={winningLineTone ?? "win"}
+        />
+      )}
+    />
+  );
+}
+
+function describeGomokuMove(move: GomokuMove, player: Player): string {
+  const stone = player === 1 ? "Black" : "White";
+  return `${stone} played row ${move.row + 1}, column ${move.col + 1}`;
+}
+
+export function GomokuRoute({
+  seats,
+  onExit,
+  onPlayAgain,
+  onNextGame,
+}: GameRouteProps): React.JSX.Element {
+  return (
+    <GamePlayScreen
+      game={gomoku}
+      gameTitle={GAME_CATALOG.gomoku?.title ?? "Gomoku"}
+      seats={seats}
+      describeMove={describeGomokuMove}
+      onExit={onExit}
+      {...(onPlayAgain ? { onPlayAgain } : {})}
+      {...(onNextGame ? { onNextGame } : {})}
+      renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
+        <GomokuBoard
           state={state}
           onMove={onMove}
           disabled={disabled}

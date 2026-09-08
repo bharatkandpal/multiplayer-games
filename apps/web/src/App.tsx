@@ -20,6 +20,7 @@ import {
   JoinScreen,
   LeaderboardScreen,
   NimRoute,
+  GomokuRoute,
   RealtimeGameRoute,
   SetupScreen,
   TicTacToeMoveOnlineRoute,
@@ -121,6 +122,7 @@ const GAME_ROUTES: Partial<Record<GameId, (props: GameRouteProps) => React.JSX.E
   "tictactoe-move": TicTacToeMoveRoute,
   connect4: ConnectFourRoute,
   nim: NimRoute,
+  gomoku: GomokuRoute,
 };
 
 function GameRoute({

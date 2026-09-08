@@ -9,3 +9,6 @@ export type { TicTacToeMoveBoardProps } from "./TicTacToeMoveBoard";
 
 export { NimBoard } from "./NimBoard";
 export type { NimBoardProps } from "./NimBoard";
+
+export { GomokuBoard } from "./GomokuBoard";
+export type { GomokuBoardProps } from "./GomokuBoard";
