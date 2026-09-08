@@ -159,13 +159,14 @@ describe("cosmetic storage", () => {
     expect(loadCosmetics(schema)).toEqual({ hat: "cap", shirt: "blue" });
   });
 
-  it.each([["corrupt JSON", "{not json"], ["a non-object", "42"], ["an array", "[1,2]"]])(
-    "falls back to defaults on %s rather than throwing",
-    (_label, raw) => {
-      window.localStorage.setItem("mpg:cosmetics:test-game", raw);
-      expect(loadCosmetics(schema)).toEqual({ hat: "none", shirt: "blue" });
-    },
-  );
+  it.each([
+    ["corrupt JSON", "{not json"],
+    ["a non-object", "42"],
+    ["an array", "[1,2]"],
+  ])("falls back to defaults on %s rather than throwing", (_label, raw) => {
+    window.localStorage.setItem("mpg:cosmetics:test-game", raw);
+    expect(loadCosmetics(schema)).toEqual({ hat: "none", shirt: "blue" });
+  });
 
   it("survives storage being unavailable entirely", () => {
     const getItem = window.localStorage.getItem;

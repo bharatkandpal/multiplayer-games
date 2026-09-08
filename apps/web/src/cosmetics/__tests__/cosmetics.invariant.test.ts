@@ -100,7 +100,9 @@ describe("cosmetics are renderer-only — engine state-shape guard", () => {
     ]);
 
     const states: Record<string, unknown>[] = [
-      ...builtInGames.map((game) => game.createInitialState() as unknown as Record<string, unknown>),
+      ...builtInGames.map(
+        (game) => game.createInitialState() as unknown as Record<string, unknown>,
+      ),
       ...builtInRealtimeGames.map(
         (game) => game.createInitialState(1) as unknown as Record<string, unknown>,
       ),

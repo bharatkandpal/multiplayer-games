@@ -3,7 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useShareLink } from "../useShareLink";
 
-const PAYLOAD = { url: "https://example.test/drunk-walk", title: "Drunk Walk", text: "I scored 17" };
+const PAYLOAD = {
+  url: "https://example.test/drunk-walk",
+  title: "Drunk Walk",
+  text: "I scored 17",
+};
 
 /** Installs (or removes) a `navigator.share` for one test. */
 function stubNativeShare(impl?: (data: ShareData) => Promise<void>): void {

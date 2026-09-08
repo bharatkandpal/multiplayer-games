@@ -142,12 +142,7 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
   shareUrl,
 }: RealtimePlayScreenProps<S, I, A>): React.JSX.Element {
   const reducedMotion = usePrefersReducedMotion();
-  const {
-    share,
-    status: shareStatus,
-    canShare,
-    reset: resetShare,
-  } = useShareLink();
+  const { share, status: shareStatus, canShare, reset: resetShare } = useShareLink();
 
   // Rising-edge input: actions pressed (via key or tap) since the last tick,
   // consumed and cleared once per fixed tick by the controller.
