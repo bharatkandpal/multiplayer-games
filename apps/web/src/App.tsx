@@ -35,6 +35,7 @@ import {
 import { GAME_CATALOG } from "./screens/HomeScreen";
 import { isAllBotRoom, publicRoomToSeats, toSeatConfigInput } from "./api/roomSeats";
 import { getStoredUsername } from "./api/username";
+import { initSession } from "./api/session";
 import { getStoredCreatorToken } from "./api/watchSession";
 import { useRoom } from "./hooks/useRoom";
 import { useUsernameGate } from "./hooks/useUsernameGate";
@@ -249,6 +250,18 @@ export default function App(): React.JSX.Element {
     },
     [createRoom, usernameGate],
   );
+
+  // Session bootstrap (MPG-054, wired in MPG-080). Mints the opaque session
+  // token once per browser so username sync, leaderboard writes and the socket
+  // handshake all carry the same identity. Deliberately fire-and-forget: a
+  // missing session is a degraded-but-valid state (local play vs bots still
+  // works), so a server that is down or absent must never block first paint or
+  // surface an error here.
+  useEffect(() => {
+    void initSession().catch(() => {
+      // Intentionally swallowed — see above.
+    });
+  }, []);
 
   // Direct invite-link opens (`/:gameId/room/:roomId`) land straight on
   // "join" from `initialRoute()`, but the browser back/forward buttons can

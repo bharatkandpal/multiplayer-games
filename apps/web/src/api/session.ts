@@ -6,8 +6,9 @@
  * `x-session-token` header so the server can recognize returning visitors
  * without any auth.
  *
- * NOT yet wired into the app shell — that lands with MPG-011+ once the
- * server is actually running. This module is safe to import standalone.
+ * Bootstrapped once at app start from `App.tsx` (MPG-080). Best-effort: if the
+ * server is unreachable the app stays fully playable without a session token,
+ * it just has no durable identity.
  */
 
 export const SESSION_HEADER = "x-session-token";
@@ -51,24 +52,41 @@ export function getSessionToken(): string | null {
 }
 
 /**
+ * De-duplicates concurrent `initSession()` calls. Without this, React
+ * StrictMode's double-invoked mount effect (and any other parallel caller)
+ * would each see an empty cache and mint a *separate* server-side session,
+ * orphaning the first. Cleared once settled so a later call can retry after a
+ * failure.
+ */
+let inFlightInit: Promise<string> | undefined;
+
+/**
  * Ensures a session token exists, fetching one from the server if the
- * local cache is empty. Call once at app boot.
+ * local cache is empty. Call once at app boot; safe to call repeatedly.
  */
 export async function initSession(): Promise<string> {
   const cached = readStoredToken();
   if (cached) return cached;
 
-  const res = await fetch(`${getApiBaseUrl()}/api/session`, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to initialize session: ${res.status}`);
-  }
+  inFlightInit ??= (async () => {
+    const res = await fetch(`${getApiBaseUrl()}/api/session`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to initialize session: ${res.status}`);
+    }
 
-  const body = (await res.json()) as { token: string };
-  writeStoredToken(body.token);
-  return body.token;
+    const body = (await res.json()) as { token: string };
+    writeStoredToken(body.token);
+    return body.token;
+  })();
+
+  try {
+    return await inFlightInit;
+  } finally {
+    inFlightInit = undefined;
+  }
 }
 
 /** "Forget me": asks the server to erase all data for this session, then clears local state. */

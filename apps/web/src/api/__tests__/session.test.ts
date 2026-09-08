@@ -67,6 +67,35 @@ describe("session client", () => {
 
       await expect(initSession()).rejects.toThrow();
     });
+
+    // MPG-080: App.tsx bootstraps this on mount, and React StrictMode
+    // double-invokes mount effects in dev — without de-duplication each call
+    // would see an empty cache and mint a separate server-side session.
+    it("de-duplicates concurrent calls into a single request", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ token: "shared-token" }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const [a, b, c] = await Promise.all([initSession(), initSession(), initSession()]);
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect([a, b, c]).toEqual(["shared-token", "shared-token", "shared-token"]);
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBe("shared-token");
+    });
+
+    it("can retry after a failure (the in-flight guard is released)", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: false, status: 503 })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ token: "second-try" }) });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(initSession()).rejects.toThrow();
+      await expect(initSession()).resolves.toBe("second-try");
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("clearSession", () => {

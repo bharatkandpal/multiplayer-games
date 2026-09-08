@@ -12,8 +12,8 @@ For product/architecture context see [PRD.md](PRD.md), [TDD.md](TDD.md), and
 # 1. Install deps
 pnpm install
 
-# 2. Start the web dev server (play local games right away)
-pnpm --filter @mpg/web dev          # → http://localhost:5173
+# 2. Start BOTH servers (web :5173 + API/realtime :3001)
+pnpm dev
 
 # 3. (Optional) Start a local Postgres for durable persistence
 docker compose up -d                # Postgres 17 on localhost:5432
@@ -23,6 +23,20 @@ pnpm --filter @mpg/server db:migrate   # apply migrations
 
 # Without Docker, the server falls back to in-memory storage automatically.
 ```
+
+> **Run both servers.** `pnpm --filter @mpg/web dev` alone gives you local play
+> (vs bot, watch) but **no** sessions, rooms, link-share, or leaderboards — those
+> are REST/Socket.IO calls to `@mpg/server` on **:3001**. `pnpm dev` starts both.
+>
+> **How the client reaches the API (MPG-080).** REST calls go through `apiFetch`,
+> whose base URL is `VITE_API_URL` and defaults to `""` (same-origin). In dev that
+> would resolve to the Vite server on :5173, where `/api/*` doesn't exist — so
+> `apps/web/vite.config.ts` **proxies `/api` → `http://localhost:3001`**. Nothing to
+> configure. Override the target with `API_PROXY_TARGET` if your server runs
+> elsewhere; set `VITE_API_URL` to bypass the proxy entirely (required for
+> `vite preview`/production builds, which do **not** use the dev proxy).
+> Socket.IO is separate — it connects straight to `VITE_SERVER_URL`
+> (default `http://localhost:3001`), so it never relies on the proxy.
 
 ---
 
@@ -71,8 +85,10 @@ Run from the repo root. `pnpm -r` fans a script out across all workspaces.
 | `pnpm --filter @mpg/server db:migrate`  | Apply pending migrations to your local Postgres                         |
 | `pnpm --filter @mpg/server db:studio`   | Open Drizzle Studio (visual DB browser)                                 |
 
-**What runs today:** `pnpm --filter @mpg/web dev` shows the full game catalog with local
-play (vs bot, vs friend, watch). The server has the persistence layer but no HTTP/WS yet.
+**What runs today:** `pnpm dev` gives you the full game catalog with local play (vs bot,
+watch) **plus** the server on :3001 — sessions, room create/join over a shared link,
+server-authoritative moves, rematch, and leaderboards. Running only the web dev server
+still works, but limits you to local play.
 
 ## 4. Toolchain notes
 
