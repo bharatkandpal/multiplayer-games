@@ -4,9 +4,10 @@
 import { registerRealtimeGame } from "./realtime-registry";
 import { floppyBirds } from "./floppy-birds";
 import { drunkWalk } from "./drunk-walk";
+import { reflexTest } from "./reflex-test";
 
 /** All real-time modules shipped with the platform. */
-export const builtInRealtimeGames = [floppyBirds, drunkWalk];
+export const builtInRealtimeGames = [floppyBirds, drunkWalk, reflexTest];
 
 /** Register every built-in real-time game. Call once at platform startup. */
 export function registerBuiltInRealtimeGames(): void {

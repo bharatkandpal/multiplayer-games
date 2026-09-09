@@ -1,0 +1,159 @@
+.scene {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-3);
+  box-sizing: border-box;
+}
+
+/*
+ * The signal panel. Takes the lion's share of the surface so it's an unmissable
+ * peripheral-vision cue — the flip is the whole game, and a small swatch would
+ * make the test measure "finding the panel" rather than reaction time.
+ */
+.panel {
+  flex: 1 1 auto;
+  min-height: 8rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--color-border-strong);
+  text-align: center;
+  padding: var(--space-4);
+  /*
+   * Deliberately NOT transitioned. A fade between red and green would add its own
+   * latency to the exact event being measured, inflating every reported time.
+   */
+  transition: none;
+}
+
+.panelIdle {
+  background: var(--color-bg-inset);
+  color: var(--color-text-muted);
+}
+
+.panelWait {
+  background: var(--color-danger);
+  color: var(--color-text-inverse);
+  border-color: var(--color-danger-text);
+}
+
+.panelGo {
+  background: var(--color-success);
+  color: var(--color-text-inverse);
+  border-color: var(--color-success-text);
+}
+
+.panelFalseStart {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  border-color: var(--color-warning-text);
+}
+
+.panelGlyph {
+  font-size: var(--font-size-700);
+  line-height: 1;
+}
+
+/* The word carrying the state — colour is never the only signal (UX DoD). */
+.panelLabel {
+  font-size: var(--font-size-600);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.02em;
+}
+
+.panelSub {
+  font-size: var(--font-size-300);
+  font-weight: var(--font-weight-medium);
+  /* Reserve the line so the panel doesn't resize the instant a time appears. */
+  min-height: 1.5em;
+}
+
+.roundLine {
+  margin: 0;
+  text-align: center;
+  font-size: var(--font-size-200);
+  color: var(--color-text-muted);
+}
+
+.times {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeChip {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  font-size: var(--font-size-200);
+  font-variant-numeric: tabular-nums;
+}
+
+.timeChipPending {
+  color: var(--color-text-muted);
+  background: transparent;
+  border-style: dashed;
+}
+
+.timeIndex {
+  font-size: var(--font-size-100);
+  color: var(--color-text-muted);
+}
+
+.timeValue {
+  font-weight: var(--font-weight-medium);
+}
+
+.summary {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-6);
+  margin: 0;
+}
+
+.summaryItem {
+  text-align: center;
+}
+
+.summaryLabel {
+  font-size: var(--font-size-100);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.summaryValue {
+  margin: 0;
+  font-size: var(--font-size-500);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Narrow phones: keep the panel dominant by shrinking the surrounding readouts. */
+@media (max-width: 30rem) {
+  .panelGlyph {
+    font-size: var(--font-size-600);
+  }
+
+  .panelLabel {
+    font-size: var(--font-size-500);
+  }
+
+  .summary {
+    gap: var(--space-4);
+  }
+}

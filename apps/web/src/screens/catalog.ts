@@ -94,6 +94,13 @@ export const REALTIME_CATALOG: Partial<Record<RealtimeGameId, RealtimeCatalogEnt
       "Balance a wobbly walker down an endless path. Tap the side opposite your lean to correct it — the wrong side makes it worse.",
     kind: "realtime",
   },
+  "reflex-test": {
+    id: "reflex-test",
+    title: "Reflex Test",
+    description:
+      "Wait for red to turn green, then tap as fast as you can. Five rounds — see your best and average reaction time. Tap too early and the run is over.",
+    kind: "realtime",
+  },
 };
 
 /** A single entry in the ordered game list, discriminated by family. */

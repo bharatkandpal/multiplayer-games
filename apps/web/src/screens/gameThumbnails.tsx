@@ -197,6 +197,17 @@ function GenericThumbnail(): React.JSX.Element {
   );
 }
 
+function ReflexTestThumbnail(): React.JSX.Element {
+  return (
+    <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      {/* A two-lamp signal: red held, green lit — the flip the game is built on. */}
+      <rect x="30" y="10" width="40" height="80" rx="14" className={styles.reflexHousing} />
+      <circle cx="50" cy="34" r="12" className={styles.reflexLampRed} />
+      <circle cx="50" cy="66" r="12" className={styles.reflexLampGreen} />
+    </svg>
+  );
+}
+
 // Partial, mirroring GAME_CATALOG's pattern (see HomeScreen.tsx): a game can
 // exist without a bespoke thumbnail yet. GenericThumbnail below covers that.
 export const GAME_THUMBNAILS: Partial<Record<GameId, () => React.JSX.Element>> = {
@@ -210,6 +221,7 @@ export const GAME_THUMBNAILS: Partial<Record<GameId, () => React.JSX.Element>> =
 export const REALTIME_THUMBNAILS: Partial<Record<RealtimeGameId, () => React.JSX.Element>> = {
   "floppy-birds": FloppyBirdsThumbnail,
   "drunk-walk": DrunkWalkThumbnail,
+  "reflex-test": ReflexTestThumbnail,
 };
 
 /** Accepts either family's id (both are plain string unions); falls back to the generic mark. */

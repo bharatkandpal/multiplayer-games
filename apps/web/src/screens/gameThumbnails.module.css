@@ -72,3 +72,20 @@
 .drunkFigure {
   fill: var(--color-warning);
 }
+
+/* Reflex Test — a two-lamp signal, red above green, using the same danger/success
+   tokens the live panel reads so the preview matches the game in both themes.
+   The lit green lamp mirrors the moment the player is waiting for. */
+.reflexHousing {
+  fill: var(--color-bg-inset);
+  stroke: var(--color-border-strong);
+  stroke-width: 3;
+}
+
+.reflexLampRed {
+  fill: var(--color-danger);
+}
+
+.reflexLampGreen {
+  fill: var(--color-success);
+}

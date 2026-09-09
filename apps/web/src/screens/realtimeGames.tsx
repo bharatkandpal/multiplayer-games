@@ -8,12 +8,15 @@ import { useState, type ReactNode } from "react";
 import {
   drunkWalk,
   floppyBirds,
+  reflexTest,
   type DrunkWalkInput,
   type DrunkWalkState,
   type FloppyInput,
   type FloppyState,
   type RealtimeGameId,
   type RealtimeModule,
+  type ReflexInput,
+  type ReflexState,
 } from "@mpg/engine";
 import { DrunkWalkScene } from "../components/realtime/DrunkWalkScene";
 import { DrunkWalkCustomizeMenu } from "../components/realtime/DrunkWalkCustomizeMenu";
@@ -24,6 +27,7 @@ import {
   type DrunkWalkCharacter,
 } from "../components/realtime/drunkWalkCharacter";
 import { FloppyBirdsScene } from "../components/realtime/FloppyBirdsScene";
+import { ReflexTestScene } from "../components/realtime/ReflexTestScene";
 import { Button, GearIcon } from "../components/ui";
 import {
   RealtimePlayScreen,
@@ -88,6 +92,19 @@ const drunkWalkControls: RealtimeControls<DrunkWalkInput, "left" | "right"> = {
   resolveTapAction: (fractionX) => (fractionX < 0.5 ? "left" : "right"),
 };
 
+// Any tap is the same "I saw it" signal, so every key maps to one action and the
+// whole surface is the target — no `resolveTapAction`, no on-screen buttons. The
+// explainer spells out the false-start rule up front: a player who only discovers
+// it by losing a run has been punished by a rule nobody told them.
+const reflexControls: RealtimeControls<ReflexInput, "tap"> = {
+  primaryAction: "tap",
+  keyMap: { Space: "tap", Enter: "tap", ArrowUp: "tap", ArrowDown: "tap" },
+  toInput: (pressed) => ({ tap: pressed.has("tap") }),
+  actionHint: "Tap (or press Space) the moment the panel turns green",
+  readyExplainer:
+    "The panel holds red for a random moment, then turns green — tap as fast as you can. Five rounds. Tap while it's still red and the run ends immediately.",
+};
+
 /**
  * The real-time catalog. `Partial` like the turn-based `GAME_CATALOG`:
  * `RealtimeGameId` already includes `"lumberjack"` (MPG-041), which isn't built
@@ -103,6 +120,11 @@ export const REALTIME_GAMES: Partial<Record<RealtimeGameId, RealtimeGameWiring>>
     drunkWalk,
     (props) => <DrunkWalkScene {...props} />,
     drunkWalkControls,
+  ),
+  "reflex-test": defineRealtimeGame<ReflexState, ReflexInput, "tap">(
+    reflexTest,
+    (props) => <ReflexTestScene {...props} />,
+    reflexControls,
   ),
 };
 
