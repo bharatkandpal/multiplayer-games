@@ -172,7 +172,7 @@ export function createLeaderboardRouter(store: Store): Router {
     const existing = await store.results.findByRunId(runId);
     if (existing) {
       const entry = await fetchOwnEntry(store, gameId, "score", token, filter);
-      res.json({ ok: true, duplicate: true, entry: entry ?? null });
+      res.json({ ok: true, duplicate: true, entry: entry ?? null, resultId: existing.id });
       return;
     }
 
@@ -191,7 +191,7 @@ export function createLeaderboardRouter(store: Store): Router {
       return;
     }
 
-    await writeGameResult(store, {
+    const saved = await writeGameResult(store, {
       runId,
       gameId,
       gameFamily: "realtime",
@@ -212,7 +212,10 @@ export function createLeaderboardRouter(store: Store): Router {
       timeBucket: timeBucket ?? null,
     });
 
-    res.json({ ok: true, entry });
+    // `resultId` is what a durable share link points at (MPG-056) — returning it
+    // here saves the client a lookup it has no other way to perform (it knows
+    // only its own client-minted `runId`).
+    res.json({ ok: true, entry, resultId: saved.id });
   });
 
   return router;

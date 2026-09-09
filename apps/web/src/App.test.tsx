@@ -190,3 +190,53 @@ describe("MPG-055: real-time run → post-game rank → full leaderboard", () =>
     expect(await screen.findByRole("columnheader", { name: "Best score" })).toBeInTheDocument();
   });
 });
+
+describe("MPG-056: a durable share link is its own entry point", () => {
+  beforeEach(() => {
+    window.history.pushState({}, "", "/s/tok-shared");
+  });
+
+  afterEach(() => {
+    window.history.pushState({}, "", "/");
+    vi.unstubAllGlobals();
+  });
+
+  it("opens /s/:token straight into the shared view — no session, no Home fallthrough", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          kind: "result",
+          result: {
+            gameId: "floppy-birds",
+            gameFamily: "realtime",
+            status: "complete",
+            score: 42,
+            winnerSlot: null,
+            seatsSnapshot: null,
+            durationMs: null,
+            createdAt: "2026-09-09T00:00:00.000Z",
+          },
+        }),
+      }),
+    );
+
+    render(<App />);
+
+    // The visitor lands on the result, not on the game grid.
+    expect(await screen.findByText("Scored 42")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Available games" })).not.toBeInTheDocument();
+  });
+
+  it("a dead link still lands somewhere with a way into a game", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+
+    render(<App />);
+
+    expect(await screen.findByText("Link no longer works")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Browse games" }));
+    expect(screen.getByRole("list", { name: "Available games" })).toBeInTheDocument();
+  });
+});
