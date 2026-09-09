@@ -59,7 +59,9 @@
 }
 
 .title {
+  font-family: var(--font-family-display);
   font-size: var(--font-size-500);
+  letter-spacing: var(--letter-spacing-display);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-tight);
   margin: 0;

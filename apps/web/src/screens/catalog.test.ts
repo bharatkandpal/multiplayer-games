@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { GameId } from "@mpg/engine";
-import { buildGameItems, indexOfGame, nextGame, prevGame, type GameItem } from "./catalog";
+import {
+  buildGameItems,
+  gameTags,
+  hasTag,
+  indexOfGame,
+  nextGame,
+  prevGame,
+  GAME_CATALOG,
+  REALTIME_CATALOG,
+  type GameCatalogEntry,
+  type GameItem,
+} from "./catalog";
 
 describe("catalog — buildGameItems", () => {
   it("lists turn-based games first, then real-time, each tagged by kind", () => {
@@ -27,6 +38,58 @@ describe("catalog — buildGameItems", () => {
 
   it("tolerates an empty real-time registry", () => {
     expect(buildGameItems(["connect4"])).toHaveLength(1);
+  });
+});
+
+describe("catalog — tags (UI-3)", () => {
+  const connect4 = GAME_CATALOG.connect4!;
+  const floppy = REALTIME_CATALOG["floppy-birds"]!;
+
+  it("puts the derived seat tag first, then the authored tags in order", () => {
+    expect(gameTags(connect4)).toEqual(["2-player", "vs-bot", "online", "watch"]);
+  });
+
+  it("treats every real-time game as solo — they have no seats at all", () => {
+    expect(gameTags(floppy)).toEqual(["solo", "endless"]);
+  });
+
+  // The whole reason the seat tag is derived rather than authored: it cannot
+  // drift away from what the engine actually reports.
+  it("derives the seat tag from playerCount, not from the authored list", () => {
+    const base = { ...connect4 };
+    expect(gameTags({ ...base, playerCount: 1 })[0]).toBe("solo");
+    expect(gameTags({ ...base, playerCount: 2 })[0]).toBe("2-player");
+  });
+
+  // Per the seat model, 1v1 is only the current shape — nothing may hardcode 2.
+  it("classifies a three-or-more-seat game as multiplayer", () => {
+    const threeSeat: GameCatalogEntry = { ...connect4, playerCount: 3 };
+    expect(gameTags(threeSeat)[0]).toBe("multiplayer");
+    expect(hasTag(threeSeat, "2-player")).toBe(false);
+  });
+
+  it("never lets an entry author a seat tag by hand", () => {
+    // `AuthoredGameTag` excludes them at the type level; assert the data too,
+    // so a future entry can't sneak one in via a cast.
+    const authored = [...Object.values(GAME_CATALOG), ...Object.values(REALTIME_CATALOG)].flatMap(
+      (entry) => [...entry.tags],
+    );
+    expect(authored).not.toContain("solo");
+    expect(authored).not.toContain("2-player");
+    expect(authored).not.toContain("multiplayer");
+  });
+
+  it("matches tags through hasTag, including the derived one", () => {
+    expect(hasTag(connect4, "online")).toBe(true);
+    expect(hasTag(connect4, "2-player")).toBe(true);
+    expect(hasTag(connect4, "endless")).toBe(false);
+    expect(hasTag(floppy, "solo")).toBe(true);
+  });
+
+  it("gives every catalogued game at least one tag beyond the seat tag", () => {
+    for (const entry of [...Object.values(GAME_CATALOG), ...Object.values(REALTIME_CATALOG)]) {
+      expect(gameTags(entry).length).toBeGreaterThan(1);
+    }
   });
 });
 

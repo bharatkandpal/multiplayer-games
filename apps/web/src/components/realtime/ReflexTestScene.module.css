@@ -67,9 +67,12 @@
   letter-spacing: 0.02em;
 }
 
+/* Carries the reaction time once a round lands — the data voice (UI-2). */
 .panelSub {
+  font-family: var(--font-family-mono);
   font-size: var(--font-size-300);
   font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
   /* Reserve the line so the panel doesn't resize the instant a time appears. */
   min-height: 1.5em;
 }
@@ -115,6 +118,7 @@
 }
 
 .timeValue {
+  font-family: var(--font-family-mono);
   font-weight: var(--font-weight-medium);
 }
 
@@ -138,6 +142,7 @@
 
 .summaryValue {
   margin: 0;
+  font-family: var(--font-family-mono);
   font-size: var(--font-size-500);
   font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;

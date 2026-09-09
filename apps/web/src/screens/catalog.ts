@@ -17,6 +17,39 @@ import type { GameId, RealtimeGameId } from "@mpg/engine";
  */
 export type GameKind = "turn-based" | "realtime";
 
+/**
+ * Player-facing facets (UI-3), deliberately orthogonal to `kind`.
+ *
+ * `kind` is architectural — it decides which router branch a game takes and
+ * whether it has seats at all. `tags` are how a *player* scans the shelf:
+ * "can I play this with someone?", "is this a two-minute thing?".
+ *
+ * The seat-count tags (`solo` / `2-player` / `multiplayer`) are NEVER authored
+ * on an entry — `gameTags()` derives them from `playerCount`, so a catalog
+ * entry can't drift into claiming something the engine contradicts. Author
+ * only the tags below that aren't derivable from data we already hold.
+ */
+export type GameTag =
+  /** Derived — one seat, no opponent. */
+  | "solo"
+  /** Derived — exactly two seats. */
+  | "2-player"
+  /** Derived — three or more seats (ADR: never hardcode 2). */
+  | "multiplayer"
+  /** A bot can take a seat. */
+  | "vs-bot"
+  /** Can be played over a shareable room link. */
+  | "online"
+  /** Supports an all-bot room you can spectate. */
+  | "watch"
+  /** Typically over in under a minute. */
+  | "quick"
+  /** No win condition — you're chasing a score. */
+  | "endless";
+
+/** The subset of `GameTag` an entry may author (the rest are derived). */
+export type AuthoredGameTag = Exclude<GameTag, "solo" | "2-player" | "multiplayer">;
+
 export interface GameCatalogEntry {
   readonly id: GameId;
   readonly title: string;
@@ -24,6 +57,7 @@ export interface GameCatalogEntry {
   /** Number of seats the game supports (`GameModule.playerCount`) — drives seat setup (MPG-024). */
   readonly playerCount: number;
   readonly kind: "turn-based";
+  readonly tags: readonly AuthoredGameTag[];
 }
 
 export interface RealtimeCatalogEntry {
@@ -31,6 +65,7 @@ export interface RealtimeCatalogEntry {
   readonly title: string;
   readonly description: string;
   readonly kind: "realtime";
+  readonly tags: readonly AuthoredGameTag[];
 }
 
 // Partial, not exhaustive: a game can exist in the engine registry before it's
@@ -43,6 +78,7 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
     description: "Classic 3x3. Quick games, easy to teach a bot to play well.",
     playerCount: ticTacToe.playerCount,
     kind: "turn-based",
+    tags: ["vs-bot", "online", "watch", "quick"],
   },
   connect4: {
     id: "connect4",
@@ -50,6 +86,7 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
     description: "Drop discs, connect four in a row. 7 columns, 6 rows.",
     playerCount: connectFour.playerCount,
     kind: "turn-based",
+    tags: ["vs-bot", "online", "watch"],
   },
   "tictactoe-move": {
     id: "tictactoe-move",
@@ -58,6 +95,7 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
       "Only 3 pieces each — place them, then move one to any empty square per turn. Get three in a row to win (no draws by filling up, but repeating the same position three times is a draw).",
     playerCount: ticTacToeMove.playerCount,
     kind: "turn-based",
+    tags: ["vs-bot", "online", "watch"],
   },
   nim: {
     id: "nim",
@@ -66,6 +104,7 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
       "Take turns removing objects from piles — whoever takes the last object wins. Simple rules, deep strategy.",
     playerCount: nim.playerCount,
     kind: "turn-based",
+    tags: ["vs-bot", "online", "watch", "quick"],
   },
   gomoku: {
     id: "gomoku",
@@ -74,6 +113,7 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
       "Place stones on a 9x9 board and be the first to line up five in a row — across, down, or diagonally.",
     playerCount: gomoku.playerCount,
     kind: "turn-based",
+    tags: ["vs-bot", "online", "watch"],
   },
 };
 
@@ -86,6 +126,7 @@ export const REALTIME_CATALOG: Partial<Record<RealtimeGameId, RealtimeCatalogEnt
     description:
       "Tap to flap and thread the bird through the pipes. One player, one life — chase a high score.",
     kind: "realtime",
+    tags: ["endless"],
   },
   "drunk-walk": {
     id: "drunk-walk",
@@ -93,6 +134,7 @@ export const REALTIME_CATALOG: Partial<Record<RealtimeGameId, RealtimeCatalogEnt
     description:
       "Balance a wobbly walker down an endless path. Tap the side opposite your lean to correct it — the wrong side makes it worse.",
     kind: "realtime",
+    tags: ["endless"],
   },
   "reflex-test": {
     id: "reflex-test",
@@ -100,8 +142,37 @@ export const REALTIME_CATALOG: Partial<Record<RealtimeGameId, RealtimeCatalogEnt
     description:
       "Wait for red to turn green, then tap as fast as you can. Five rounds — see your best and average reaction time. Tap too early and the run is over.",
     kind: "realtime",
+    tags: ["quick"],
   },
 };
+
+/**
+ * The full tag list for an entry: the derived seat-count tag first, then the
+ * authored ones in catalog order.
+ *
+ * The seat tag is computed rather than written down so it can never contradict
+ * `playerCount` — and so a future three-seat game is classified correctly
+ * without anyone revisiting the catalog. Real-time games have no seats at all
+ * (ADR 0002 §3), which is what makes them `solo`.
+ *
+ * Callers get a plain mutable array back; the catalog's own `tags` stay
+ * `readonly`.
+ */
+export function gameTags(entry: GameCatalogEntry | RealtimeCatalogEntry): GameTag[] {
+  return [seatTag(entry), ...entry.tags];
+}
+
+/** The one tag derived from seat count rather than authored. */
+function seatTag(entry: GameCatalogEntry | RealtimeCatalogEntry): GameTag {
+  if (entry.kind === "realtime") return "solo";
+  if (entry.playerCount <= 1) return "solo";
+  return entry.playerCount === 2 ? "2-player" : "multiplayer";
+}
+
+/** True when `entry` carries `tag` — the predicate a tag filter is built on. */
+export function hasTag(entry: GameCatalogEntry | RealtimeCatalogEntry, tag: GameTag): boolean {
+  return gameTags(entry).includes(tag);
+}
 
 /** A single entry in the ordered game list, discriminated by family. */
 export type GameItem =
