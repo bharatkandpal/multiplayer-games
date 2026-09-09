@@ -33,7 +33,7 @@ import {
   type OnlineGameRouteProps,
   type WatchGameRouteProps,
 } from "./screens";
-import { GAME_CATALOG } from "./screens/HomeScreen";
+import { GAME_CATALOG, REALTIME_CATALOG } from "./screens/HomeScreen";
 import { buildGameItems, nextGame, type GameItem } from "./screens/catalog";
 import { GameSwitcher } from "./screens/GameSwitcher";
 import { isAllBotRoom, publicRoomToSeats, toSeatConfigInput } from "./api/roomSeats";
@@ -84,7 +84,9 @@ type Route =
   // MPG-055: the full leaderboard for a game, reached from the post-game rank
   // preview ("View full leaderboard"). "Home" always exits back to the home
   // screen, not back to the (now-finished) game.
-  | { screen: "leaderboard"; gameId: GameId };
+  // `gameId` spans both families: real-time games rank on `score`, turn-based
+  // on win/loss/draw, and the same screen renders either.
+  | { screen: "leaderboard"; gameId: GameId | RealtimeGameId };
 
 const ROOM_PATH_RE = /^\/([^/]+)\/room\/([^/]+)\/?$/;
 
@@ -474,8 +476,16 @@ export default function App(): React.JSX.Element {
       {route.screen === "leaderboard" ? (
         <LeaderboardScreen
           gameId={route.gameId}
-          gameTitle={GAME_CATALOG[route.gameId]?.title ?? route.gameId}
-          metric={LEADERBOARD_METRIC[route.gameId] ?? "wld"}
+          gameTitle={
+            GAME_CATALOG[route.gameId as GameId]?.title ??
+            REALTIME_CATALOG[route.gameId as RealtimeGameId]?.title ??
+            route.gameId
+          }
+          metric={
+            REALTIME_CATALOG[route.gameId as RealtimeGameId]
+              ? "score"
+              : (LEADERBOARD_METRIC[route.gameId as GameId] ?? "wld")
+          }
           onBack={goHome}
         />
       ) : null}
@@ -487,6 +497,7 @@ export default function App(): React.JSX.Element {
             key={route.gameId}
             gameId={route.gameId}
             onExit={() => setRoute({ screen: "home" })}
+            onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
           />
         </>
       ) : null}

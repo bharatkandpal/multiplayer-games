@@ -120,6 +120,13 @@ export interface RealtimePlayScreenProps<S, I, A extends string = string> {
    * button, the fallback ladder, and the copy all stay put.
    */
   shareUrl?: string;
+  /**
+   * Optional extra content rendered on the game-over surface, below the share
+   * affordance — e.g. the post-game leaderboard rank preview (MPG-055). Kept as
+   * a slot rather than a leaderboard-aware prop so this screen stays generic:
+   * it knows about run phases, not about leaderboards.
+   */
+  resultExtra?: ReactNode;
 }
 
 const HINT_ID_PREFIX = "rt-hint";
@@ -140,6 +147,7 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
   autoPauseOnBlur = true,
   surfaceExtra,
   shareUrl,
+  resultExtra,
 }: RealtimePlayScreenProps<S, I, A>): React.JSX.Element {
   const reducedMotion = usePrefersReducedMotion();
   const { share, status: shareStatus, canShare, reset: resetShare } = useShareLink();
@@ -373,6 +381,7 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
                     ) : null}
                   </>
                 ) : null}
+                {resultExtra}
               </div>
             ) : null}
           </div>
