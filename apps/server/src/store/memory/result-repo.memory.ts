@@ -38,6 +38,12 @@ export function createMemoryResultRepo(): ResultRepo {
       return store.get(runId);
     },
 
+    async findById(id) {
+      // The map is keyed by runId (the idempotency key), so an id lookup is a
+      // scan. Fine for the dev/test store — Postgres has the real index.
+      return [...store.values()].find((r) => r.id === id);
+    },
+
     async findByOwner(ownerToken, opts) {
       const results = [...store.values()]
         .filter((r) => r.ownerToken === ownerToken)

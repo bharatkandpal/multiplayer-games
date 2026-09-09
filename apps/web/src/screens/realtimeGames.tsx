@@ -37,6 +37,7 @@ import {
 import { REALTIME_CATALOG } from "./HomeScreen";
 import { RankPreview } from "./RankPreview";
 import { submitRealtimeScore } from "../api/leaderboard";
+import { createShareLink, shareUrlForToken } from "../api/share";
 import type { RunComplete } from "../game/useRealtimeLoop";
 
 /**
@@ -135,9 +136,10 @@ function makeSeed(): number {
 }
 
 /**
- * What a finished run currently links to when shared (MPG-087): the game's own
- * URL. There is no durable per-result link yet — MPG-056 adds one, and this is
- * the single function that changes when it does.
+ * Where a share falls back to when there is no durable result link (MPG-087):
+ * the game's own URL. Still the right fallback — "here's the game" beats a
+ * button that does nothing — but the durable per-result link (MPG-056) is what
+ * a finished run shares whenever one could be minted.
  */
 function buildShareUrl(gameId: RealtimeGameId): string {
   const path = `/${gameId}`;
@@ -168,16 +170,38 @@ function makeRunId(): string {
  * only tells the caller WHEN the server's view is settled, so the post-game rank
  * preview can read it (see `useSettledRun`) instead of racing the write.
  */
-function submitRun(result: RunComplete<unknown>): Promise<void> {
+function submitRun(result: RunComplete<unknown>): Promise<string | undefined> {
   return submitRealtimeScore(result.gameId, {
     runId: makeRunId(),
     seed: result.seed,
     score: result.score,
     inputLog: result.inputLog,
   })
-    .then(() => undefined)
+    .then((res) => res.resultId)
     .catch((error: unknown) => {
       console.warn("[leaderboard] score submission failed", error);
+      return undefined;
+    });
+}
+
+/**
+ * Mints the durable share link for a finished run (MPG-056), returning the
+ * `/s/:token` URL to hand the share button.
+ *
+ * Minted EAGERLY when the run settles rather than lazily on the share tap, and
+ * that ordering is deliberate: `navigator.share` must be called inside the
+ * user's gesture, and awaiting a network round-trip first breaks the gesture on
+ * some mobile browsers — the sheet then silently never opens. The cost is a
+ * share_link row per completed run whether or not it is ever shared, which is
+ * what the row's optional expiry and the retention sweep exist to bound.
+ */
+function mintResultLink(resultId: string): Promise<string | undefined> {
+  return createShareLink({ kind: "result", targetId: resultId })
+    .then((link) => shareUrlForToken(link.token))
+    .catch((error: unknown) => {
+      // Never break sharing over this: the caller falls back to the game URL.
+      console.warn("[share] could not mint a durable result link", error);
+      return undefined;
     });
 }
 
@@ -201,19 +225,29 @@ export interface RealtimeGameRouteProps {
 function useSettledRun(): {
   runKey: number;
   settled: boolean;
+  shareToken: string | undefined;
   onRunComplete: (r: RunComplete<unknown>) => void;
 } {
   // `runKey` is bumped per run so the preview remounts (and refetches) on every
   // game over, not just the first; `settled` hides it while a submission is in
   // flight, so the player never sees the PREVIOUS run's rank under this one's score.
   const [{ runKey, settled }, setRun] = useState({ runKey: 0, settled: false });
+  // The durable `/s/:token` URL for the run just finished. Cleared at the start
+  // of each run so one run's link can never be shared under the next run's score.
+  const [shareToken, setShareToken] = useState<string | undefined>(undefined);
+
   const onRunComplete = (result: RunComplete<unknown>): void => {
     setRun((prev) => ({ ...prev, settled: false }));
-    void submitRun(result).then(() => {
+    setShareToken(undefined);
+    void submitRun(result).then(async (resultId) => {
+      // The rank is readable the moment the score write lands; don't make it
+      // wait on the share link, which is a separate, optional round-trip.
       setRun((prev) => ({ runKey: prev.runKey + 1, settled: true }));
+      if (resultId) setShareToken(await mintResultLink(resultId));
     });
   };
-  return { runKey, settled, onRunComplete };
+
+  return { runKey, settled, shareToken, onRunComplete };
 }
 
 /**
@@ -228,7 +262,7 @@ export function RealtimeGameRoute({
   onViewLeaderboard,
 }: RealtimeGameRouteProps): React.JSX.Element | null {
   const [seed] = useState(makeSeed);
-  const { runKey, settled, onRunComplete } = useSettledRun();
+  const { runKey, settled, shareToken, onRunComplete } = useSettledRun();
   // Only meaningful for "drunk-walk" (the one game with a character to
   // customize), but declared unconditionally so this component's hook
   // count/order stays stable across `gameId` values.
@@ -267,7 +301,7 @@ export function RealtimeGameRoute({
           renderScene={(props) => <DrunkWalkScene {...props} character={character} />}
           onExit={onExit}
           onRunComplete={onRunComplete}
-          shareUrl={buildShareUrl(gameId)}
+          shareUrl={shareToken ?? buildShareUrl(gameId)}
           resultExtra={rankPreview}
           surfaceExtra={
             <Button
@@ -299,7 +333,7 @@ export function RealtimeGameRoute({
       renderScene={wiring.renderScene}
       onExit={onExit}
       onRunComplete={onRunComplete}
-      shareUrl={buildShareUrl(gameId)}
+      shareUrl={shareToken ?? buildShareUrl(gameId)}
       resultExtra={rankPreview}
     />
   );

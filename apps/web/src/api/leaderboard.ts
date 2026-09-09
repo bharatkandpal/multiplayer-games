@@ -99,6 +99,11 @@ export interface SubmitScoreResponse {
   /** Present when this `runId` had already been persisted — the write was a no-op. */
   readonly duplicate?: boolean;
   readonly entry: LeaderboardEntry | null;
+  /**
+   * Id of the persisted result row. This is what a durable share link points at
+   * (MPG-056); the client knows only its own `runId`, so the server returns it.
+   */
+  readonly resultId?: string;
 }
 
 /**

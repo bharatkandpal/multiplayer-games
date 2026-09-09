@@ -98,6 +98,13 @@ export interface ResultRepo {
   /** Find a result by its idempotency key. */
   findByRunId(runId: string): Promise<GameResult | undefined>;
 
+  /**
+   * Find a result by its primary key. Share links store the result's `id` as
+   * their `targetId` (MPG-056), so resolving a shared link is a lookup by id,
+   * not by the client-minted `runId`.
+   */
+  findById(id: string): Promise<GameResult | undefined>;
+
   /** All results owned by a session token, newest first. */
   findByOwner(ownerToken: string, opts?: PaginationOpts): Promise<GameResult[]>;
 
