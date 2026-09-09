@@ -34,6 +34,7 @@ import {
   type WatchGameRouteProps,
 } from "./screens";
 import { GAME_CATALOG, REALTIME_CATALOG } from "./screens/HomeScreen";
+import { SharedResultScreen } from "./screens/SharedResultScreen";
 import { buildGameItems, nextGame, type GameItem } from "./screens/catalog";
 import { GameSwitcher } from "./screens/GameSwitcher";
 import { isAllBotRoom, publicRoomToSeats, toSeatConfigInput } from "./api/roomSeats";
@@ -86,9 +87,21 @@ type Route =
   // screen, not back to the (now-finished) game.
   // `gameId` spans both families: real-time games rank on `score`, turn-based
   // on win/loss/draw, and the same screen renders either.
-  | { screen: "leaderboard"; gameId: GameId | RealtimeGameId };
+  | { screen: "leaderboard"; gameId: GameId | RealtimeGameId }
+  // MPG-056: a durable share link (`/s/:token`) was opened. Unlike the room
+  // invite above, this outlives every room — the token resolves to a finished
+  // result, a replay, or a leaderboard view, and needs no session to read.
+  | { screen: "shared"; token: string };
 
 const ROOM_PATH_RE = /^\/([^/]+)\/room\/([^/]+)\/?$/;
+const SHARE_PATH_RE = /^\/s\/([^/]+)\/?$/;
+
+/** Parses `/s/:token` out of a pathname (MPG-056). */
+function parseSharePath(pathname: string): string | undefined {
+  const match = SHARE_PATH_RE.exec(pathname);
+  const token = match?.[1];
+  return token ? decodeURIComponent(token) : undefined;
+}
 
 /** Parses `/:gameId/room/:roomId` out of a pathname, if it matches a known game. */
 function parseRoomPath(pathname: string): { gameId: GameId; roomId: string } | undefined {
@@ -101,6 +114,10 @@ function parseRoomPath(pathname: string): { gameId: GameId; roomId: string } | u
 
 function initialRoute(): Route {
   if (typeof window === "undefined") return { screen: "home" };
+  // A share link is checked FIRST: it is the one entry point reached by people
+  // who have never used the app, so it must not fall through to Home.
+  const shareToken = parseSharePath(window.location.pathname);
+  if (shareToken) return { screen: "shared", token: shareToken };
   const parsed = parseRoomPath(window.location.pathname);
   if (!parsed) return { screen: "home" };
   // MPG-025: a reload of this tab's own all-bot watch room — its creator
@@ -500,6 +517,23 @@ export default function App(): React.JSX.Element {
             onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
           />
         </>
+      ) : null}
+
+      {route.screen === "shared" ? (
+        <SharedResultScreen
+          token={route.token}
+          onBackHome={goHome}
+          onPlayGame={(gameId) => {
+            // The shared game may be from either family, so resolve it through
+            // the same ordered catalog Home uses rather than guessing.
+            const item = gameItems.find((candidate) => candidate.id === gameId);
+            if (item) quickStart(item);
+            else goHome();
+          }}
+          onViewLeaderboard={(gameId) =>
+            setRoute({ screen: "leaderboard", gameId: gameId as GameId | RealtimeGameId })
+          }
+        />
       ) : null}
 
       {route.screen === "gallery" ? (

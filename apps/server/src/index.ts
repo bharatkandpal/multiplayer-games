@@ -16,6 +16,7 @@ import { registerGameHandlers } from "./rooms/moveHandler.js";
 import { registerRematchHandlers } from "./rooms/rematchHandler.js";
 import { RoomManager, RoomManagerError } from "./rooms/RoomManager.js";
 import { registerRoomHandlers } from "./rooms/roomHandlers.js";
+import { createShareRouter } from "./share/shareRoutes.js";
 import type { SeatConfig } from "./rooms/types.js";
 import {
   createSessionMiddleware,
@@ -48,6 +49,9 @@ app.use("/api", createSessionRouter(store));
 
 // Leaderboard routes (GET /api/leaderboard/:gameId, GET /api/leaderboard/:gameId/rank).
 app.use("/api", createLeaderboardRouter(store));
+
+// Durable share links (POST /api/share, GET/DELETE /api/share/:token) — MPG-056.
+app.use("/api", createShareRouter(store));
 
 const startedAt = Date.now();
 

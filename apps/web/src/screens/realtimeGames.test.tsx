@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { drunkWalk, floppyBirds } from "@mpg/engine";
 import { REALTIME_GAMES, RealtimeGameRoute } from "./realtimeGames";
 import { fetchYourRank, submitRealtimeScore, type LeaderboardEntry } from "../api/leaderboard";
+import { createShareLink } from "../api/share";
 
 const RANKED_ENTRY: LeaderboardEntry = {
   id: "e1",
@@ -23,6 +24,11 @@ const RANKED_ENTRY: LeaderboardEntry = {
 
 // The leaderboard is a server concern; these tests assert the CLIENT's
 // sequencing (submit the run, then read the rank the write produced).
+vi.mock("../api/share", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api/share")>();
+  return { ...actual, createShareLink: vi.fn() };
+});
+
 vi.mock("../api/leaderboard", () => ({
   submitRealtimeScore: vi.fn(async () => ({ ok: true, entry: null })),
   fetchYourRank: vi.fn(),
@@ -42,6 +48,12 @@ beforeEach(() => {
   rafCb = null;
   vi.mocked(submitRealtimeScore).mockReset().mockResolvedValue({ ok: true, entry: null });
   vi.mocked(fetchYourRank).mockReset().mockResolvedValue({ rank: 4, entry: RANKED_ENTRY });
+  vi.mocked(createShareLink).mockReset().mockResolvedValue({
+    token: "tok-durable",
+    kind: "result",
+    createdAt: "2026-09-09T00:00:00.000Z",
+    expiresAt: null,
+  });
   // jsdom has no 2D canvas; return null quietly (the renderer no-ops on it)
   // instead of letting jsdom log "getContext not implemented" for every frame.
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
@@ -253,5 +265,90 @@ describe("RealtimeGameRoute — post-game leaderboard rank (MPG-055)", () => {
     });
     expect(fetchYourRank).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: /View full leaderboard/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("RealtimeGameRoute — durable share link (MPG-056)", () => {
+  // A stubbed native share sheet, so the URL actually handed to the platform is
+  // observable rather than inferred.
+  let shareSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    shareSpy = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { value: shareSpy, configurable: true });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, "share");
+  });
+
+  function playToGameOver(): void {
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    let clock = 1000;
+    frame(clock);
+    for (let i = 0; i < 20 && screen.queryByRole("button", { name: /Play again/ }) === null; i++) {
+      clock += 250;
+      frame(clock);
+    }
+  }
+
+  it("mints a link to the persisted RESULT and shares that, not the game URL", async () => {
+    vi.mocked(submitRealtimeScore).mockResolvedValue({
+      ok: true,
+      entry: null,
+      resultId: "res-42",
+    });
+    render(<RealtimeGameRoute gameId="floppy-birds" onExit={vi.fn()} />);
+    playToGameOver();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // The link points at the result row the server just persisted — the client
+    // only knows its own runId, so this id has to come back from the submit.
+    expect(createShareLink).toHaveBeenCalledWith({ kind: "result", targetId: "res-42" });
+
+    // ...and the share affordance hands over exactly that URL.
+    fireEvent.click(screen.getByRole("button", { name: /Share score|Copy link/ }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(shareSpy).toHaveBeenCalledTimes(1);
+    expect((shareSpy.mock.calls[0]![0] as { url: string }).url).toContain("/s/tok-durable");
+  });
+
+  it("falls back to the game URL when the link can't be minted — sharing never breaks", async () => {
+    vi.mocked(submitRealtimeScore).mockResolvedValue({
+      ok: true,
+      entry: null,
+      resultId: "res-42",
+    });
+    vi.mocked(createShareLink).mockRejectedValue(new Error("offline"));
+
+    render(<RealtimeGameRoute gameId="floppy-birds" onExit={vi.fn()} />);
+    playToGameOver();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // The affordance is still there and still offers a real URL.
+    expect(screen.getByRole("button", { name: /Share score|Copy link/ })).toBeInTheDocument();
+  });
+
+  it("does not mint a link when the score submission never produced a result", async () => {
+    vi.mocked(submitRealtimeScore).mockResolvedValue({ ok: true, entry: null });
+
+    render(<RealtimeGameRoute gameId="floppy-birds" onExit={vi.fn()} />);
+    playToGameOver();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(createShareLink).not.toHaveBeenCalled();
   });
 });

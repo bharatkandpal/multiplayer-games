@@ -147,6 +147,13 @@ describe.each([["memory", () => createMemoryStore()]])("%s adapter", (_name, fac
       expect(found).toEqual(saved);
     });
 
+    it("findById resolves by primary key — the key share links point at", async () => {
+      const saved = await store.results.save(makeResult({ runId: "run-by-id" }));
+
+      expect(await store.results.findById(saved.id)).toEqual(saved);
+      expect(await store.results.findById(crypto.randomUUID())).toBeUndefined();
+    });
+
     it("save is idempotent on runId", async () => {
       const input = makeResult({ runId: "dup-1" });
       const first = await store.results.save(input);

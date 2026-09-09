@@ -64,6 +64,11 @@ export function createPgResultRepo(db: Database): ResultRepo {
       return row ? toGameResult(row) : undefined;
     },
 
+    async findById(id) {
+      const [row] = await db.select().from(gameResults).where(eq(gameResults.id, id)).limit(1);
+      return row ? toGameResult(row) : undefined;
+    },
+
     async findByOwner(ownerToken, opts?: PaginationOpts) {
       const rows = await db
         .select()
