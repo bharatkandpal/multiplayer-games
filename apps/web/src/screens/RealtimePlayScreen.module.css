@@ -20,8 +20,10 @@
 }
 
 .heading {
+  font-family: var(--font-family-display);
   font-size: var(--font-size-500);
   font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-display);
   margin: 0;
 }
 
@@ -43,10 +45,12 @@
 }
 
 /* The score total, made prominent within the badge — read as text, never
-   conveyed by motion alone (ADR 0002 §5). Tabular figures so it doesn't
-   jitter as the count climbs. */
+   conveyed by motion alone (ADR 0002 §5). The data voice (UI-2): mono with
+   tabular figures, so a score climbing every frame keeps a fixed width
+   instead of jittering the badge around it. */
 .scoreValue {
   margin-left: var(--space-1);
+  font-family: var(--font-family-mono);
   font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
 }
@@ -142,8 +146,10 @@
 }
 
 .overlayTitle {
+  font-family: var(--font-family-display);
   margin: 0;
   font-size: var(--font-size-500);
+  letter-spacing: var(--letter-spacing-display);
   font-weight: var(--font-weight-bold);
 }
 

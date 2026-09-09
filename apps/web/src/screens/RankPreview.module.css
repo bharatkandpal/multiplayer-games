@@ -10,3 +10,10 @@
 .rank {
   color: var(--color-text);
 }
+
+/* The rank number itself — data voice (UI-2), so it matches the figures in the
+   full leaderboard this previews. */
+.rankValue {
+  font-family: var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+}

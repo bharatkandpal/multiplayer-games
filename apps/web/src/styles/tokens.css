@@ -17,6 +17,17 @@
  *    carries no color rules of its own, so the plain `:root` values (light)
  *    and the `prefers-color-scheme: dark` override still apply as expected.
  *
+ * Accent (UI-1):
+ *  - The accent is deliberately NOT blue. It used to be `#2f5fff`, which sat
+ *    in the same hue family as `--color-player-1` (`#0072b2`) — so a focus
+ *    ring, a primary button and a player-one piece all read as one signal on
+ *    a board mid-game. Moving the accent to plum leaves blue meaning "player
+ *    one" and nothing else, which is the whole point of picking the seat
+ *    colors from a colorblind-safe palette in the first place.
+ *  - The neutral ramp carries a slight violet bias toward the accent rather
+ *    than being pure grey, so surfaces sit under the accent instead of
+ *    fighting it.
+ *
  * Accessibility:
  *  - Player-side colors (--color-player-1 / --color-player-2) are chosen from
  *    the Okabe–Ito colorblind-safe palette (blue / vermillion) and are
@@ -24,31 +35,42 @@
  *    layer (e.g. circle vs. cross, solid vs. hatched) — never rely on hue
  *    alone to distinguish sides (UX_PRINCIPLES §4, PRD §7).
  *  - Text/background pairings below are chosen to clear WCAG AA (4.5:1 for
- *    normal text). Key pairings verified (light / dark):
- *      light: --color-text on --color-bg               17.99:1
- *      light: --color-text-muted on --color-bg           7.19:1
- *      light: --color-text on --color-bg-subtle         16.49:1
- *      light: --color-on-accent on --color-accent         5.00:1
- *      light: --color-accent-text on --color-bg           5.00:1
- *      light: --color-success-text on --color-bg          5.08:1
- *      light: --color-danger-text on --color-bg           6.20:1
- *      light: --color-warning-text on --color-bg          5.43:1
- *      light: --color-info-text on --color-bg             5.19:1
- *      light: --color-player-1 on --color-bg               5.19:1
- *      light: --color-player-2 on --color-bg               5.50:1
- *      dark:  --color-text on --color-bg                 15.87:1
- *      dark:  --color-text-muted on --color-bg             8.61:1
- *      dark:  --color-on-accent on --color-accent          7.82:1
- *      dark:  --color-accent-text on --color-bg            7.23:1
- *      dark:  --color-success-text on --color-bg           9.20:1
- *      dark:  --color-danger-text on --color-bg            7.41:1
- *      dark:  --color-warning-text on --color-bg          10.20:1
- *      dark:  --color-info-text on --color-bg              9.59:1
- *      dark:  --color-player-1 on --color-bg               9.87:1
- *      dark:  --color-player-2 on --color-bg               9.98:1
- *    `--color-border` is intentionally low-contrast (~1.4:1) — it's a
- *    hairline/divider, not text, and is never used to convey information on
- *    its own.
+ *    normal text). Key pairings re-verified after UI-1 (light / dark):
+ *      light: --color-text on --color-bg               16.47:1
+ *      light: --color-text-muted on --color-bg           6.43:1
+ *      light: --color-text on --color-bg-subtle         15.40:1
+ *      light: --color-text on --color-bg-inset          14.24:1
+ *      light: --color-text on --color-surface           18.00:1
+ *      light: --color-text-muted on --color-surface      7.03:1
+ *      light: --color-on-accent on --color-accent        6.89:1
+ *      light: --color-accent-text on --color-bg          6.31:1
+ *      light: --color-text on --color-accent-bg         15.57:1
+ *      light: --color-success-text on --color-bg         4.65:1
+ *      light: --color-danger-text on --color-bg          5.67:1
+ *      light: --color-warning-text on --color-bg         4.96:1
+ *      light: --color-info-text on --color-bg            4.75:1
+ *      light: --color-player-1 on --color-bg             4.74:1
+ *      light: --color-player-2 on --color-bg             5.03:1
+ *      dark:  --color-text on --color-bg                16.03:1
+ *      dark:  --color-text-muted on --color-bg           7.46:1
+ *      dark:  --color-text on --color-bg-subtle         14.83:1
+ *      dark:  --color-text on --color-bg-inset          13.44:1
+ *      dark:  --color-text on --color-surface           14.83:1
+ *      dark:  --color-text-muted on --color-surface      6.90:1
+ *      dark:  --color-on-accent on --color-accent        6.98:1
+ *      dark:  --color-accent-text on --color-bg          6.90:1
+ *      dark:  --color-text on --color-accent-bg         13.69:1
+ *      dark:  --color-success-text on --color-bg         9.63:1
+ *      dark:  --color-danger-text on --color-bg          7.76:1
+ *      dark:  --color-warning-text on --color-bg        10.68:1
+ *      dark:  --color-info-text on --color-bg           10.04:1
+ *      dark:  --color-player-1 on --color-bg            10.33:1
+ *      dark:  --color-player-2 on --color-bg            10.45:1
+ *    The light-theme margins are thinner than they were pre-UI-1 because
+ *    `--color-bg` is no longer pure white; every pairing still clears 4.5:1.
+ *    `--color-border` is intentionally low-contrast — it's a hairline/divider,
+ *    not text, and is never used to convey information on its own.
+ *    `--color-text-disabled` is exempt (WCAG 1.4.3 excludes disabled controls).
  */
 
 :root {
@@ -57,27 +79,30 @@
   /* ---------------------------------------------------------------- */
   /* Color — neutral surface / background / text scale (light)         */
   /* ---------------------------------------------------------------- */
-  --color-bg: #ffffff;
-  --color-bg-subtle: #f4f5f7;
-  --color-bg-inset: #eceef1;
+  --color-bg: #f6f4f8;
+  --color-bg-subtle: #efecf4;
+  --color-bg-inset: #e7e3ee;
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
-  --color-border: #d8dbdf;
-  --color-border-strong: #b7bcc3;
+  --color-border: #ded9e6;
+  --color-border-strong: #c3bcd2;
 
-  --color-text: #14171a;
-  --color-text-muted: #52585f;
-  --color-text-disabled: #9aa0a7;
+  --color-text: #191424;
+  --color-text-muted: #5c5570;
+  --color-text-disabled: #8b849c;
   --color-text-inverse: #ffffff;
 
-  /* Accent / brand */
-  --color-accent: #2f5fff;
-  --color-accent-hover: #2650db;
-  --color-accent-active: #1f43b8;
-  --color-accent-text: #2f5fff; /* accent used as text/link on --color-bg */
+  /* Accent / brand — plum, deliberately off-blue (see header note). */
+  --color-accent: #a81e67;
+  --color-accent-hover: #8e1857;
+  --color-accent-active: #7a1449;
+  --color-accent-text: #a81e67; /* accent used as text/link on --color-bg */
+  --color-accent-bg: #fbeaf3; /* tinted surface, e.g. "this row is you" */
   --color-on-accent: #ffffff; /* text/icons placed on top of --color-accent */
 
-  /* Semantic */
+  /* Semantic — unchanged by UI-1, and RESERVED for state. Scenery inside a
+     game must not borrow these (a pipe painted --color-success made green
+     mean both "this kills you" and "act now" across two games). */
   --color-success: #1a7f37;
   --color-success-bg: #e7f6ea;
   --color-success-text: #1a7f37;
@@ -91,6 +116,29 @@
   --color-info-bg: #e7f1fd;
   --color-info-text: #0969da;
 
+  /* ---------------------------------------------------------------- */
+  /* Game grounds (UI-1)                                               */
+  /*                                                                    */
+  /* The catalogue has two families (ADR 0002 §2) and they want two     */
+  /* different materials: turn-based games sit on a matte "table", and  */
+  /* real-time games sit in a lit "cabinet". The cabinet is dark in     */
+  /* BOTH themes on purpose — an arcade screen is a lit panel in a dark */
+  /* bezel, and a light-mode scene washes the actor out.                */
+  /* ---------------------------------------------------------------- */
+  --color-table: #e9e5ee;
+  --color-table-line: #d2ccdd;
+  --color-cabinet: #120e1c;
+  --color-cabinet-raised: #241a33;
+  --color-cabinet-line: #3a2c50;
+  --color-on-cabinet: #f2eef8;
+
+  /* The ambient field behind page content. Glass surfaces need something to
+     blur; over a flat `--color-bg` `backdrop-filter` returns that same flat
+     color and the effect is paid for but never seen. */
+  --field-page:
+    radial-gradient(58rem 34rem at 12% -8%, #f3ddec 0%, transparent 62%),
+    radial-gradient(46rem 30rem at 92% 4%, #dfe9f7 0%, transparent 58%);
+
   /* Drunk Walk scenery (MPG-076) — asphalt ground plane. Tree colors used to
      live here too, but roadside trees are now hand-authored SVG sprites with
      colors baked into the asset (see DrunkWalkScene.tsx), so there's no
@@ -99,12 +147,12 @@
   --color-asphalt-far: #2a2b2f;
 
   /* Focus ring — always visible, never the only affordance */
-  --color-focus-ring: #2f5fff;
+  --color-focus-ring: #a81e67;
 
   /* Overlay/scrim — behind modals and other blocking surfaces, over page
      content. Always a dark tint (regardless of theme) so it reads as
      "the page behind is dimmed," not a surface color. */
-  --color-overlay: rgba(20, 23, 26, 0.5);
+  --color-overlay: rgba(25, 20, 36, 0.5);
 
   /* Player sides — colorblind-safe (Okabe–Ito blue / vermillion). Pair with
      shape/pattern at the component layer; never hue alone. */
@@ -116,8 +164,21 @@
   /* ---------------------------------------------------------------- */
   /* Typography                                                        */
   /* ---------------------------------------------------------------- */
+
+  /* Display (UI-2): a rounded grotesque for titles, verdicts and card
+     headings — it reads as "game" where the body face reads as "app". Every
+     entry is a face that genuinely ships on some platform (ui-rounded on
+     Apple, Segoe UI Variable on Windows), degrading to the body stack rather
+     than to something arbitrary. No webfont: nothing to download, and no
+     silent fallback while it loads. */
+  --font-family-display:
+    ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", "Nunito", system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
   --font-family-base:
     system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Data (UI-2): every score, reaction time, rank and countdown. Always paired
+     with `font-variant-numeric: tabular-nums` so digits keep a fixed advance
+     width and a live-updating number stops jittering. */
   --font-family-mono:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 
@@ -136,6 +197,11 @@
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-bold: 700;
+
+  /* Display text is set tighter than body text — the tracking that makes 16px
+     body readable makes a 40px heading look loose. */
+  --letter-spacing-display: -0.025em;
+  --letter-spacing-label: 0.12em; /* uppercase micro-caps need the opposite */
 
   /* ---------------------------------------------------------------- */
   /* Spacing (4px base scale)                                          */
@@ -163,24 +229,34 @@
   --radius-lg: 0.75rem;
   --radius-full: 999px;
 
+  /* A separator between two groups should be the quietest mark on the page.
+     A 1px rule is TWO device pixels on a 2x display and reads as a border;
+     the override below halves it so it lands as an actual hairline. Use for
+     dividers and chip outlines, never for anything load-bearing. */
+  --border-width-hairline: 1px;
   --border-width-thin: 1px;
   --border-width-thick: 2px;
 
-  --shadow-sm: 0 1px 2px rgba(20, 23, 26, 0.06);
-  --shadow-md: 0 4px 12px rgba(20, 23, 26, 0.1);
-  --shadow-lg: 0 12px 32px rgba(20, 23, 26, 0.16);
+  --shadow-sm: 0 1px 2px rgba(25, 20, 36, 0.07);
+  --shadow-md: 0 6px 18px rgba(25, 20, 36, 0.1);
+  --shadow-lg: 0 18px 44px rgba(25, 20, 36, 0.16);
 
   /* ---------------------------------------------------------------- */
   /* Liquid glass — frosted, translucent surfaces (blur + sheen).      */
   /* Consumed via backdrop-filter with a solid @supports fallback so   */
   /* the surface never turns unreadable where blur is unsupported.     */
+  /*                                                                    */
+  /* Only worth using where something actually sits BEHIND the surface  */
+  /* — an in-game HUD, a modal over a live board. Over a flat page      */
+  /* background it costs a compositing layer and returns the same flat  */
+  /* color.                                                             */
   /* ---------------------------------------------------------------- */
-  --glass-bg: rgba(255, 255, 255, 0.55);
-  --glass-bg-hover: rgba(255, 255, 255, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.7);
-  --glass-highlight: rgba(255, 255, 255, 0.85); /* top-edge sheen */
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-bg-hover: rgba(255, 255, 255, 0.74);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-highlight: rgba(255, 255, 255, 0.9); /* top-edge sheen */
   --glass-blur: 16px;
-  --glass-shadow: 0 8px 32px rgba(20, 23, 26, 0.12);
+  --glass-shadow: 0 8px 32px rgba(25, 20, 36, 0.12);
 
   /* ---------------------------------------------------------------- */
   /* Motion                                                            */
@@ -211,6 +287,13 @@
   --z-toast: 50;
 }
 
+/* One device pixel, not one CSS pixel — see --border-width-hairline above. */
+@media (min-resolution: 2dppx) {
+  :root {
+    --border-width-hairline: 0.5px;
+  }
+}
+
 /* ---------------------------------------------------------------------- */
 /* Dark theme — OS default (no explicit data-theme override)              */
 /* ---------------------------------------------------------------------- */
@@ -218,24 +301,25 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --color-bg: #14171a;
-    --color-bg-subtle: #1c2024;
-    --color-bg-inset: #22262b;
-    --color-surface: #1c2024;
-    --color-surface-raised: #22262b;
-    --color-border: #33383e;
-    --color-border-strong: #474e56;
+    --color-bg: #12101a;
+    --color-bg-subtle: #1b1826;
+    --color-bg-inset: #252031;
+    --color-surface: #1b1826;
+    --color-surface-raised: #252031;
+    --color-border: #322c42;
+    --color-border-strong: #4a4260;
 
-    --color-text: #eef1f4;
-    --color-text-muted: #aeb4bb;
-    --color-text-disabled: #6b7178;
-    --color-text-inverse: #14171a;
+    --color-text: #efebf5;
+    --color-text-muted: #a79fba;
+    --color-text-disabled: #7b7392;
+    --color-text-inverse: #12101a;
 
-    --color-accent: #7fa1ff;
-    --color-accent-hover: #9bb6ff;
-    --color-accent-active: #6a8dee;
-    --color-accent-text: #7fa1ff;
-    --color-on-accent: #0b0d10;
+    --color-accent: #f26fb2;
+    --color-accent-hover: #f78ac3;
+    --color-accent-active: #dd5c9e;
+    --color-accent-text: #f26fb2;
+    --color-accent-bg: #3a1329;
+    --color-on-accent: #1c0a13;
 
     --color-success: #4fd17b;
     --color-success-bg: #143122;
@@ -250,10 +334,22 @@
     --color-info-bg: #10283a;
     --color-info-text: #7cc4ff;
 
+    --color-table: #1e1a2a;
+    --color-table-line: #2e2740;
+    /* Cabinet values are theme-independent by design — see the light block. */
+    --color-cabinet: #0d0a14;
+    --color-cabinet-raised: #2a1e3c;
+    --color-cabinet-line: #3a2c50;
+    --color-on-cabinet: #f2eef8;
+
+    --field-page:
+      radial-gradient(58rem 34rem at 12% -8%, #2c1730 0%, transparent 62%),
+      radial-gradient(46rem 30rem at 92% 4%, #16233a 0%, transparent 58%);
+
     --color-asphalt: #4a4c52;
     --color-asphalt-far: #2f3136;
 
-    --color-focus-ring: #7fa1ff;
+    --color-focus-ring: #f26fb2;
 
     /* Darker/more opaque than light-theme: the page behind is already dark,
        so the scrim needs more weight to read as "dimmed" against it. */
@@ -264,14 +360,14 @@
     --color-player-1-bg: #10283a;
     --color-player-2-bg: #3a2a10;
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
-    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 18px 44px rgba(0, 0, 0, 0.6);
 
-    --glass-bg: rgba(34, 38, 43, 0.5);
-    --glass-bg-hover: rgba(44, 50, 57, 0.66);
-    --glass-border: rgba(255, 255, 255, 0.14);
-    --glass-highlight: rgba(255, 255, 255, 0.22);
+    --glass-bg: rgba(38, 33, 51, 0.55);
+    --glass-bg-hover: rgba(48, 42, 64, 0.68);
+    --glass-border: rgba(255, 255, 255, 0.13);
+    --glass-highlight: rgba(255, 255, 255, 0.2);
     --glass-blur: 16px;
     --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   }
@@ -283,24 +379,25 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --color-bg: #14171a;
-  --color-bg-subtle: #1c2024;
-  --color-bg-inset: #22262b;
-  --color-surface: #1c2024;
-  --color-surface-raised: #22262b;
-  --color-border: #33383e;
-  --color-border-strong: #474e56;
+  --color-bg: #12101a;
+  --color-bg-subtle: #1b1826;
+  --color-bg-inset: #252031;
+  --color-surface: #1b1826;
+  --color-surface-raised: #252031;
+  --color-border: #322c42;
+  --color-border-strong: #4a4260;
 
-  --color-text: #eef1f4;
-  --color-text-muted: #aeb4bb;
-  --color-text-disabled: #6b7178;
-  --color-text-inverse: #14171a;
+  --color-text: #efebf5;
+  --color-text-muted: #a79fba;
+  --color-text-disabled: #7b7392;
+  --color-text-inverse: #12101a;
 
-  --color-accent: #7fa1ff;
-  --color-accent-hover: #9bb6ff;
-  --color-accent-active: #6a8dee;
-  --color-accent-text: #7fa1ff;
-  --color-on-accent: #0b0d10;
+  --color-accent: #f26fb2;
+  --color-accent-hover: #f78ac3;
+  --color-accent-active: #dd5c9e;
+  --color-accent-text: #f26fb2;
+  --color-accent-bg: #3a1329;
+  --color-on-accent: #1c0a13;
 
   --color-success: #4fd17b;
   --color-success-bg: #143122;
@@ -315,10 +412,21 @@
   --color-info-bg: #10283a;
   --color-info-text: #7cc4ff;
 
+  --color-table: #1e1a2a;
+  --color-table-line: #2e2740;
+  --color-cabinet: #0d0a14;
+  --color-cabinet-raised: #2a1e3c;
+  --color-cabinet-line: #3a2c50;
+  --color-on-cabinet: #f2eef8;
+
+  --field-page:
+    radial-gradient(58rem 34rem at 12% -8%, #2c1730 0%, transparent 62%),
+    radial-gradient(46rem 30rem at 92% 4%, #16233a 0%, transparent 58%);
+
   --color-asphalt: #4a4c52;
   --color-asphalt-far: #2f3136;
 
-  --color-focus-ring: #7fa1ff;
+  --color-focus-ring: #f26fb2;
 
   --color-overlay: rgba(0, 0, 0, 0.6);
 
@@ -327,14 +435,14 @@
   --color-player-1-bg: #10283a;
   --color-player-2-bg: #3a2a10;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 18px 44px rgba(0, 0, 0, 0.6);
 
-  --glass-bg: rgba(34, 38, 43, 0.5);
-  --glass-bg-hover: rgba(44, 50, 57, 0.66);
-  --glass-border: rgba(255, 255, 255, 0.14);
-  --glass-highlight: rgba(255, 255, 255, 0.22);
+  --glass-bg: rgba(38, 33, 51, 0.55);
+  --glass-bg-hover: rgba(48, 42, 64, 0.68);
+  --glass-border: rgba(255, 255, 255, 0.13);
+  --glass-highlight: rgba(255, 255, 255, 0.2);
   --glass-blur: 16px;
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
@@ -347,23 +455,24 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --color-bg: #ffffff;
-  --color-bg-subtle: #f4f5f7;
-  --color-bg-inset: #eceef1;
+  --color-bg: #f6f4f8;
+  --color-bg-subtle: #efecf4;
+  --color-bg-inset: #e7e3ee;
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
-  --color-border: #d8dbdf;
-  --color-border-strong: #b7bcc3;
+  --color-border: #ded9e6;
+  --color-border-strong: #c3bcd2;
 
-  --color-text: #14171a;
-  --color-text-muted: #52585f;
-  --color-text-disabled: #9aa0a7;
+  --color-text: #191424;
+  --color-text-muted: #5c5570;
+  --color-text-disabled: #8b849c;
   --color-text-inverse: #ffffff;
 
-  --color-accent: #2f5fff;
-  --color-accent-hover: #2650db;
-  --color-accent-active: #1f43b8;
-  --color-accent-text: #2f5fff;
+  --color-accent: #a81e67;
+  --color-accent-hover: #8e1857;
+  --color-accent-active: #7a1449;
+  --color-accent-text: #a81e67;
+  --color-accent-bg: #fbeaf3;
   --color-on-accent: #ffffff;
 
   --color-success: #1a7f37;
@@ -379,28 +488,39 @@
   --color-info-bg: #e7f1fd;
   --color-info-text: #0969da;
 
+  --color-table: #e9e5ee;
+  --color-table-line: #d2ccdd;
+  --color-cabinet: #120e1c;
+  --color-cabinet-raised: #241a33;
+  --color-cabinet-line: #3a2c50;
+  --color-on-cabinet: #f2eef8;
+
+  --field-page:
+    radial-gradient(58rem 34rem at 12% -8%, #f3ddec 0%, transparent 62%),
+    radial-gradient(46rem 30rem at 92% 4%, #dfe9f7 0%, transparent 58%);
+
   --color-asphalt: #3f4045;
   --color-asphalt-far: #2a2b2f;
 
-  --color-focus-ring: #2f5fff;
+  --color-focus-ring: #a81e67;
 
-  --color-overlay: rgba(20, 23, 26, 0.5);
+  --color-overlay: rgba(25, 20, 36, 0.5);
 
   --color-player-1: #0072b2;
   --color-player-2: #b34700;
   --color-player-1-bg: #e3f1fa;
   --color-player-2-bg: #fbeadf;
 
-  --shadow-sm: 0 1px 2px rgba(20, 23, 26, 0.06);
-  --shadow-md: 0 4px 12px rgba(20, 23, 26, 0.1);
-  --shadow-lg: 0 12px 32px rgba(20, 23, 26, 0.16);
+  --shadow-sm: 0 1px 2px rgba(25, 20, 36, 0.07);
+  --shadow-md: 0 6px 18px rgba(25, 20, 36, 0.1);
+  --shadow-lg: 0 18px 44px rgba(25, 20, 36, 0.16);
 
-  --glass-bg: rgba(255, 255, 255, 0.55);
-  --glass-bg-hover: rgba(255, 255, 255, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.7);
-  --glass-highlight: rgba(255, 255, 255, 0.85);
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-bg-hover: rgba(255, 255, 255, 0.74);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-highlight: rgba(255, 255, 255, 0.9);
   --glass-blur: 16px;
-  --glass-shadow: 0 8px 32px rgba(20, 23, 26, 0.12);
+  --glass-shadow: 0 8px 32px rgba(25, 20, 36, 0.12);
 }
 
 /* ---------------------------------------------------------------------- */

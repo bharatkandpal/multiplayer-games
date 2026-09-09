@@ -26,8 +26,10 @@
 }
 
 .headline {
+  font-family: var(--font-family-display);
   margin: 0;
   font-size: var(--font-size-600);
+  letter-spacing: var(--letter-spacing-display);
   font-weight: var(--font-weight-bold);
   line-height: 1.1;
 }

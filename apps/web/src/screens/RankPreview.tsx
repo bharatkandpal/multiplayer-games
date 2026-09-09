@@ -46,7 +46,7 @@ export function RankPreview({
     <div className={styles.wrap}>
       {rank !== null ? (
         <span className={styles.rank}>
-          Leaderboard rank: <strong>#{rank}</strong>
+          Leaderboard rank: <strong className={styles.rankValue}>#{rank}</strong>
         </span>
       ) : null}
       <Button variant="ghost" size="sm" onClick={onViewLeaderboard}>

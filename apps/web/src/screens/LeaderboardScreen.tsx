@@ -135,10 +135,12 @@ export function LeaderboardScreen({
                   className={isYou ? styles.selfRow : undefined}
                   aria-current={isYou ? "true" : undefined}
                 >
-                  <td>{rank}</td>
+                  <td className={styles.numeric}>{rank}</td>
                   <td>{playerLabel(entry.ownerToken, isYou)}</td>
-                  <td>{isScore ? (entry.bestScore ?? 0) : entry.wins}</td>
-                  <td>{entry.totalGames}</td>
+                  <td className={styles.numeric}>
+                    {isScore ? (entry.bestScore ?? 0) : entry.wins}
+                  </td>
+                  <td className={styles.numeric}>{entry.totalGames}</td>
                 </tr>
               );
             })}
