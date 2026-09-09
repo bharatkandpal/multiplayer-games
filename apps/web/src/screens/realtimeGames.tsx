@@ -35,6 +35,7 @@ import {
   type RealtimeSceneProps,
 } from "./RealtimePlayScreen";
 import { REALTIME_CATALOG } from "./HomeScreen";
+import { RankPreview } from "./RankPreview";
 import { submitRealtimeScore } from "../api/leaderboard";
 import type { RunComplete } from "../game/useRealtimeLoop";
 
@@ -163,23 +164,56 @@ function makeRunId(): string {
  * score, so there is nothing for the player to act on here, and a leaderboard
  * write must never block, delay, or interrupt the game-over surface. Failures
  * (offline, 4xx, a 422 `SCORE_MISMATCH`) are logged for debugging and otherwise
- * swallowed. Rank is surfaced separately by the leaderboard screen, which reads
- * the server's own view rather than anything we could optimistically assume here.
+ * swallowed. Rank is never assumed optimistically here — the returned promise
+ * only tells the caller WHEN the server's view is settled, so the post-game rank
+ * preview can read it (see `useSettledRun`) instead of racing the write.
  */
-function submitRun(result: RunComplete<unknown>): void {
-  void submitRealtimeScore(result.gameId, {
+function submitRun(result: RunComplete<unknown>): Promise<void> {
+  return submitRealtimeScore(result.gameId, {
     runId: makeRunId(),
     seed: result.seed,
     score: result.score,
     inputLog: result.inputLog,
-  }).catch((error: unknown) => {
-    console.warn("[leaderboard] score submission failed", error);
-  });
+  })
+    .then(() => undefined)
+    .catch((error: unknown) => {
+      console.warn("[leaderboard] score submission failed", error);
+    });
 }
 
 export interface RealtimeGameRouteProps {
   gameId: RealtimeGameId;
   onExit: () => void;
+  /**
+   * Opens the full leaderboard for this game (MPG-055). Omit to hide the
+   * post-game rank preview entirely — a rank with nowhere to go is a dead end.
+   */
+  onViewLeaderboard?: () => void;
+}
+
+/**
+ * Post-game rank preview for a real-time run, mounted only once the run's score
+ * submission has SETTLED. The submission is what creates/updates the entry the
+ * rank is read from, so fetching earlier would race it and show the player their
+ * previous rank. A failed submission still settles (fire-and-forget by design) —
+ * the preview then just reflects the server's existing view, which is honest.
+ */
+function useSettledRun(): {
+  runKey: number;
+  settled: boolean;
+  onRunComplete: (r: RunComplete<unknown>) => void;
+} {
+  // `runKey` is bumped per run so the preview remounts (and refetches) on every
+  // game over, not just the first; `settled` hides it while a submission is in
+  // flight, so the player never sees the PREVIOUS run's rank under this one's score.
+  const [{ runKey, settled }, setRun] = useState({ runKey: 0, settled: false });
+  const onRunComplete = (result: RunComplete<unknown>): void => {
+    setRun((prev) => ({ ...prev, settled: false }));
+    void submitRun(result).then(() => {
+      setRun((prev) => ({ runKey: prev.runKey + 1, settled: true }));
+    });
+  };
+  return { runKey, settled, onRunComplete };
 }
 
 /**
@@ -191,8 +225,10 @@ export interface RealtimeGameRouteProps {
 export function RealtimeGameRoute({
   gameId,
   onExit,
+  onViewLeaderboard,
 }: RealtimeGameRouteProps): React.JSX.Element | null {
   const [seed] = useState(makeSeed);
+  const { runKey, settled, onRunComplete } = useSettledRun();
   // Only meaningful for "drunk-walk" (the one game with a character to
   // customize), but declared unconditionally so this component's hook
   // count/order stays stable across `gameId` values.
@@ -204,6 +240,17 @@ export function RealtimeGameRoute({
   if (!wiring) return null;
 
   const title = REALTIME_CATALOG[gameId]?.title ?? gameId;
+
+  // Real-time games rank on `score`, not the turn-based win/loss/draw metric.
+  const rankPreview =
+    onViewLeaderboard && settled ? (
+      <RankPreview
+        key={runKey}
+        gameId={gameId}
+        metric="score"
+        onViewLeaderboard={onViewLeaderboard}
+      />
+    ) : null;
 
   if (gameId === "drunk-walk") {
     const handleChangeCharacter = (next: DrunkWalkCharacter): void => {
@@ -219,8 +266,9 @@ export function RealtimeGameRoute({
           controls={drunkWalkControls}
           renderScene={(props) => <DrunkWalkScene {...props} character={character} />}
           onExit={onExit}
-          onRunComplete={submitRun}
+          onRunComplete={onRunComplete}
           shareUrl={buildShareUrl(gameId)}
+          resultExtra={rankPreview}
           surfaceExtra={
             <Button
               variant="ghost"
@@ -250,8 +298,9 @@ export function RealtimeGameRoute({
       controls={wiring.controls}
       renderScene={wiring.renderScene}
       onExit={onExit}
-      onRunComplete={submitRun}
+      onRunComplete={onRunComplete}
       shareUrl={buildShareUrl(gameId)}
+      resultExtra={rankPreview}
     />
   );
 }

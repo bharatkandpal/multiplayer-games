@@ -3,6 +3,33 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import App from "./App";
 
+// The leaderboard's own behavior is covered in its screen/route tests; here we
+// only care that the app ROUTES to it correctly, so the network is stubbed.
+vi.mock("./api/leaderboard", () => ({
+  submitRealtimeScore: vi.fn(async () => ({ ok: true, entry: null })),
+  fetchYourRank: vi.fn(async () => ({ rank: 2, entry: null })),
+  fetchLeaderboard: vi.fn(async () => ({
+    entries: [
+      {
+        id: "e1",
+        gameId: "floppy-birds",
+        metric: "score",
+        eventId: null,
+        timeBucket: null,
+        ownerToken: "tok-abcdef",
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        bestScore: 7,
+        totalGames: 1,
+        runId: "r1",
+        updatedAt: "2026-09-09T00:00:00.000Z",
+      },
+    ],
+    yourRank: 1,
+  })),
+}));
+
 const BOT_THINKING_STEP_MS = 600; // fallback in ./game/motion.ts (no CSS var in jsdom)
 
 /** Advances the paced bot-thinking timer and flushes the resulting React updates. */
@@ -113,5 +140,53 @@ describe("App", () => {
           .every((c) => c.getAttribute("aria-label")?.endsWith(", empty")),
       ).toBe(true);
     });
+  });
+});
+
+describe("MPG-055: real-time run → post-game rank → full leaderboard", () => {
+  let rafCb: FrameRequestCallback | null = null;
+
+  beforeEach(() => {
+    rafCb = null;
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      rafCb = cb;
+      return 1;
+    });
+    vi.stubGlobal("cancelAnimationFrame", () => {
+      rafCb = null;
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("routes a finished real-time run to that game's SCORE leaderboard", async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: /Floppy Birds/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    // Play the real module through to game over (no flaps → the bird drops).
+    let clock = 1000;
+    for (let i = 0; i < 25 && screen.queryByRole("button", { name: /Play again/ }) === null; i++) {
+      const cb = rafCb;
+      rafCb = null;
+      await act(async () => {
+        cb?.(clock);
+      });
+      clock += 250;
+    }
+    expect(screen.getByText("Game over")).toBeInTheDocument();
+
+    // The post-game rank preview links onward to the full board — with the
+    // real-time game's own title and the score metric, not win/loss/draw.
+    fireEvent.click(await screen.findByRole("button", { name: /View full leaderboard/ }));
+
+    expect(
+      await screen.findByRole("heading", { name: /Floppy Birds Leaderboard/ }),
+    ).toBeInTheDocument();
+    expect(await screen.findByRole("columnheader", { name: "Best score" })).toBeInTheDocument();
   });
 });

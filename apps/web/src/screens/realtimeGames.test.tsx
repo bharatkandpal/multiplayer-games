@@ -3,6 +3,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { drunkWalk, floppyBirds } from "@mpg/engine";
 import { REALTIME_GAMES, RealtimeGameRoute } from "./realtimeGames";
+import { fetchYourRank, submitRealtimeScore, type LeaderboardEntry } from "../api/leaderboard";
+
+const RANKED_ENTRY: LeaderboardEntry = {
+  id: "e1",
+  gameId: "floppy-birds",
+  metric: "score",
+  eventId: null,
+  timeBucket: null,
+  ownerToken: "tok-abcdef",
+  wins: 0,
+  losses: 0,
+  draws: 0,
+  bestScore: 7,
+  totalGames: 1,
+  runId: "r1",
+  updatedAt: "2026-09-09T00:00:00.000Z",
+};
+
+// The leaderboard is a server concern; these tests assert the CLIENT's
+// sequencing (submit the run, then read the rank the write produced).
+vi.mock("../api/leaderboard", () => ({
+  submitRealtimeScore: vi.fn(async () => ({ ok: true, entry: null })),
+  fetchYourRank: vi.fn(),
+}));
 
 // --- Controlled requestAnimationFrame (see RealtimePlayScreen.test.tsx) ------
 let rafCb: FrameRequestCallback | null = null;
@@ -16,6 +40,8 @@ function frame(now: number): void {
 
 beforeEach(() => {
   rafCb = null;
+  vi.mocked(submitRealtimeScore).mockReset().mockResolvedValue({ ok: true, entry: null });
+  vi.mocked(fetchYourRank).mockReset().mockResolvedValue({ rank: 4, entry: RANKED_ENTRY });
   // jsdom has no 2D canvas; return null quietly (the renderer no-ops on it)
   // instead of letting jsdom log "getContext not implemented" for every frame.
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
@@ -150,5 +176,82 @@ describe("RealtimeGameRoute — Drunk Walk end-to-end", () => {
 
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
+  });
+});
+
+describe("RealtimeGameRoute — post-game leaderboard rank (MPG-055)", () => {
+  /** Plays a real Floppy Birds run through to game over. */
+  function playToGameOver(): void {
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    let clock = 1000;
+    frame(clock);
+    for (let i = 0; i < 20 && screen.queryByRole("button", { name: /Play again/ }) === null; i++) {
+      clock += 250;
+      frame(clock);
+    }
+    expect(screen.getByText("Game over")).toBeInTheDocument();
+  }
+
+  it("submits the run, then shows the rank preview read AFTER the write settled", async () => {
+    const onViewLeaderboard = vi.fn();
+    render(
+      <RealtimeGameRoute
+        gameId="floppy-birds"
+        onExit={vi.fn()}
+        onViewLeaderboard={onViewLeaderboard}
+      />,
+    );
+    playToGameOver();
+
+    // The run is submitted for server-side re-simulation with the seed + the
+    // full input log — the client's score is never the authority.
+    expect(submitRealtimeScore).toHaveBeenCalledTimes(1);
+    const [gameId, submission] = vi.mocked(submitRealtimeScore).mock.calls[0]!;
+    expect(gameId).toBe("floppy-birds");
+    expect(submission.runId).toBeTruthy();
+    expect(submission.inputLog.length).toBeGreaterThan(0);
+
+    // Rank is fetched only once the submission settled, and on the "score"
+    // metric — real-time games don't rank on win/loss/draw.
+    expect(await screen.findByText("#4")).toBeInTheDocument();
+    expect(fetchYourRank).toHaveBeenCalledWith("floppy-birds", { metric: "score" });
+
+    fireEvent.click(screen.getByRole("button", { name: /View full leaderboard/ }));
+    expect(onViewLeaderboard).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fetch a rank before the score submission settles", async () => {
+    let settle: (() => void) | undefined;
+    vi.mocked(submitRealtimeScore).mockReturnValueOnce(
+      new Promise((resolve) => {
+        settle = () => resolve({ ok: true, entry: null });
+      }),
+    );
+
+    render(
+      <RealtimeGameRoute gameId="floppy-birds" onExit={vi.fn()} onViewLeaderboard={vi.fn()} />,
+    );
+    playToGameOver();
+
+    // Submission in flight: no rank shown, and nothing read from the server yet
+    // (reading now would report the PREVIOUS run's rank under this run's score).
+    expect(fetchYourRank).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /View full leaderboard/ })).not.toBeInTheDocument();
+
+    await act(async () => {
+      settle!();
+    });
+    expect(await screen.findByText("#4")).toBeInTheDocument();
+  });
+
+  it("omits the rank preview entirely when there is nowhere to view the leaderboard", async () => {
+    render(<RealtimeGameRoute gameId="floppy-birds" onExit={vi.fn()} />);
+    playToGameOver();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchYourRank).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /View full leaderboard/ })).not.toBeInTheDocument();
   });
 });
