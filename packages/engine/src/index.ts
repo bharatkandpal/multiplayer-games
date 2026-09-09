@@ -41,6 +41,9 @@ export type { FloppyState, FloppyInput, Pipe } from "./floppy-birds";
 export { drunkWalk, WORLD as DRUNK_WALK_WORLD } from "./drunk-walk";
 export type { DrunkWalkState, DrunkWalkInput, SteppingLeg } from "./drunk-walk";
 
+export { reflexTest, REFLEX, bestTimeMs, averageTimeMs, currentReactionMs } from "./reflex-test";
+export type { ReflexState, ReflexInput, ReflexLight } from "./reflex-test";
+
 export { builtInRealtimeGames, registerBuiltInRealtimeGames } from "./realtime-games";
 
 export { ticTacToe } from "./tictactoe";
