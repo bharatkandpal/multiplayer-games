@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Multiplayer Games">
+  <!--
+    Mark: a rounded tile in the brand accent (plum) holding two non-overlapping
+    circles in the seat-color palette (Okabe-Ito blue / vermillion, see
+    tokens.css --color-player-1/2) — reads as "two players, one board" and
+    stays legible down to a 16px browser tab.
+
+    Colors are duplicated (not var()-referenced) because a standalone favicon
+    file is fetched outside the app's CSS cascade; the light/dark swap below
+    mirrors tokens.css's accent + player values by hand.
+  -->
+  <style>
+    .bg { fill: #a81e67; }
+    .p1 { fill: #0072b2; }
+    .p2 { fill: #b34700; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #f26fb2; }
+      .p1 { fill: #7fc7ff; }
+      .p2 { fill: #ffb066; }
+    }
+  </style>
+  <rect class="bg" x="0" y="0" width="32" height="32" rx="6" />
+  <circle class="p1" cx="11.4" cy="11.4" r="6.4" />
+  <circle class="p2" cx="20.6" cy="20.6" r="6.4" />
+</svg>
