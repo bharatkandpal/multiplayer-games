@@ -1,4 +1,10 @@
 .main {
+  /* MPG bugfix: App's `.main` shell is a flex column; `margin: 0 auto`
+     below disables flexbox's default cross-axis stretch, so without an
+     explicit width this shrink-wraps to whatever content is widest at
+     that render (e.g. an un-sized inline SVG appearing later) instead of
+     the viewport. Pin it to the parent's full width. */
+  width: 100%;
   max-width: var(--container-md);
   margin: 0 auto;
   padding: var(--space-6) var(--space-4);

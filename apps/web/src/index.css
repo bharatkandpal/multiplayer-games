@@ -19,6 +19,16 @@
   box-sizing: border-box;
 }
 
+/* Kill the default mobile WebKit/Chromium tap-highlight rect (UX_PRINCIPLES
+   §4/§8 bug: a blue flash on every touch, most visible on a full-bleed
+   tappable surface like Floppy Birds'/Drunk Walk's play area, which gets
+   tapped rapidly and repeatedly). `:focus-visible` above stays untouched —
+   this only removes the transient touch-highlight paint, never the
+   deliberate focus ring, so keyboard/AT focus visibility is unaffected. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
 html,
 body,
 #root {
