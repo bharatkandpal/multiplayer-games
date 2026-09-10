@@ -128,10 +128,18 @@
 }
 
 /* Sits below the same-game actions (Rematch / play again vs…): moving on to a
-   different game is a deliberate step away, so it reads after them. */
+   different game is a deliberate step away, so it reads after them. A
+   hairline + top padding (rather than just `.resultActions`'s flex `gap`)
+   visually separates it from `.playAgainGroup` right above — without it,
+   "Next game" (ghost) sat close enough under "or play again vs…" that it
+   read as a third option in that group instead of an unrelated action. */
 .nextGameRow {
   display: flex;
   justify-content: center;
+  width: 100%;
+  max-width: 20rem;
+  padding-top: var(--space-3);
+  border-top: var(--border-width-hairline) solid var(--color-border);
 }
 
 .playAgainLabel {

@@ -43,11 +43,12 @@ export function GameSwitcher({
         <Button
           variant="ghost"
           size="sm"
+          className={styles.sideButton}
           onClick={() => onSwitch(previous)}
           aria-label={`Previous game: ${previous.title}`}
         >
-          <span aria-hidden="true">‹ </span>
-          {previous.title}
+          <span aria-hidden="true">‹</span>
+          <span className={styles.sideLabel}>{previous.title}</span>
         </Button>
       </span>
       {/* aria-current marks which of the three names is the one being played —
@@ -59,11 +60,12 @@ export function GameSwitcher({
         <Button
           variant="ghost"
           size="sm"
+          className={styles.sideButton}
           onClick={() => onSwitch(next)}
           aria-label={`Next game: ${next.title}`}
         >
-          {next.title}
-          <span aria-hidden="true"> ›</span>
+          <span className={styles.sideLabel}>{next.title}</span>
+          <span aria-hidden="true">›</span>
         </Button>
       </span>
     </nav>
