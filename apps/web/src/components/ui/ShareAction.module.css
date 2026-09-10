@@ -1,0 +1,39 @@
+/* Layout only — colour and type are inherited from the mount point, so this
+   reads correctly both in the arcade overlay (dark in either theme) and in the
+   turn-based result actions. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+/* Present even when empty, so a confirmation never reflows what's below it. */
+.status {
+  margin: 0;
+  min-height: 1.25em;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-300);
+}
+
+/* Last-resort manual copy: sized to sit inside a game-over overlay without
+   pushing the primary action off-screen on a small viewport. */
+.fallback {
+  display: block;
+  width: 100%;
+  max-width: 22rem;
+}
+
+.fallbackInput {
+  width: 100%;
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-mono, monospace);
+  font-size: var(--font-size-200);
+  text-overflow: ellipsis;
+}

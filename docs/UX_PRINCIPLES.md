@@ -91,8 +91,38 @@ A task is not done unless, for what it touches:
 - [ ] Motion is meaningful and respects reduced-motion.
 - [ ] Uses shared design tokens/components (no one-off styles).
 - [ ] Copy reviewed for tone and clarity.
+- [ ] **Local play is unaffected with the backend down** (§7) — the feature degrades to
+      absence, never to an error or a block.
 
-## 7. Enablers (so the bar is cheap to hit)
+## 7. Offline-first: no feature may break local play
+
+**Hard rule.** Every game in the catalogue must be fully playable, start to finish, with
+every network service down. Sharing, leaderboards, chat, voice, presence and analytics are
+enhancements layered on a game that already works locally — none of them may become a
+dependency of playing one.
+
+What this requires of any feature that touches the network:
+
+- **Never block or delay gameplay.** No screen, move or result waits on a request. The
+  local engine decides the game; the network is told about it afterwards, fire-and-forget.
+- **Degrade to absence, not to an error.** Service down means the affordance is not
+  offered — no share button, no rank, chat controls disabled — never an error banner over
+  a finished game about something the player never asked for.
+- **Never strand the player.** No dead ends, no retry loop in front of the board, no
+  spinner that outlives its request.
+
+**Worked example — durable share links (MPG-131).** A finished local game is reported to
+`POST /api/results` and a link minted from the id that comes back. Both calls are
+fire-and-forget and both swallow their failures: the result screen renders the instant the
+game ends, the share button appears a beat later _if_ a link exists, and with the backend
+unreachable the player simply sees the ordinary result screen with Rematch. Nothing about
+the game changes.
+
+**How to verify.** Stop the backend, then play a game of each kind to completion. Every
+single-player and hot-seat game must be unaffected; only network-backed affordances may
+disappear. This is part of the §6 gate, not a separate pass.
+
+## 8. Enablers (so the bar is cheap to hit)
 
 - **Design system / UI kit early** (tokens: color, type, spacing, motion; core components:
   Button, Board, Cell, Toast, Modal, StatusBadge, Skeleton). Built in Phase 1, before

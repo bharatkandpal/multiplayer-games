@@ -4,7 +4,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { drunkWalk, floppyBirds } from "@mpg/engine";
 import { REALTIME_GAMES, RealtimeGameRoute } from "./realtimeGames";
 import { fetchYourRank, submitRealtimeScore, type LeaderboardEntry } from "../api/leaderboard";
-import { createShareLink } from "../api/share";
+import { mintResultShareUrl, shareUrlForToken } from "../api/share";
 
 const RANKED_ENTRY: LeaderboardEntry = {
   id: "e1",
@@ -24,9 +24,13 @@ const RANKED_ENTRY: LeaderboardEntry = {
 
 // The leaderboard is a server concern; these tests assert the CLIENT's
 // sequencing (submit the run, then read the rank the write produced).
+// Mocked at `mintResultShareUrl` rather than at `createShareLink` beneath it:
+// that helper is the seam the route actually calls (MPG-131 moved it into
+// `api/share` so both game families mint through one path), and a mock on the
+// inner function would not intercept a same-module call anyway.
 vi.mock("../api/share", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api/share")>();
-  return { ...actual, createShareLink: vi.fn() };
+  return { ...actual, mintResultShareUrl: vi.fn() };
 });
 
 vi.mock("../api/leaderboard", () => ({
@@ -48,12 +52,7 @@ beforeEach(() => {
   rafCb = null;
   vi.mocked(submitRealtimeScore).mockReset().mockResolvedValue({ ok: true, entry: null });
   vi.mocked(fetchYourRank).mockReset().mockResolvedValue({ rank: 4, entry: RANKED_ENTRY });
-  vi.mocked(createShareLink).mockReset().mockResolvedValue({
-    token: "tok-durable",
-    kind: "result",
-    createdAt: "2026-09-09T00:00:00.000Z",
-    expiresAt: null,
-  });
+  vi.mocked(mintResultShareUrl).mockReset().mockResolvedValue(shareUrlForToken("tok-durable"));
   // jsdom has no 2D canvas; return null quietly (the renderer no-ops on it)
   // instead of letting jsdom log "getContext not implemented" for every frame.
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
@@ -310,7 +309,7 @@ describe("RealtimeGameRoute — durable share link (MPG-056)", () => {
 
     // The link points at the result row the server just persisted — the client
     // only knows its own runId, so this id has to come back from the submit.
-    expect(createShareLink).toHaveBeenCalledWith({ kind: "result", targetId: "res-42" });
+    expect(mintResultShareUrl).toHaveBeenCalledWith("res-42");
 
     // ...and the share affordance hands over exactly that URL.
     fireEvent.click(screen.getByRole("button", { name: /Share score|Copy link/ }));
@@ -327,7 +326,9 @@ describe("RealtimeGameRoute — durable share link (MPG-056)", () => {
       entry: null,
       resultId: "res-42",
     });
-    vi.mocked(createShareLink).mockRejectedValue(new Error("offline"));
+    // `mintResultShareUrl` never rejects — it resolves `undefined` when the
+    // link can't be minted, which is exactly the offline/service-down case.
+    vi.mocked(mintResultShareUrl).mockResolvedValue(undefined);
 
     render(<RealtimeGameRoute gameId="floppy-birds" onExit={vi.fn()} />);
     playToGameOver();
@@ -349,6 +350,6 @@ describe("RealtimeGameRoute — durable share link (MPG-056)", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(createShareLink).not.toHaveBeenCalled();
+    expect(mintResultShareUrl).not.toHaveBeenCalled();
   });
 });

@@ -64,6 +64,9 @@ export function WatchGamePlayScreen<S, M, L = unknown>({
   const controller: PlayController<S, M> = {
     session,
     seats,
+    // No seat here, so nothing to report or share (MPG-131) — a spectator's view
+    // of someone else's game is not their result to publish.
+    moveLog: [],
     isHumanTurn: false,
     thinkingSeat: phase === "watching" ? session.turn : null,
     isAllBots: false, // hides the local watch-speed controls — the server already paces this.

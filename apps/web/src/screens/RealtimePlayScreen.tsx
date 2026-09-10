@@ -7,11 +7,17 @@ import {
   type ReactNode,
 } from "react";
 import type { RealtimeModule } from "@mpg/engine";
-import { BackArrowIcon, Button, HomeIcon, StatusBadge, VisuallyHidden } from "../components/ui";
+import {
+  BackArrowIcon,
+  Button,
+  HomeIcon,
+  ShareAction,
+  StatusBadge,
+  VisuallyHidden,
+} from "../components/ui";
 import { cx } from "../components/ui/cx";
 import { type RealtimeLoopPhase, type RunComplete, useRealtimeLoop } from "../game";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
-import { useShareLink } from "../hooks/useShareLink";
 import styles from "./RealtimePlayScreen.module.css";
 
 /**
@@ -150,7 +156,6 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
   resultExtra,
 }: RealtimePlayScreenProps<S, I, A>): React.JSX.Element {
   const reducedMotion = usePrefersReducedMotion();
-  const { share, status: shareStatus, canShare, reset: resetShare } = useShareLink();
 
   // Rising-edge input: actions pressed (via key or tap) since the last tick,
   // consumed and cleared once per fixed tick by the controller.
@@ -241,17 +246,6 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
   const handlePlayAgain = useCallback(() => {
     restart(nextSeed());
   }, [restart, nextSeed]);
-
-  // Brag-first text (PRD FR-23): the score leads, the link follows, and there's
-  // no "Play now!" CTA — the URL is the invitation.
-  const handleShare = useCallback(() => {
-    if (!shareUrl) return;
-    void share({
-      url: shareUrl,
-      title: gameTitle,
-      text: `I scored ${score} on ${gameTitle}`,
-    });
-  }, [share, shareUrl, gameTitle, score]);
 
   useEffect(() => {
     if (phase === "ready") startBtnRef.current?.focus();
@@ -351,35 +345,19 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
                   Play again
                 </Button>
                 {shareUrl ? (
-                  <>
-                    {/* Secondary to "Play again" — one primary action per state
-                        stays the rule; sharing is the optional brag on top. */}
-                    <Button variant="secondary" size="sm" onClick={handleShare}>
-                      {canShare ? "Share score" : "Copy link"}
-                    </Button>
-                    {/* Feedback lives in the overlay itself, politely announced,
-                        so it never covers the board or steals focus from the
-                        primary action. */}
-                    <p className={styles.overlayText} role="status">
-                      {shareStatus === "shared" ? "Shared!" : null}
-                      {shareStatus === "copied" ? "Link copied!" : null}
-                    </p>
-                    {shareStatus === "unavailable" ? (
-                      // Last rung: nothing automatic worked, so hand over the
-                      // URL itself rather than dead-ending on an error.
-                      <label className={styles.shareFallback}>
-                        <VisuallyHidden>Link to copy</VisuallyHidden>
-                        <input
-                          className={styles.shareFallbackInput}
-                          type="text"
-                          readOnly
-                          value={shareUrl}
-                          onFocus={(event) => event.currentTarget.select()}
-                          onBlur={resetShare}
-                        />
-                      </label>
-                    ) : null}
-                  </>
+                  /* Secondary to "Play again" — one primary action per state
+                     stays the rule; sharing is the optional brag on top. The
+                     whole ladder (sheet → clipboard → visible URL) plus its
+                     politely-announced feedback lives in `ShareAction`, shared
+                     with the turn-based result actions so the two can't drift.
+                     Brag-first text (PRD FR-23): the score leads, the link
+                     follows, and there's no "Play now!" CTA. */
+                  <ShareAction
+                    url={shareUrl}
+                    title={gameTitle}
+                    text={`I scored ${score} on ${gameTitle}`}
+                    shareLabel="Share score"
+                  />
                 ) : null}
                 {resultExtra}
               </div>

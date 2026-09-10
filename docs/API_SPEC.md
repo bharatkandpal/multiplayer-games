@@ -189,6 +189,70 @@ score if it equals `getScore(finalState)` **and** `isGameOver(finalState)` is `t
 - `422 { "error": "SCORE_MISMATCH" }` — the replayed run's score and/or game-over state
   doesn't match the client's claim; nothing is written
 
+### `POST /api/results` (MPG-131)
+
+Persists a finished **local turn-based** game — vs-bot or hot-seat, the games that never
+touch a room and so have no server-side result of their own. Room-backed games do NOT use
+this: the server already wrote their result when it refereed the game, and hands each seat
+its id over `game:result-saved` (§3.2).
+
+Session-scoped — requires `x-session-token` header / `mpg_session` cookie. The client's
+claimed **outcome is never trusted**: the server replays `moveLog` through that game's pure
+`GameModule` (`createInitialState` → `applyMove` per entry) and derives `status`/`winnerSlot`
+from its own final position. `applyMove` enforces turn order and legality itself, so a
+forged log fails the replay rather than being written as fact. The same posture
+`POST /api/leaderboard/:gameId/submit` takes for real-time runs.
+
+**Body**
+
+```json
+{
+  "runId": "client-generated-uuid",
+  "gameId": "tictactoe",
+  "moveLog": [
+    { "slot": 1, "move": { "cell": 0 } },
+    { "slot": 2, "move": { "cell": 3 } }
+  ],
+  "seatsSnapshot": [
+    { "slot": 1, "kind": "human" },
+    { "slot": 2, "kind": "bot", "difficulty": "medium" }
+  ],
+  "durationMs": 42000
+}
+```
+
+- `runId` — idempotency key, client-minted so a retry after a network blip can't
+  double-write. Stored namespaced (`local:<runId>`) so it can never collide with a room's
+  server-minted key.
+- `moveLog` — required, non-empty, max 500 entries. `move` is the game-native opaque shape
+  (`M` in `GameModule<S, M>`); `slot` is the 1-based seat that played it.
+- `seatsSnapshot` — required, exactly `playerCount` entries. Rebuilt field-by-field on the
+  server (only `slot`/`kind`/`difficulty` survive), because it is echoed to strangers by
+  `GET /api/share/:token`.
+- `durationMs?` — optional.
+
+**Deliberately writes no leaderboard entry.** A local game is played against a bot whose
+difficulty the player chose, or against someone on the same sofa; ranking it alongside room
+games would make the board meaningless. This route exists to give a finished local game
+something a durable share link can point at (MPG-056), nothing more.
+
+**Response `201`** → `{ "ok": true, "resultId": "…" }`, or on a repeat of the same `runId`,
+`200 { "ok": true, "duplicate": true, "resultId": "…" }`.
+
+**Errors**
+
+- `400 { "error": "no_session" }` — no session token resolved
+- `400 { "error": "INVALID_REQUEST" }` — missing/malformed `runId`/`gameId`/`moveLog`/`durationMs`,
+  or a move log that is empty or over the 500-entry cap
+- `400 { "error": "UNKNOWN_GAME" }` — `:gameId` has no registered `GameModule`
+- `400 { "error": "INVALID_SEATS" }` — `seatsSnapshot` malformed, or not `playerCount` long
+- `409 { "error": "RUN_ID_TAKEN" }` — that `runId` belongs to another session (deliberately
+  not a peek at their result id)
+- `422 { "error": "REPLAY_MISMATCH" }` — a move was illegal, out of turn, or played after
+  the game ended; nothing is written
+- `422 { "error": "GAME_NOT_OVER" }` — the replay reached a non-terminal position; only a
+  finished game is worth a durable link
+
 ### `GET /api/session` (MPG-054)
 
 Current (or newly-minted) session identity. Session-scoped via `x-session-token` header /
@@ -308,11 +372,20 @@ the rest of this table is the target contract for MPG-012.
 | `game:update`           | `{ room: PublicRoom, lastMove }`       | New authoritative state after a move.             |
 | `move:rejected`         | `{ reason }`                           | `NOT_YOUR_TURN` \| `ILLEGAL_MOVE` \| `GAME_OVER`. |
 | `game:over`             | `{ room: PublicRoom, result: Result }` | Terminal state.                                   |
+| `game:result-saved`     | `{ roomId, resultId }`                 | **Per-seat, not broadcast** — see below.          |
 | `opponent:disconnected` | `{ graceMs }`                          | Opponent dropped; reconnect window open.          |
 | `opponent:reconnected`  | `{}`                                   | Opponent came back within grace.                  |
 | `room:abandoned`        | `{ reason }`                           | Opponent didn't return / room closed.             |
 | `rematch:pending`       | `{ from: Slot }`                       | _Superseded by `rematch:proposed` — see §3.5._    |
 | `error`                 | `{ code, message }`                    | Generic protocol/validation error.                |
+
+**`game:result-saved` (MPG-131).** Sent only to the individual socket of each human seat,
+once the server's result write for that seat lands. `game:over` deliberately goes out first
+and never waits on the database — the result screen is the moment the game ends — so the
+persisted row's id follows separately. That id is what a durable share link is minted
+against (`POST /api/share`), and it identifies a row owned by one session, which is why it
+is never part of the room-wide broadcast. A seat that disconnected in between is simply not
+told; its result is still persisted and readable via `GET /api/session/history`.
 
 ### 3.3 Bot seats (server-driven)
 

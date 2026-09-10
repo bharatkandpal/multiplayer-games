@@ -42,9 +42,17 @@ function gameTitle(gameId: string): string {
 function headline(view: Extract<SharedView, { kind: "result" | "replay" }>): string {
   const { result } = view;
   if (result.score !== null) return `Scored ${result.score}`;
-  if (result.status !== "complete") return "Unfinished game";
-  if (result.winnerSlot === null) return "Ended in a draw";
-  return `Player ${result.winnerSlot + 1} won`;
+  // `winnerSlot` is a 1-based seat slot — the same index the engine calls
+  // `Player`, and what both result writers persist (`rooms/moveHandler.ts`,
+  // `results/resultRoutes.ts`). It is already the number a player reads on the
+  // board, so incrementing it would name the wrong seat.
+  if (result.winnerSlot !== null) return `Player ${result.winnerSlot} won`;
+  // A finished game with neither a score nor a winner is a draw. The two
+  // families spell "finished" differently — turn-based rows carry the engine's
+  // own "win"/"draw", real-time rows carry "complete" — so this checks for the
+  // one status that ISN'T terminal rather than enumerating those that are.
+  if (result.status === "in_progress") return "Unfinished game";
+  return "Ended in a draw";
 }
 
 export function SharedResultScreen({

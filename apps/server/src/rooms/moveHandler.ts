@@ -156,7 +156,15 @@ function emitUpdate(
   return publicRoom;
 }
 
-/** Broadcasts `game:over` and fires the (fire-and-forget) result persistence. */
+/**
+ * Broadcasts `game:over` and fires the (fire-and-forget) result persistence.
+ *
+ * `game:over` goes out FIRST and never waits on the database: the result screen
+ * is the moment the game ends, and a slow (or failed) write must not delay it for
+ * everyone in the room. The persisted row's id follows once it exists, as a
+ * separate per-seat `game:result-saved` — that id is what a durable share link
+ * points at (MPG-056/MPG-131), and each player only ever learns their own.
+ */
 function emitGameOver(
   io: Server,
   roomManager: RoomManager,
@@ -166,17 +174,43 @@ function emitGameOver(
 ): void {
   const publicRoom = roomManager.toPublicRoom(room);
   io.to(room.id).emit("game:over", { room: publicRoom, result });
-  void persistResults(store, room, result).catch((err: unknown) => {
-    console.error("Failed to persist game result", err);
-  });
+  void persistResults(store, room, result)
+    .then((saved) => {
+      for (const { socketId, resultId } of saved) {
+        // A seat that disconnected between game-over and this write has no socket
+        // to tell. Nothing is lost that matters — the row is persisted and still
+        // reachable via `/api/session/history`; only the one-tap share on this
+        // particular result screen is missed.
+        if (socketId) io.to(socketId).emit("game:result-saved", { roomId: room.id, resultId });
+      }
+    })
+    .catch((err: unknown) => {
+      console.error("Failed to persist game result", err);
+    });
+}
+
+/** A persisted result paired with the socket that should be told about it. */
+interface PersistedSeatResult {
+  readonly slot: Slot;
+  readonly socketId: string | undefined;
+  readonly resultId: string;
 }
 
 /**
  * Persist one idempotent `GameResult` per human seat (each row owned by that seat's
  * session token, so it surfaces in their `/api/session/history`). Bot seats have no
  * session and are recorded only in `seatsSnapshot`.
+ *
+ * Returns each human seat's persisted result so the caller can hand that seat its
+ * own `resultId` — deliberately per-seat rather than a room-wide broadcast: a
+ * result id is the target a share link is minted against, and it belongs to the
+ * one session that owns the row.
  */
-async function persistResults(store: Store, room: Room, result: Result): Promise<void> {
+async function persistResults(
+  store: Store,
+  room: Room,
+  result: Result,
+): Promise<PersistedSeatResult[]> {
   const winnerSlot = result.status === "win" ? result.winner : null;
   const seatsSnapshot = room.seats.map((seat) => ({
     slot: seat.slot,
@@ -191,9 +225,9 @@ async function persistResults(store: Store, room: Room, result: Result): Promise
       seat.kind === "human" && typeof seat.sessionToken === "string",
   );
 
-  await Promise.all(
-    humanSeats.map((seat) =>
-      writeGameResult(store, {
+  const saved: PersistedSeatResult[] = await Promise.all(
+    humanSeats.map(async (seat) => {
+      const row = await writeGameResult(store, {
         runId: `${room.runId}:${seat.slot}`,
         gameId: room.gameId,
         gameFamily: "turn-based",
@@ -203,8 +237,12 @@ async function persistResults(store: Store, room: Room, result: Result): Promise
         seatsSnapshot,
         durationMs,
         moveLog: room.moveLog,
-      }),
-    ),
+      });
+      // Read at write time, not at emit time: a seat that reconnects in between
+      // gets a new socket, and telling the stale one is a no-op rather than a
+      // misdelivery — the id still only ever travels to that seat's own socket.
+      return { slot: seat.slot, socketId: seat.socketId, resultId: row.id };
+    }),
   );
 
   if (result.status === "win" || result.status === "draw") {
@@ -216,4 +254,6 @@ async function persistResults(store: Store, room: Room, result: Result): Promise
       { runId: room.runId },
     );
   }
+
+  return saved;
 }

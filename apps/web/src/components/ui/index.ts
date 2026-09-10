@@ -16,6 +16,9 @@ export type { ModalProps } from "./Modal";
 export { UsernamePrompt } from "./UsernamePrompt";
 export type { UsernamePromptProps } from "./UsernamePrompt";
 
+export { ShareAction } from "./ShareAction";
+export type { ShareActionProps } from "./ShareAction";
+
 export { Skeleton, SkeletonGroup } from "./Skeleton";
 export type { SkeletonProps, SkeletonVariant, SkeletonGroupProps } from "./Skeleton";
 

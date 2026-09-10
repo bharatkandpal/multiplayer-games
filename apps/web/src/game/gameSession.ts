@@ -57,6 +57,22 @@ export interface GameSessionState<S, M> {
   /** Whose turn it is in `state` right now. Meaningless once `result` is terminal. */
   readonly turn: Player;
   readonly lastMove: AppliedMove<M> | null;
+  /**
+   * Every move applied to THIS session locally, oldest first (MPG-131) — the
+   * evidence `POST /api/results` replays to validate a finished local game.
+   *
+   * Kept here rather than assembled by a caller watching `lastMove`, because
+   * only the reducer can tell a move that landed from one that was rejected
+   * (a rejection returns the same position with an "error" status), and because
+   * a log derived in an effect lags the position it describes by a render — long
+   * enough for a game-over handler to read it one move short.
+   *
+   * Fed by `apply_local_move` alone. `reconcile` deliberately does NOT append:
+   * online play would double-count its own optimistically-applied move, and the
+   * server's broadcast is the source of truth there — `useOnlinePlay` keeps its
+   * own log from that stream. This one is authoritative for local play.
+   */
+  readonly moveLog: readonly AppliedMove<M>[];
   readonly status: GameSessionStatus<M>;
 }
 
@@ -76,6 +92,7 @@ export function createGameSession<S, M>(
     result,
     turn: game.currentPlayer(state),
     lastMove: null,
+    moveLog: [],
     status: { type: "idle" },
   };
 }
@@ -146,6 +163,7 @@ export function gameSessionReducer<S, M>(
           result,
           turn: session.game.currentPlayer(nextState),
           lastMove: { move: action.move, player },
+          moveLog: [...session.moveLog, { move: action.move, player }],
           status: statusForResult(result),
         };
       } catch (err) {
@@ -192,6 +210,9 @@ export function gameSessionReducer<S, M>(
         result,
         turn: session.game.currentPlayer(action.state),
         lastMove: null,
+        // Drop the optimistic move this revert is rolling back, so the log
+        // never claims a move the authoritative state doesn't contain.
+        moveLog: session.moveLog.slice(0, -1),
         status,
       };
     }
@@ -210,6 +231,7 @@ export function gameSessionReducer<S, M>(
         result,
         turn: session.game.currentPlayer(nextState),
         lastMove: null,
+        moveLog: [],
         status: { type: "idle" },
       };
     }
