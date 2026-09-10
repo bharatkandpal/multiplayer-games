@@ -1,4 +1,14 @@
 .main {
+  /* Flex item of App's flex-column shell (App.module.css `.main`): the
+     `margin: 0 auto` centering below disables flexbox's default cross-axis
+     stretch, so without an explicit width this shrink-wraps to whatever
+     content happens to be widest at that render — most visibly, an
+     un-sized inline <svg> mark/stone (no width/height attrs, so its
+     max-content contribution falls back to the SVG default 300x150 box)
+     appearing on the first move, which ballooned this container (and the
+     board inside it) wider right after that move. Pin it to the parent's
+     full width so layout is driven by viewport, not board content. */
+  width: 100%;
   max-width: var(--container-md);
   margin: 0 auto;
   padding: var(--space-6) var(--space-4);
