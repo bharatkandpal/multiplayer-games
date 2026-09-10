@@ -590,7 +590,13 @@ export function GamePlayScreenView<S, M, L = unknown>({
 
           {onNextGame ? (
             <div className={styles.nextGameRow}>
-              <Button variant="secondary" onClick={onNextGame}>
+              {/* `ghost` (not `secondary`) deliberately: "Next game" sits
+                  right under the "or play again vs…" group, which also uses
+                  `secondary` buttons — matching that style made it read as a
+                  third same-game option instead of the unrelated "leave to a
+                  different game" action it actually is. The divider above
+                  (`.nextGameRow`) does the rest of that separation. */}
+              <Button variant="ghost" onClick={onNextGame}>
                 Next game <span aria-hidden="true">›</span>
               </Button>
             </div>

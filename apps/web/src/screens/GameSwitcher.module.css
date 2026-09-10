@@ -27,14 +27,40 @@
   text-overflow: ellipsis;
 }
 
+/* MPG bugfix: `flex: 0 0 auto` sized each side to its own button's content,
+   so a short neighbour ("Reflex Test") and a long one ("Move-Mode
+   Tic-Tac-Toe") produced unequal side widths — pushing `.current` off-centre
+   and starving it of space on narrow viewports (it truncated to "Tic-Tac-…"
+   even with room to spare). `flex: 1 1 0` gives both sides an equal, bounded
+   share of the row so they're actually symmetric, and `min-width: 0` lets
+   the label below do its own truncation instead of overflowing. */
 .side {
-  flex: 0 0 auto;
-  /* Reserve both slots even when only one is rendered, so the title doesn't
-     jump horizontally between games. */
-  min-width: var(--size-touch-target);
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
 }
 
 .sideEnd {
-  display: flex;
   justify-content: flex-end;
+}
+
+/* Lets the Button itself shrink to `.side`'s allocated (now-equal) share of
+   the row, instead of forcing the row wider to fit a long neighbour title. */
+.sideButton {
+  width: 100%;
+  min-width: 0;
+}
+
+/* The neighbour game's title, inside the Button — truncates on its own
+   rather than stretching the side slot (and thus starving `.current`) to
+   fit a long name. */
+.sideLabel {
+  /* A flex item's default min-width is content-based (auto), which defeats
+     ellipsis truncation entirely — `flex-shrink` alone won't shrink it past
+     its own text width. `min-width: 0` is what actually lets it shrink. */
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
