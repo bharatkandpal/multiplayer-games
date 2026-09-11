@@ -10,6 +10,8 @@ import {
   drunkWalk,
   floppyBirds,
   game2048,
+  game2048_3,
+  game2048_5,
   reflexTest,
   type BreakoutInput,
   type BreakoutState,
@@ -18,6 +20,7 @@ import {
   type FloppyInput,
   type FloppyState,
   type Game2048Input,
+  type Game2048Size,
   type Game2048State,
   type RealtimeGameId,
   type RealtimeModule,
@@ -36,6 +39,8 @@ import {
 import { FloppyBirdsScene } from "../components/realtime/FloppyBirdsScene";
 import { ReflexTestScene } from "../components/realtime/ReflexTestScene";
 import { Game2048Scene } from "../components/realtime/Game2048Scene";
+import { Game2048CustomizeMenu } from "../components/realtime/Game2048CustomizeMenu";
+import { loadStored2048Size, store2048Size } from "../components/realtime/game2048Size";
 import { BreakoutScene } from "../components/realtime/BreakoutScene";
 import { Button, GearIcon } from "../components/ui";
 import {
@@ -344,6 +349,11 @@ export function RealtimeGameRoute({
   const [character, setCharacter] = useState<DrunkWalkCharacter>(() =>
     gameId === "drunk-walk" ? loadStoredDrunkWalkCharacter() : DEFAULT_DRUNK_WALK_CHARACTER,
   );
+  // Only meaningful for "2048" (its grid size is customizable), declared
+  // unconditionally to keep hook order stable, like `character` above.
+  const [size, setSize] = useState<Game2048Size>(() =>
+    gameId === "2048" ? loadStored2048Size() : 4,
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const wiring = REALTIME_GAMES[gameId];
   // This game's input source (MPG-120). Built once per game: a source owns mutable
@@ -398,6 +408,60 @@ export function RealtimeGameRoute({
           isOpen={menuOpen}
           character={character}
           onChange={handleChangeCharacter}
+          onClose={() => setMenuOpen(false)}
+        />
+      </>
+    );
+  }
+
+  if (gameId === "2048") {
+    // The selected size chooses which registered module plays — and therefore
+    // which leaderboard the run submits to (the loop reads `module.id`, so the
+    // submit id follows automatically; only the rank read needs it explicitly).
+    const module2048 = size === 3 ? game2048_3 : size === 5 ? game2048_5 : game2048;
+    const rank2048 =
+      onViewLeaderboard && settled ? (
+        <RankPreview
+          key={runKey}
+          gameId={module2048.id}
+          metric="score"
+          onViewLeaderboard={onViewLeaderboard}
+        />
+      ) : null;
+    const handleChangeSize = (next: Game2048Size): void => {
+      setSize(next);
+      store2048Size(next);
+    };
+    return (
+      <>
+        <RealtimePlayScreen<Game2048State, Game2048Input>
+          // Remount on a size change: a different grid is a different game, so the
+          // run resets cleanly to a fresh `ready` state built by the new module.
+          key={size}
+          module={module2048}
+          gameTitle={title}
+          seed={seed}
+          inputSource={inputSource as InputSource<Game2048Input>}
+          renderScene={(props) => <Game2048Scene {...props} />}
+          onExit={onExit}
+          onRunComplete={onRunComplete}
+          shareUrl={shareToken ?? buildShareUrl(gameId)}
+          resultExtra={rank2048}
+          surfaceExtra={
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Change board size"
+            >
+              <GearIcon />
+            </Button>
+          }
+        />
+        <Game2048CustomizeMenu
+          isOpen={menuOpen}
+          size={size}
+          onChange={handleChangeSize}
           onClose={() => setMenuOpen(false)}
         />
       </>

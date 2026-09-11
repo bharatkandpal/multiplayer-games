@@ -201,6 +201,29 @@ describe("RealtimeGameRoute — Drunk Walk end-to-end", () => {
   });
 });
 
+describe("RealtimeGameRoute — 2048 board size (MPG-096)", () => {
+  afterEach(() => window.localStorage.clear());
+
+  it("opens the size menu from the cog and persists a new size", () => {
+    render(<RealtimeGameRoute gameId="2048" onExit={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Change board size" }));
+    // 4×4 is the default selection until the player changes it.
+    expect(screen.getByRole("button", { name: /4 by 4/ })).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: /3 by 3/ }));
+    expect(window.localStorage.getItem("mpg:2048:size")).toBe("3");
+  });
+
+  it("starts on the player's stored non-default size", () => {
+    window.localStorage.setItem("mpg:2048:size", "5");
+    render(<RealtimeGameRoute gameId="2048" onExit={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Change board size" }));
+    expect(screen.getByRole("button", { name: /5 by 5/ })).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
 describe("RealtimeGameRoute — post-game leaderboard rank (MPG-055)", () => {
   /** Plays a real Floppy Birds run through to game over. */
   function playToGameOver(): void {
