@@ -5,6 +5,7 @@ import {
   Button,
   HomeIcon,
   SeatCard,
+  ShareAction,
   StatusBadge,
   Toast,
   VisuallyHidden,
@@ -22,6 +23,7 @@ import {
   sameSeatKinds,
   useLocalPlayController,
 } from "../game";
+import { useLocalResultShare } from "../hooks/useResultShare";
 import { RankPreview } from "./RankPreview";
 import styles from "./GamePlayScreen.module.css";
 
@@ -132,6 +134,19 @@ export interface GamePlayScreenViewProps<S, M, L = unknown> {
   gameId?: string;
   onViewLeaderboard?: () => void;
   /**
+   * MPG-131: a durable `/s/:token` URL for this finished game, which turns the
+   * result actions into leg 5 of the loop. Omit (the default) and no share
+   * affordance is rendered at all — deliberately, rather than falling back to
+   * the game's own URL: a turn-based outcome shared as a bare "here's the game"
+   * link is a worse artifact than no button, since nothing about the result
+   * survives the trip.
+   *
+   * Arrives asynchronously (the result is persisted, then a link minted), so the
+   * button appears a beat after game-over. That's why it's not the primary
+   * action — nothing the player is waiting on ever pops in late.
+   */
+  shareUrl?: string;
+  /**
    * MPG-025: hides the Rematch button (and its online negotiation status)
    * on the game-over actions — used by the read-only watch screen, where
    * "rematch" isn't a concept (no seat here to propose one from); the
@@ -174,6 +189,29 @@ function resultHeadline(result: Result, seats: SeatsConfig): string {
   }
   if (result.status === "win") return `${describeSeat(seats, seatIndexOf(result.winner))} wins!`;
   return "";
+}
+
+/**
+ * The accompanying text on a shared result (MPG-131), brag-first per PRD FR-23.
+ *
+ * First person where the sharer can be identified — a sole human seat that won is
+ * unambiguously "I", the same reasoning `resultTone` uses to decide it may show a
+ * defeat. Anything else (hot-seat, all-bot, a loss) states the outcome plainly
+ * rather than claiming a win nobody can attribute. Never a CTA: the URL is the
+ * invitation.
+ */
+function shareText(result: Result, seats: SeatsConfig, gameTitle: string): string {
+  if (result.status === "draw") return `We drew at ${gameTitle}`;
+  if (result.status !== "win") return gameTitle;
+
+  const humanSeatIndices = seats.reduce<number[]>((acc, seat, index) => {
+    if (seat.kind === "human") acc.push(index);
+    return acc;
+  }, []);
+  if (humanSeatIndices.length === 1 && humanSeatIndices[0] === seatIndexOf(result.winner)) {
+    return `I won at ${gameTitle}`;
+  }
+  return `${describeSeat(seats, seatIndexOf(result.winner))} won at ${gameTitle}`;
 }
 
 /**
@@ -334,6 +372,7 @@ export function GamePlayScreenView<S, M, L = unknown>({
   online,
   gameId,
   onViewLeaderboard,
+  shareUrl,
   showRematch = true,
   controller,
 }: GamePlayScreenViewProps<S, M, L>): React.JSX.Element {
@@ -602,6 +641,18 @@ export function GamePlayScreenView<S, M, L = unknown>({
             </div>
           ) : null}
 
+          {shareUrl ? (
+            <div className={styles.shareRow}>
+              <ShareAction
+                url={shareUrl}
+                title={gameTitle}
+                // Brag-first (PRD FR-23): the outcome leads, the link follows,
+                // and there's no "Play now!" CTA — the URL is the invitation.
+                text={shareText(session.result, seats, gameTitle)}
+              />
+            </div>
+          ) : null}
+
           {gameId && onViewLeaderboard ? (
             <RankPreview gameId={gameId} onViewLeaderboard={onViewLeaderboard} />
           ) : null}
@@ -634,11 +685,26 @@ export function GamePlayScreen<S, M, L = unknown>({
   ...rest
 }: GamePlayScreenProps<S, M, L>): React.JSX.Element {
   const controller = useLocalPlayController(game, seats);
+  const resolvedGameId = gameId ?? game.id;
+
+  // MPG-131: a local game exists only in this browser until it's reported, so a
+  // finished one is persisted (and replay-validated server-side) before a durable
+  // link can be minted for it. Skipped for all-bot sessions — that's a watch, and
+  // "two bots played" is nobody's brag.
+  const shareUrl = useLocalResultShare({
+    gameId: resolvedGameId,
+    seats,
+    moveLog: controller.moveLog,
+    isGameOver: controller.session.status.type === "game_over",
+    enabled: !controller.isAllBots,
+  });
+
   return (
     <GamePlayScreenView
       seats={seats}
       controller={controller}
-      gameId={gameId ?? game.id}
+      gameId={resolvedGameId}
+      {...(shareUrl ? { shareUrl } : {})}
       {...rest}
     />
   );

@@ -142,6 +142,18 @@
   border-top: var(--border-width-hairline) solid var(--color-border);
 }
 
+/* MPG-131: the share affordance sits below the "play again" options — it's the
+   optional brag on top of a finished game, never the primary action, and it
+   appears a beat late (the link is minted after the result persists). Sized to
+   the same 20rem column as `.nextGameRow` so its arrival doesn't widen the
+   actions block. */
+.shareRow {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: 20rem;
+}
+
 .playAgainLabel {
   font-size: var(--font-size-200);
   color: var(--color-text-muted);

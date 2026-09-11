@@ -165,28 +165,6 @@
   font-size: var(--font-size-300);
 }
 
-/* Last-resort manual copy on the game-over surface: shown only when both the
-   native share sheet and the clipboard failed, so the URL is never unreachable.
-   Sized to fit the overlay without pushing the primary action off-screen on a
-   small phone. */
-.shareFallback {
-  display: block;
-  width: 100%;
-  max-width: 22rem;
-}
-
-.shareFallbackInput {
-  width: 100%;
-  padding: var(--space-2);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background-color: var(--color-surface);
-  color: var(--color-text);
-  font-family: var(--font-family-mono, monospace);
-  font-size: var(--font-size-200);
-  text-overflow: ellipsis;
-}
-
 .playAgainIcon {
   display: inline-block;
   margin-right: var(--space-2);

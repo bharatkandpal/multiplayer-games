@@ -65,11 +65,21 @@ describe("SharedResultScreen (MPG-056)", () => {
   it("READY: a turn-based result with no score states the outcome instead", async () => {
     vi.mocked(fetchSharedView).mockResolvedValue({
       kind: "result",
-      result: { ...RESULT_VIEW.result, gameId: "connect4", score: null, winnerSlot: 1 },
+      // The shape a turn-based row actually has: the engine's own terminal
+      // status, and a 1-BASED winner slot (`Player`). Naming the winner
+      // "Player 2" here would be the off-by-one MPG-131 fixed — the seat the
+      // player saw win was seat 1.
+      result: {
+        ...RESULT_VIEW.result,
+        gameId: "connect4",
+        status: "win",
+        score: null,
+        winnerSlot: 1,
+      },
     });
     renderScreen();
 
-    expect(await screen.findByText("Player 2 won")).toBeInTheDocument();
+    expect(await screen.findByText("Player 1 won")).toBeInTheDocument();
   });
 
   it("READY: a draw reads as a draw, not as 'Player 1 won'", async () => {

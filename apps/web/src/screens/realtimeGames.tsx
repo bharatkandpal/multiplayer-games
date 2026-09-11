@@ -37,7 +37,7 @@ import {
 import { REALTIME_CATALOG } from "./HomeScreen";
 import { RankPreview } from "./RankPreview";
 import { submitRealtimeScore } from "../api/leaderboard";
-import { createShareLink, shareUrlForToken } from "../api/share";
+import { mintResultShareUrl } from "../api/share";
 import type { RunComplete } from "../game/useRealtimeLoop";
 
 /**
@@ -184,27 +184,6 @@ function submitRun(result: RunComplete<unknown>): Promise<string | undefined> {
     });
 }
 
-/**
- * Mints the durable share link for a finished run (MPG-056), returning the
- * `/s/:token` URL to hand the share button.
- *
- * Minted EAGERLY when the run settles rather than lazily on the share tap, and
- * that ordering is deliberate: `navigator.share` must be called inside the
- * user's gesture, and awaiting a network round-trip first breaks the gesture on
- * some mobile browsers — the sheet then silently never opens. The cost is a
- * share_link row per completed run whether or not it is ever shared, which is
- * what the row's optional expiry and the retention sweep exist to bound.
- */
-function mintResultLink(resultId: string): Promise<string | undefined> {
-  return createShareLink({ kind: "result", targetId: resultId })
-    .then((link) => shareUrlForToken(link.token))
-    .catch((error: unknown) => {
-      // Never break sharing over this: the caller falls back to the game URL.
-      console.warn("[share] could not mint a durable result link", error);
-      return undefined;
-    });
-}
-
 export interface RealtimeGameRouteProps {
   gameId: RealtimeGameId;
   onExit: () => void;
@@ -243,7 +222,7 @@ function useSettledRun(): {
       // The rank is readable the moment the score write lands; don't make it
       // wait on the share link, which is a separate, optional round-trip.
       setRun((prev) => ({ runKey: prev.runKey + 1, settled: true }));
-      if (resultId) setShareToken(await mintResultLink(resultId));
+      if (resultId) setShareToken(await mintResultShareUrl(resultId));
     });
   };
 

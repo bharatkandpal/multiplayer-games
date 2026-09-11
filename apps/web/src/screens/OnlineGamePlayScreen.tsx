@@ -14,6 +14,7 @@ import { Button, StatusBadge, Toast } from "../components/ui";
 import type { SeatsConfig } from "../game";
 import { useOnlinePlay } from "../hooks/useOnlinePlay";
 import { useRematch } from "../hooks/useRematch";
+import { useResultShareUrl } from "../hooks/useResultShare";
 import type { PublicRoom, Slot } from "../api/roomTypes";
 import { type BoardRenderProps, GamePlayScreenView, type PlayController } from "./GamePlayScreen";
 import styles from "./OnlineGamePlayScreen.module.css";
@@ -63,11 +64,18 @@ export function OnlineGamePlayScreen<S, M, L = unknown>({
     yourTurn,
     makeMove,
     clearError,
+    moveLog,
     phase,
     opponentDisconnected,
     roomAbandoned,
     roomAbandonReason,
+    resultId,
   } = useOnlinePlay<S, M, L>({ game, roomId, yourSlot, initialRoom });
+
+  // MPG-131: the server already persisted this seat's result (it refereed the
+  // game), so unlike local play there is nothing to report — only a link to mint
+  // against the id it pushed back over the socket.
+  const shareUrl = useResultShareUrl(resultId);
 
   const { rematchProposed, opponentProposed, rematchAccepted, proposeRematch, declineRematch } =
     useRematch(roomId, sessionToken, yourSlot, onRematchStart);
@@ -75,6 +83,7 @@ export function OnlineGamePlayScreen<S, M, L = unknown>({
   const controller: PlayController<S, M> = {
     session,
     seats,
+    moveLog,
     isHumanTurn: yourTurn,
     thinkingSeat: null,
     isAllBots: false,
@@ -127,6 +136,7 @@ export function OnlineGamePlayScreen<S, M, L = unknown>({
           onExit={onExit}
           controller={controller}
           gameId={game.id}
+          {...(shareUrl ? { shareUrl } : {})}
           {...(onViewLeaderboard ? { onViewLeaderboard } : {})}
           online={{
             isRoomFinished: phase === "finished",

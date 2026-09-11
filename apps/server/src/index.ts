@@ -16,6 +16,7 @@ import { registerGameHandlers } from "./rooms/moveHandler.js";
 import { registerRematchHandlers } from "./rooms/rematchHandler.js";
 import { RoomManager, RoomManagerError } from "./rooms/RoomManager.js";
 import { registerRoomHandlers } from "./rooms/roomHandlers.js";
+import { createResultRouter } from "./results/resultRoutes.js";
 import { createShareRouter } from "./share/shareRoutes.js";
 import type { SeatConfig } from "./rooms/types.js";
 import {
@@ -49,6 +50,10 @@ app.use("/api", createSessionRouter(store));
 
 // Leaderboard routes (GET /api/leaderboard/:gameId, GET /api/leaderboard/:gameId/rank).
 app.use("/api", createLeaderboardRouter(store));
+
+// Client-reported turn-based results (POST /api/results) — MPG-131. Local play
+// never touches a room, so this is the only way a local game becomes shareable.
+app.use("/api", createResultRouter(store));
 
 // Durable share links (POST /api/share, GET/DELETE /api/share/:token) — MPG-056.
 app.use("/api", createShareRouter(store));

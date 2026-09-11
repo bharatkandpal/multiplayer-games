@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Difficulty, GameModule, Player } from "@mpg/engine";
 import { pickMove } from "@mpg/engine";
 import { useGameSession } from "./useGameSession";
-import type { GameSessionState } from "./gameSession";
+import type { AppliedMove, GameSessionState } from "./gameSession";
 import type { SeatsConfig } from "./seatConfig";
 import { getBotThinkingDelayMs } from "./motion";
 
@@ -39,6 +39,13 @@ interface PendingBotMove<S> {
 export interface LocalPlayController<S, M> {
   readonly session: GameSessionState<S, M>;
   readonly seats: SeatsConfig;
+  /**
+   * Every move applied this game, oldest first — straight from the session (see
+   * `GameSessionState.moveLog`), so it is always in step with the position rather
+   * than a render behind it. The evidence `POST /api/results` replays to validate
+   * a finished local game (MPG-131); the same shape `useOnlinePlay` exposes.
+   */
+  readonly moveLog: readonly AppliedMove<M>[];
   /** Whether the seat to move is a human and awaiting a board interaction. */
   readonly isHumanTurn: boolean;
   /** The seat (1-based) currently "thinking", or `null` if no bot is computing a move. */
@@ -224,6 +231,7 @@ export function useLocalPlayController<S, M>(
   return {
     session,
     seats,
+    moveLog: session.moveLog,
     isHumanTurn,
     thinkingSeat,
     isAllBots,

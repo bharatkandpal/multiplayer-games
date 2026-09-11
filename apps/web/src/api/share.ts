@@ -96,3 +96,27 @@ export function shareUrlForToken(token: string): string {
   if (typeof window === "undefined") return path;
   return `${window.location.origin}${path}`;
 }
+
+/**
+ * Mints the durable share link for a finished result and returns its `/s/:token`
+ * URL — the one path both game families take (MPG-131 put turn-based results on
+ * it; real-time runs were already there).
+ *
+ * Callers mint EAGERLY when the result settles rather than lazily on the share
+ * tap, and that ordering is deliberate: `navigator.share` must be called inside
+ * the user's gesture, and awaiting a network round-trip first breaks the gesture
+ * on some mobile browsers — the sheet then silently never opens. The cost is a
+ * share_link row per completed game whether or not it is ever shared, which is
+ * what the row's optional expiry and the retention sweep exist to bound.
+ *
+ * Never throws: sharing degrades to whatever fallback URL the caller holds
+ * (typically the game's own page) rather than dead-ending on an error.
+ */
+export function mintResultShareUrl(resultId: string): Promise<string | undefined> {
+  return createShareLink({ kind: "result", targetId: resultId })
+    .then((link) => shareUrlForToken(link.token))
+    .catch((error: unknown) => {
+      console.warn("[share] could not mint a durable result link", error);
+      return undefined;
+    });
+}

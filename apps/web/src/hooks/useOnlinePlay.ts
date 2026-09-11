@@ -73,6 +73,14 @@ export interface UseOnlinePlayResult<S, M> {
   roomAbandoned: boolean;
   /** `{ reason }` from `room:abandoned`, for display copy. */
   roomAbandonReason: string | undefined;
+  /**
+   * The id of THIS seat's persisted result, once the server has written it
+   * (`game:result-saved`, MPG-131). Arrives shortly after `game:over` — the
+   * broadcast deliberately doesn't wait on the database — and is what a durable
+   * share link is minted against. Stays `undefined` if persistence failed or this
+   * seat's socket had already gone; sharing is simply not offered then.
+   */
+  resultId: string | undefined;
 }
 
 /** Maps the server's `move:rejected` reason codes onto the shared, lower-case
@@ -114,6 +122,7 @@ export function useOnlinePlay<S, M, L = unknown>({
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [roomAbandoned, setRoomAbandoned] = useState(false);
   const [roomAbandonReason, setRoomAbandonReason] = useState<string | undefined>(undefined);
+  const [resultId, setResultId] = useState<string | undefined>(undefined);
 
   // Last known-good (server-authoritative) state — what `revert` rolls an
   // optimistic move back to. Kept in a ref (not state) so `handleMoveRejected`
@@ -195,6 +204,14 @@ export function useOnlinePlay<S, M, L = unknown>({
       setPhase("finished");
     };
 
+    // Sent only to this seat's own socket, once the server's fire-and-forget
+    // result write lands (MPG-131). A result id identifies a row owned by one
+    // session, so it is never part of the room-wide `game:over` broadcast.
+    const handleResultSaved = (payload: { roomId: string; resultId: string }): void => {
+      if (payload.roomId !== roomIdRef.current) return;
+      setResultId(payload.resultId);
+    };
+
     const handleMoveRejected = (payload: { reason: string }): void => {
       if (authoritativeStateRef.current === undefined) return;
       revert(authoritativeStateRef.current, describeRejection(payload.reason));
@@ -211,6 +228,7 @@ export function useOnlinePlay<S, M, L = unknown>({
     socket.on("game:start", handleGameStart);
     socket.on("game:update", handleGameUpdate);
     socket.on("game:over", handleGameOver);
+    socket.on("game:result-saved", handleResultSaved);
     socket.on("move:rejected", handleMoveRejected);
     socket.on("opponent:disconnected", handleOpponentDisconnected);
     socket.on("opponent:reconnected", handleOpponentReconnected);
@@ -220,6 +238,7 @@ export function useOnlinePlay<S, M, L = unknown>({
       socket.off("game:start", handleGameStart);
       socket.off("game:update", handleGameUpdate);
       socket.off("game:over", handleGameOver);
+      socket.off("game:result-saved", handleResultSaved);
       socket.off("move:rejected", handleMoveRejected);
       socket.off("opponent:disconnected", handleOpponentDisconnected);
       socket.off("opponent:reconnected", handleOpponentReconnected);
@@ -259,5 +278,6 @@ export function useOnlinePlay<S, M, L = unknown>({
     opponentDisconnected,
     roomAbandoned,
     roomAbandonReason,
+    resultId,
   };
 }
