@@ -53,3 +53,5 @@ export { createActionInputSource } from "./inputSource";
 
 export type { PointerAxisConfig } from "./pointerAxisInputSource";
 export { createPointerAxisInputSource } from "./pointerAxisInputSource";
+
+export { clearPersonalBest, loadPersonalBest, recordPersonalBest } from "./personalBest";
