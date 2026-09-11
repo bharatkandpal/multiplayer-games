@@ -136,97 +136,104 @@ export function createLeaderboardRouter(store: Store, limit: RateLimitFor = noop
   // Server re-simulates {seed, inputLog} through the deterministic engine module and
   // only trusts the client-declared `score` if it matches the replayed outcome AND the
   // replayed run actually reached game over — never the client's word alone.
-  router.post("/leaderboard/:gameId/submit", limit("score_submit"), async (req: Request, res: Response) => {
-    const token = req.sessionToken;
-    if (!token) {
-      res.status(400).json({ error: "no_session" });
-      return;
-    }
+  router.post(
+    "/leaderboard/:gameId/submit",
+    limit("score_submit"),
+    async (req: Request, res: Response) => {
+      const token = req.sessionToken;
+      if (!token) {
+        res.status(400).json({ error: "no_session" });
+        return;
+      }
 
-    const gameId = req.params["gameId"] as string;
-    const body = req.body as SubmitScoreBody | undefined;
-    const seed = body?.seed;
-    const inputLog = body?.inputLog;
-    const runId = body?.runId;
-    const score = body?.score;
-    const eventId = typeof body?.eventId === "string" ? body.eventId : undefined;
-    const timeBucket = typeof body?.timeBucket === "string" ? body.timeBucket : undefined;
+      const gameId = req.params["gameId"] as string;
+      const body = req.body as SubmitScoreBody | undefined;
+      const seed = body?.seed;
+      const inputLog = body?.inputLog;
+      const runId = body?.runId;
+      const score = body?.score;
+      const eventId = typeof body?.eventId === "string" ? body.eventId : undefined;
+      const timeBucket = typeof body?.timeBucket === "string" ? body.timeBucket : undefined;
 
-    if (
-      typeof seed !== "number" ||
-      !Number.isFinite(seed) ||
-      !Array.isArray(inputLog) ||
-      inputLog.length > MAX_INPUT_LOG_LENGTH ||
-      typeof runId !== "string" ||
-      runId.length === 0 ||
-      typeof score !== "number" ||
-      !Number.isFinite(score)
-    ) {
-      res.status(400).json({ error: "INVALID_REQUEST" });
-      return;
-    }
+      if (
+        typeof seed !== "number" ||
+        !Number.isFinite(seed) ||
+        !Array.isArray(inputLog) ||
+        inputLog.length > MAX_INPUT_LOG_LENGTH ||
+        typeof runId !== "string" ||
+        runId.length === 0 ||
+        typeof score !== "number" ||
+        !Number.isFinite(score)
+      ) {
+        res.status(400).json({ error: "INVALID_REQUEST" });
+        return;
+      }
 
-    // `getRealtimeGame` throws on unknown ids — treat that as a client error, not a crash.
-    let realtimeModule;
-    try {
-      realtimeModule = getRealtimeGame(gameId as RealtimeGameId);
-    } catch {
-      res.status(400).json({ error: "UNKNOWN_GAME" });
-      return;
-    }
+      // `getRealtimeGame` throws on unknown ids — treat that as a client error, not a crash.
+      let realtimeModule;
+      try {
+        realtimeModule = getRealtimeGame(gameId as RealtimeGameId);
+      } catch {
+        res.status(400).json({ error: "UNKNOWN_GAME" });
+        return;
+      }
 
-    const filter: LeaderboardFilter = { eventId: eventId ?? null, timeBucket: timeBucket ?? null };
+      const filter: LeaderboardFilter = {
+        eventId: eventId ?? null,
+        timeBucket: timeBucket ?? null,
+      };
 
-    // Idempotency: a run already persisted for this `runId` is a no-op success, not a
-    // re-bump (mirrors `ResultRepo.save`'s runId idempotency used for turn-based games).
-    const existing = await store.results.findByRunId(runId);
-    if (existing) {
-      const entry = await fetchOwnEntry(store, gameId, "score", token, filter);
-      res.json({ ok: true, duplicate: true, entry: entry ?? null, resultId: existing.id });
-      return;
-    }
+      // Idempotency: a run already persisted for this `runId` is a no-op success, not a
+      // re-bump (mirrors `ResultRepo.save`'s runId idempotency used for turn-based games).
+      const existing = await store.results.findByRunId(runId);
+      if (existing) {
+        const entry = await fetchOwnEntry(store, gameId, "score", token, filter);
+        res.json({ ok: true, duplicate: true, entry: entry ?? null, resultId: existing.id });
+        return;
+      }
 
-    // Re-simulate authoritatively — the client's inputLog SHAPE is trusted (each
-    // module's `tick` owns interpreting it), but never its claimed OUTCOME.
-    let state = realtimeModule.createInitialState(seed);
-    for (const input of inputLog) {
-      state = realtimeModule.tick(state, input);
-    }
+      // Re-simulate authoritatively — the client's inputLog SHAPE is trusted (each
+      // module's `tick` owns interpreting it), but never its claimed OUTCOME.
+      let state = realtimeModule.createInitialState(seed);
+      for (const input of inputLog) {
+        state = realtimeModule.tick(state, input);
+      }
 
-    const replayedScore = realtimeModule.getScore(state);
-    const replayedGameOver = realtimeModule.isGameOver(state);
+      const replayedScore = realtimeModule.getScore(state);
+      const replayedGameOver = realtimeModule.isGameOver(state);
 
-    if (!replayedGameOver || replayedScore !== score) {
-      res.status(422).json({ error: "SCORE_MISMATCH" });
-      return;
-    }
+      if (!replayedGameOver || replayedScore !== score) {
+        res.status(422).json({ error: "SCORE_MISMATCH" });
+        return;
+      }
 
-    const saved = await writeGameResult(store, {
-      runId,
-      gameId,
-      gameFamily: "realtime",
-      ownerToken: token,
-      status: "complete",
-      score: replayedScore,
-      seatsSnapshot: null,
-      moveLog: { seed, inputLog },
-      eventId: eventId ?? null,
-    });
+      const saved = await writeGameResult(store, {
+        runId,
+        gameId,
+        gameFamily: "realtime",
+        ownerToken: token,
+        status: "complete",
+        score: replayedScore,
+        seatsSnapshot: null,
+        moveLog: { seed, inputLog },
+        eventId: eventId ?? null,
+      });
 
-    const entry = await updateLeaderboardForScore(store, {
-      gameId,
-      ownerToken: token,
-      score: replayedScore,
-      runId,
-      eventId: eventId ?? null,
-      timeBucket: timeBucket ?? null,
-    });
+      const entry = await updateLeaderboardForScore(store, {
+        gameId,
+        ownerToken: token,
+        score: replayedScore,
+        runId,
+        eventId: eventId ?? null,
+        timeBucket: timeBucket ?? null,
+      });
 
-    // `resultId` is what a durable share link points at (MPG-056) — returning it
-    // here saves the client a lookup it has no other way to perform (it knows
-    // only its own client-minted `runId`).
-    res.json({ ok: true, entry, resultId: saved.id });
-  });
+      // `resultId` is what a durable share link points at (MPG-056) — returning it
+      // here saves the client a lookup it has no other way to perform (it knows
+      // only its own client-minted `runId`).
+      res.json({ ok: true, entry, resultId: saved.id });
+    },
+  );
 
   return router;
 }

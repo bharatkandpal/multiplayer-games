@@ -70,9 +70,9 @@ describe("createRateLimiter (MPG-021)", () => {
   });
 
   it("blocks with 429 + Retry-After on OUTCOME_THROTTLED", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(
-      jsonResponse({ outcome: "OUTCOME_THROTTLED", retryAfter: 30 }),
-    );
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ outcome: "OUTCOME_THROTTLED", retryAfter: 30 }));
     const { call } = await mount({ url: "http://limiter.test", fetchImpl });
 
     const res = await call();

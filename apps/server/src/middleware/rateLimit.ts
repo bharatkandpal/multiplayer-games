@@ -49,11 +49,9 @@ export interface RateLimiterConfig {
  * router's parameter to {@link noopLimit} keeps existing call sites (and tests)
  * working with rate limiting simply absent.
  */
-export type RateLimitFor = (policy: string) => (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => void;
+export type RateLimitFor = (
+  policy: string,
+) => (req: Request, res: Response, next: NextFunction) => void;
 
 /** A `RateLimitFor` that never limits — the default when no limiter is wired. */
 export const noopLimit: RateLimitFor =
@@ -99,11 +97,7 @@ export function createRateLimiter(config: RateLimiterConfig = {}): RateLimiter {
 
       const checkUrl = `${url.replace(/\/$/, "")}/v1/check`;
 
-      return function rateLimitMiddleware(
-        req: Request,
-        res: Response,
-        next: NextFunction,
-      ): void {
+      return function rateLimitMiddleware(req: Request, res: Response, next: NextFunction): void {
         // `sessionToken` is always set upstream (createSessionMiddleware mints
         // one when absent); `req.ip` is only a defensive fallback.
         const id = req.sessionToken || req.ip || "unknown";
