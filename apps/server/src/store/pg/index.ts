@@ -1,5 +1,6 @@
 import type { Database } from "../../db/drizzle.js";
 import type { Store } from "../ports.js";
+import { createPgEventRepo } from "./event-repo.pg.js";
 import { createPgLeaderboardRepo } from "./leaderboard-repo.pg.js";
 import { createPgResultRepo } from "./result-repo.pg.js";
 import { createPgSessionRepo } from "./session-repo.pg.js";
@@ -12,5 +13,6 @@ export function createPgStore(db: Database): Store {
     results: createPgResultRepo(db),
     leaderboard: createPgLeaderboardRepo(db),
     shareLinks: createPgShareLinkRepo(db),
+    events: createPgEventRepo(db),
   };
 }

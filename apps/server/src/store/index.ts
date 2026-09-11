@@ -21,6 +21,10 @@ export type {
   ShareLink,
   NewShareLink,
   ShareLinkRepo,
+  AnalyticsEvent,
+  NewAnalyticsEvent,
+  EventCount,
+  EventRepo,
   PaginationOpts,
 } from "./ports.js";
 

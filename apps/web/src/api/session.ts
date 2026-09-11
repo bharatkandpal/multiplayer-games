@@ -41,7 +41,7 @@ function removeStoredToken(): void {
 }
 
 /** Resolves the API base URL. Empty string = same-origin (dev proxy / prod). */
-function getApiBaseUrl(): string {
+export function getApiBaseUrl(): string {
   const env = import.meta.env as Record<string, string | undefined>;
   return env["VITE_API_URL"] ?? "";
 }

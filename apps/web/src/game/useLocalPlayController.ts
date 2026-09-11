@@ -15,6 +15,7 @@ import { useGameSession } from "./useGameSession";
 import type { AppliedMove, GameSessionState } from "./gameSession";
 import type { SeatsConfig } from "./seatConfig";
 import { getBotThinkingDelayMs } from "./motion";
+import { markFirstInput } from "../analytics/firstInput";
 
 /**
  * Bot-vs-bot watch pacing (UX_PRINCIPLES §3: paced watch WITH a way to speed up
@@ -217,9 +218,13 @@ export function useLocalPlayController<S, M>(
       if (session.status.type === "thinking" || session.status.type === "game_over") return;
       const seat = seats[session.turn - 1];
       if (!seat || seat.kind !== "human") return;
+      // MPG-097 leg 5. Deliberately below the guards: this is the first move a
+      // *person* chose, which is what time-to-first-input means. A bot's turn
+      // or a rejected tap is not an input. No-ops after the first call.
+      markFirstInput(game.id);
       applyLocalMove(move);
     },
-    [session.status.type, session.turn, seats, applyLocalMove],
+    [session.status.type, session.turn, seats, applyLocalMove, game.id],
   );
 
   const rematch = useCallback(() => {

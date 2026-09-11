@@ -10,6 +10,7 @@ import { createMemoryStore } from "../../store/memory/index.js";
 import type { LeaderboardEntry, Store } from "../../store/ports.js";
 import { SESSION_HEADER, createSessionMiddleware } from "../../sessions/sessionMiddleware.js";
 import { createLeaderboardRouter } from "../leaderboardRoutes.js";
+import { createStoreSink } from "../../analytics/sink.js";
 
 const NO_FLAP: FloppyInput = { flap: false };
 
@@ -42,7 +43,7 @@ describe("POST /api/leaderboard/:gameId/submit", () => {
     const app = express();
     app.use(express.json());
     if (withSession) app.use(createSessionMiddleware(store));
-    app.use("/api", createLeaderboardRouter(store));
+    app.use("/api", createLeaderboardRouter(store, createStoreSink(store.events)));
 
     server = await new Promise<Server>((resolve) => {
       const s = app.listen(0, () => resolve(s));
