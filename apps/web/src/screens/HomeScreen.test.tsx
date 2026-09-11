@@ -13,12 +13,15 @@ describe("HomeScreen", () => {
       />,
     );
 
-    expect(screen.getByRole("list", { name: "Available games" })).toBeInTheDocument();
-    expect(screen.getByText("Tic-Tac-Toe")).toBeInTheDocument();
-    expect(screen.getByText("Connect Four")).toBeInTheDocument();
+    const list = screen.getByRole("list", { name: "Available games" });
+    expect(list).toBeInTheDocument();
+    // Scoped to the grid: the same title may also appear in the Game-of-the-day
+    // spotlight above it.
+    expect(within(list).getByText("Tic-Tac-Toe")).toBeInTheDocument();
+    expect(within(list).getByText("Connect Four")).toBeInTheDocument();
 
     // The new move-mode variant (MPG-045-d) is catalogued and shows up too.
-    expect(screen.getByText("Move-Mode Tic-Tac-Toe")).toBeInTheDocument();
+    expect(within(list).getByText("Move-Mode Tic-Tac-Toe")).toBeInTheDocument();
   });
 
   it("shows a thumbnail per card, and the card's accessible name is just the title (MPG-052)", () => {
@@ -59,7 +62,7 @@ describe("HomeScreen", () => {
     expect(screen.queryByText("tictactoe-move")).not.toBeInTheDocument();
   });
 
-  it("no longer shows the game description on Home (it moved to Setup, MPG-052)", () => {
+  it("no longer shows the game description on the grid cards (it moved to Setup, MPG-052)", () => {
     render(
       <HomeScreen
         games={["tictactoe", "connect4", "tictactoe-move"]}
@@ -68,12 +71,43 @@ describe("HomeScreen", () => {
       />,
     );
 
+    // Scoped to the grid: the Game-of-the-day spotlight deliberately shows a
+    // description, but the ordinary grid cards must not.
+    const list = screen.getByRole("list", { name: "Available games" });
     expect(
-      screen.queryByText("Classic 3x3. Quick games, easy to teach a bot to play well."),
+      within(list).queryByText("Classic 3x3. Quick games, easy to teach a bot to play well."),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByText("Drop discs, connect four in a row. 7 columns, 6 rows."),
+      within(list).queryByText("Drop discs, connect four in a row. 7 columns, 6 rows."),
     ).not.toBeInTheDocument();
+  });
+
+  // Game of the day (simple randomizer; a real recommender comes later): one
+  // game is spotlighted above the grid, stable within the day, and playable in
+  // one tap through the same routing as its grid card.
+  it("spotlights a Game of the day and routes its Play button like a normal card", async () => {
+    const user = userEvent.setup();
+    const onSelectGame = vi.fn();
+    const onSelectRealtimeGame = vi.fn();
+    render(
+      <HomeScreen
+        games={["connect4"]}
+        realtimeGames={["2048"]}
+        onSelectGame={onSelectGame}
+        onSelectRealtimeGame={onSelectRealtimeGame}
+        onShowGallery={vi.fn()}
+      />,
+    );
+
+    const spotlight = screen.getByRole("region", { name: "Game of the day" });
+    const card = within(spotlight).getByRole("button");
+    expect(within(card).getByText("Play now →")).toBeInTheDocument();
+
+    await user.click(card);
+    // Exactly one of the two routers fires, matched to the spotlighted family.
+    const turnBased = onSelectGame.mock.calls.length;
+    const realtime = onSelectRealtimeGame.mock.calls.length;
+    expect(turnBased + realtime).toBe(1);
   });
 
   it("shows an empty-state message and no list when there are no games", () => {
@@ -88,7 +122,10 @@ describe("HomeScreen", () => {
     const onSelectGame = vi.fn();
     render(<HomeScreen games={["connect4"]} onSelectGame={onSelectGame} onShowGallery={vi.fn()} />);
 
-    await user.click(screen.getByRole("button", { name: /Connect Four/ }));
+    // Scoped to the grid so the Game-of-the-day spotlight (which can hold the
+    // same game) doesn't make the button ambiguous.
+    const list = screen.getByRole("list", { name: "Available games" });
+    await user.click(within(list).getByRole("button", { name: /Connect Four/ }));
     expect(onSelectGame).toHaveBeenCalledExactlyOnceWith("connect4");
   });
 
@@ -120,11 +157,13 @@ describe("HomeScreen", () => {
     expect(cards).toHaveLength(3); // 2 turn-based + 1 real-time, one grid
 
     // Turn-based cards come first; the real-time card is tagged.
-    expect(screen.getByRole("button", { name: /Floppy Birds/ })).toBeInTheDocument();
-    expect(screen.getByText("Solo arcade")).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: /Floppy Birds/ })).toBeInTheDocument();
+    expect(within(list).getByText("Solo arcade")).toBeInTheDocument();
 
     // Every card still carries a decorative, AT-hidden thumbnail.
-    const floppySvg = screen.getByRole("button", { name: /Floppy Birds/ }).querySelector("svg");
+    const floppySvg = within(list)
+      .getByRole("button", { name: /Floppy Birds/ })
+      .querySelector("svg");
     expect(floppySvg).toHaveAttribute("aria-hidden", "true");
   });
 
@@ -142,12 +181,13 @@ describe("HomeScreen", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /Floppy Birds/ }));
+    const list = screen.getByRole("list", { name: "Available games" });
+    await user.click(within(list).getByRole("button", { name: /Floppy Birds/ }));
     expect(onSelectRealtimeGame).toHaveBeenCalledExactlyOnceWith("floppy-birds");
     expect(onSelectGame).not.toHaveBeenCalled();
 
     // ...and a turn-based card still goes through onSelectGame.
-    await user.click(screen.getByRole("button", { name: /Tic-Tac-Toe/ }));
+    await user.click(within(list).getByRole("button", { name: /Tic-Tac-Toe/ }));
     expect(onSelectGame).toHaveBeenCalledExactlyOnceWith("tictactoe");
   });
 
@@ -169,7 +209,7 @@ describe("HomeScreen", () => {
     const list = screen.getByRole("list", { name: "Available games" });
     expect(within(list).getAllByRole("button")).toHaveLength(3);
 
-    const drunkCard = screen.getByRole("button", { name: /Drunk Walk/ });
+    const drunkCard = within(list).getByRole("button", { name: /Drunk Walk/ });
     expect(drunkCard).toBeInTheDocument();
     expect(drunkCard.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
 

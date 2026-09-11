@@ -32,6 +32,120 @@
   max-width: 34rem;
 }
 
+/* Game of the day — one spotlighted pick above the grid. A wider, warmer take
+   on the glass card: horizontal on desktop, stacked on narrow screens, with an
+   accent rim so it reads as the hero, not just the first tile. */
+.featured {
+  margin: 0 0 var(--space-8);
+}
+
+.featuredLabel {
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 var(--space-3);
+}
+
+.featuredCard {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-5);
+  width: 100%;
+  padding: var(--space-5);
+  overflow: hidden;
+  border: var(--border-width-thin) solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  background-color: var(--glass-bg);
+  background-image: linear-gradient(160deg, var(--glass-highlight) 0%, rgba(255, 255, 255, 0) 42%);
+  box-shadow: var(--glass-shadow);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .featuredCard {
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+    backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  }
+}
+
+.featuredCard:hover {
+  background-color: var(--glass-bg-hover);
+  box-shadow:
+    var(--glass-shadow),
+    0 0 0 var(--border-width-thin) var(--color-accent);
+  transform: translateY(-2px);
+}
+
+.featuredCard:active {
+  transform: translateY(0);
+}
+
+.featuredCard:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.featuredThumbnail {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 12rem;
+  max-width: 40%;
+  aspect-ratio: 3 / 2;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  border: var(--border-width-thin) solid var(--glass-border);
+  background-color: var(--glass-bg);
+}
+
+.featuredBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.featuredTitle {
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-500);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+}
+
+.featuredDescription {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-300);
+}
+
+.featuredCta {
+  margin-top: var(--space-1);
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+}
+
+@media (max-width: 32rem) {
+  .featuredCard {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .featuredThumbnail {
+    width: 100%;
+    max-width: none;
+  }
+}
+
 .sectionHeading {
   font-size: var(--font-size-300);
   font-weight: var(--font-weight-medium);

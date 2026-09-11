@@ -2,7 +2,9 @@ import { ENGINE_VERSION } from "@mpg/engine";
 import type { GameId, RealtimeGameId } from "@mpg/engine";
 import { Button } from "../components/ui";
 import { GameThumbnail } from "./gameThumbnails";
-import { buildGameItems } from "./catalog";
+import { buildGameItems, GAME_CATALOG, REALTIME_CATALOG } from "./catalog";
+import type { GameItem } from "./catalog";
+import { pickGameOfTheDay } from "./gameOfTheDay";
 import styles from "./HomeScreen.module.css";
 
 // The catalog itself lives in `./catalog` so the play screens can walk it for
@@ -10,6 +12,12 @@ import styles from "./HomeScreen.module.css";
 // Join, Setup, and their tests all import it from this module.
 export type { GameKind, GameCatalogEntry, RealtimeCatalogEntry } from "./catalog";
 export { GAME_CATALOG, REALTIME_CATALOG } from "./catalog";
+
+/** The catalog blurb for a listed game, used by the Game-of-the-day spotlight. */
+function itemDescription(item: GameItem): string {
+  const entry = item.kind === "realtime" ? REALTIME_CATALOG[item.id] : GAME_CATALOG[item.id];
+  return entry?.description ?? "";
+}
 
 export interface HomeScreenProps {
   /** Registered turn-based ids (from `listGames()`) — home never hardcodes the catalog. */
@@ -43,6 +51,12 @@ export function HomeScreen({
   onShowGallery,
 }: HomeScreenProps): React.JSX.Element {
   const items = buildGameItems(games, realtimeGames);
+  const featured = pickGameOfTheDay(items);
+
+  const playItem = (item: GameItem): void => {
+    if (item.kind === "realtime") onSelectRealtimeGame?.(item.id);
+    else onSelectGame(item.id);
+  };
 
   return (
     <div className={styles.main}>
@@ -51,6 +65,24 @@ export function HomeScreen({
         Tap a game to start playing straight away — you against the bot. Want a friend instead? Use
         Options on any game.
       </p>
+
+      {featured ? (
+        <section className={styles.featured} aria-labelledby="game-of-the-day">
+          <h2 id="game-of-the-day" className={styles.featuredLabel}>
+            Game of the day
+          </h2>
+          <button type="button" className={styles.featuredCard} onClick={() => playItem(featured)}>
+            <span className={styles.featuredThumbnail}>
+              <GameThumbnail gameId={featured.id} />
+            </span>
+            <span className={styles.featuredBody}>
+              <span className={styles.featuredTitle}>{featured.title}</span>
+              <span className={styles.featuredDescription}>{itemDescription(featured)}</span>
+              <span className={styles.featuredCta}>Play now →</span>
+            </span>
+          </button>
+        </section>
+      ) : null}
 
       <h2 className={styles.sectionHeading}>Choose a game</h2>
       {items.length === 0 ? (
@@ -62,13 +94,7 @@ export function HomeScreen({
         <ul className={styles.gameGrid} aria-label="Available games">
           {items.map((item) => (
             <li key={`${item.kind}:${item.id}`} className={styles.gameCell}>
-              <button
-                type="button"
-                className={styles.gameCard}
-                onClick={() =>
-                  item.kind === "realtime" ? onSelectRealtimeGame?.(item.id) : onSelectGame(item.id)
-                }
-              >
+              <button type="button" className={styles.gameCard} onClick={() => playItem(item)}>
                 <span className={styles.gameThumbnail}>
                   <GameThumbnail gameId={item.id} />
                 </span>
