@@ -16,6 +16,7 @@ import type { Request, Response } from "express";
 import { getRealtimeGame } from "@mpg/engine";
 import type { RealtimeGameId } from "@mpg/engine";
 
+import type { EventSink } from "../analytics/sink.js";
 import { writeGameResult } from "../sessions/resultWriter.js";
 import type { LeaderboardEntry, LeaderboardFilter, Store } from "../store/ports.js";
 import { updateLeaderboardForScore } from "./leaderboardWriter.js";
@@ -69,7 +70,7 @@ function parseOptionalString(raw: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-export function createLeaderboardRouter(store: Store): Router {
+export function createLeaderboardRouter(store: Store, sink: EventSink): Router {
   const router = Router();
 
   // GET /api/leaderboard/:gameId — top N entries + the requester's rank.
@@ -191,17 +192,21 @@ export function createLeaderboardRouter(store: Store): Router {
       return;
     }
 
-    const saved = await writeGameResult(store, {
-      runId,
-      gameId,
-      gameFamily: "realtime",
-      ownerToken: token,
-      status: "complete",
-      score: replayedScore,
-      seatsSnapshot: null,
-      moveLog: { seed, inputLog },
-      eventId: eventId ?? null,
-    });
+    const saved = await writeGameResult(
+      store,
+      {
+        runId,
+        gameId,
+        gameFamily: "realtime",
+        ownerToken: token,
+        status: "complete",
+        score: replayedScore,
+        seatsSnapshot: null,
+        moveLog: { seed, inputLog },
+        eventId: eventId ?? null,
+      },
+      sink,
+    );
 
     const entry = await updateLeaderboardForScore(store, {
       gameId,

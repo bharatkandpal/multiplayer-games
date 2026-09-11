@@ -11,6 +11,8 @@ import { Server as SocketIOServer } from "socket.io";
 
 import { ENGINE_VERSION, registerBuiltInGames, registerBuiltInRealtimeGames } from "@mpg/engine";
 
+import { createEventRouter } from "./analytics/eventRoutes.js";
+import { createStoreSink } from "./analytics/sink.js";
 import { createLeaderboardRouter } from "./leaderboard/leaderboardRoutes.js";
 import { registerGameHandlers } from "./rooms/moveHandler.js";
 import { registerRematchHandlers } from "./rooms/rematchHandler.js";
@@ -42,6 +44,11 @@ const app = express();
 app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
 
+// Loop analytics (MPG-097). Behind the `EventSink` seam, so swapping in a
+// hosted vendor later is a change here and nowhere else. The sink never throws:
+// instrumentation is not allowed to break the thing it measures.
+const eventSink = createStoreSink(store.events);
+
 // Session identity — mints or resolves an opaque token on every request.
 app.use(createSessionMiddleware(store));
 
@@ -49,14 +56,18 @@ app.use(createSessionMiddleware(store));
 app.use("/api", createSessionRouter(store));
 
 // Leaderboard routes (GET /api/leaderboard/:gameId, GET /api/leaderboard/:gameId/rank).
-app.use("/api", createLeaderboardRouter(store));
+app.use("/api", createLeaderboardRouter(store, eventSink));
 
 // Client-reported turn-based results (POST /api/results) — MPG-131. Local play
 // never touches a room, so this is the only way a local game becomes shareable.
-app.use("/api", createResultRouter(store));
+app.use("/api", createResultRouter(store, eventSink));
 
 // Durable share links (POST /api/share, GET/DELETE /api/share/:token) — MPG-056.
-app.use("/api", createShareRouter(store));
+app.use("/api", createShareRouter(store, eventSink));
+
+// Client-reported funnel events (POST /api/events) — MPG-097. Only events the
+// server cannot observe itself are accepted here; see `analytics/events.ts`.
+app.use("/api", createEventRouter(eventSink));
 
 const startedAt = Date.now();
 
@@ -147,7 +158,7 @@ const io = new SocketIOServer(httpServer, {
 
 io.use(createSocketSessionMiddleware(store));
 registerRoomHandlers(io, roomManager);
-registerGameHandlers(io, roomManager, store);
+registerGameHandlers(io, roomManager, store, eventSink);
 registerRematchHandlers(io, roomManager);
 
 const port = Number(process.env["PORT"] ?? 3001);

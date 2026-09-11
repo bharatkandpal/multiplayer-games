@@ -7,6 +7,7 @@ import { createMemoryStore } from "../../store/memory/index.js";
 import type { Store } from "../../store/ports.js";
 import { SESSION_HEADER, createSessionMiddleware } from "../../sessions/sessionMiddleware.js";
 import { createLeaderboardRouter } from "../leaderboardRoutes.js";
+import { createStoreSink } from "../../analytics/sink.js";
 
 describe("leaderboard routes", () => {
   let store: Store;
@@ -17,7 +18,7 @@ describe("leaderboard routes", () => {
     store = createMemoryStore();
     const app = express();
     app.use(createSessionMiddleware(store));
-    app.use("/api", createLeaderboardRouter(store));
+    app.use("/api", createLeaderboardRouter(store, createStoreSink(store.events)));
 
     server = await new Promise<Server>((resolve) => {
       const s = app.listen(0, () => resolve(s));

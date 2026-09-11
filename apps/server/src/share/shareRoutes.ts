@@ -24,6 +24,7 @@ import { randomBytes } from "node:crypto";
 import { Router } from "express";
 import type { Request, Response } from "express";
 
+import { emit, type EventSink } from "../analytics/sink.js";
 import type { GameResult, ShareLink, Store } from "../store/ports.js";
 
 /** What a token can point at. Mirrors the `kind` column's documented values. */
@@ -82,7 +83,7 @@ function toPublicLink(link: ShareLink): Record<string, unknown> {
   };
 }
 
-export function createShareRouter(store: Store): Router {
+export function createShareRouter(store: Store, sink: EventSink): Router {
   const router = Router();
 
   // POST /api/share — mint a durable link to something this session owns.
@@ -136,6 +137,15 @@ export function createShareRouter(store: Store): Router {
       expiresAt: expiry.value,
     });
 
+    // Leg 4 numerator: the share rate is `share_minted / result_saved`.
+    emit(sink, {
+      name: "share_minted",
+      ownerToken: token,
+      shareLinkId: link.id,
+      eventId,
+      props: { kind },
+    });
+
     res.status(201).json(toPublicLink(link));
   });
 
@@ -143,6 +153,7 @@ export function createShareRouter(store: Store): Router {
   // capability, so requiring a session here would break the whole point.
   router.get("/share/:token", async (req: Request, res: Response) => {
     const shareToken = req.params["token"] as string;
+    const viewerToken = req.sessionToken;
 
     // `findByToken` already excludes revoked and expired links, so all three
     // failure modes (never existed / revoked / expired) land here as one 404.
@@ -154,6 +165,19 @@ export function createShareRouter(store: Store): Router {
       res.status(404).json({ error: "LINK_NOT_FOUND" });
       return;
     }
+
+    // Leg 5 numerator: share CTR is `share_opened / share_minted`. Recorded
+    // against the *viewer's* session, not the link owner's — counting the
+    // sharer would make k-factor measure nothing but the sharer's own clicks.
+    // `isOwner` keeps that distinction queryable instead of guessed: a creator
+    // re-opening their own link is a real event, just not a viral one.
+    emit(sink, {
+      name: "share_opened",
+      ownerToken: viewerToken,
+      shareLinkId: link.id,
+      eventId: link.eventId,
+      props: { kind: link.kind, isOwner: link.ownerToken === viewerToken },
+    });
 
     if (link.kind === "leaderboard") {
       res.json({ kind: link.kind, gameId: link.targetId, eventId: link.eventId });

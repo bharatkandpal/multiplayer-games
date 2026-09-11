@@ -1,4 +1,5 @@
 import type { Store } from "../ports.js";
+import { createMemoryEventRepo } from "./event-repo.memory.js";
 import { createMemoryLeaderboardRepo } from "./leaderboard-repo.memory.js";
 import { createMemoryResultRepo } from "./result-repo.memory.js";
 import { createMemorySessionRepo } from "./session-repo.memory.js";
@@ -11,5 +12,6 @@ export function createMemoryStore(): Store {
     results: createMemoryResultRepo(),
     leaderboard: createMemoryLeaderboardRepo(),
     shareLinks: createMemoryShareLinkRepo(),
+    events: createMemoryEventRepo(),
   };
 }

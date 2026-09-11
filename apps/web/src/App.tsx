@@ -41,6 +41,8 @@ import { GameSwitcher } from "./screens/GameSwitcher";
 import { isAllBotRoom, publicRoomToSeats, toSeatConfigInput } from "./api/roomSeats";
 import { getStoredUsername } from "./api/username";
 import { initSession } from "./api/session";
+import { installFlushOnHide } from "./api/events";
+import { markColdArrival } from "./analytics/firstInput";
 import { getStoredCreatorToken } from "./api/watchSession";
 import { useRoom } from "./hooks/useRoom";
 import { useUsernameGate } from "./hooks/useUsernameGate";
@@ -118,7 +120,12 @@ function initialRoute(): Route {
   // A share link is checked FIRST: it is the one entry point reached by people
   // who have never used the app, so it must not fall through to Home.
   const shareToken = parseSharePath(window.location.pathname);
-  if (shareToken) return { screen: "shared", token: shareToken };
+  if (shareToken) {
+    // MPG-097 leg 5: start the time-to-first-input clock here, at the only
+    // entry point a stranger can arrive through.
+    markColdArrival();
+    return { screen: "shared", token: shareToken };
+  }
   const parsed = parseRoomPath(window.location.pathname);
   if (!parsed) return { screen: "home" };
   // MPG-025: a reload of this tab's own all-bot watch room — its creator
@@ -339,6 +346,12 @@ export default function App(): React.JSX.Element {
       // Intentionally swallowed — see above.
     });
   }, []);
+
+  // MPG-097: flush queued funnel events when the page goes away. Same
+  // fire-and-forget posture as the session bootstrap above — a visitor who
+  // bounces in under the flush interval is exactly the datapoint worth
+  // keeping, and losing it silently is the worst outcome available here.
+  useEffect(() => installFlushOnHide(), []);
 
   // Direct invite-link opens (`/:gameId/room/:roomId`) land straight on
   // "join" from `initialRoute()`, but the browser back/forward buttons can

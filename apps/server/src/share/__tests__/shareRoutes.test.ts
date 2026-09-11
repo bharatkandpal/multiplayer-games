@@ -7,6 +7,7 @@ import { createMemoryStore } from "../../store/memory/index.js";
 import type { GameResult, Store } from "../../store/ports.js";
 import { SESSION_HEADER, createSessionMiddleware } from "../../sessions/sessionMiddleware.js";
 import { createShareRouter } from "../shareRoutes.js";
+import { createStoreSink } from "../../analytics/sink.js";
 
 describe("share link routes (MPG-056)", () => {
   let store: Store;
@@ -21,7 +22,7 @@ describe("share link routes (MPG-056)", () => {
     const app = express();
     app.use(express.json());
     app.use(createSessionMiddleware(store));
-    app.use("/api", createShareRouter(store));
+    app.use("/api", createShareRouter(store, createStoreSink(store.events)));
 
     server = await new Promise<Server>((resolve) => {
       const s = app.listen(0, () => resolve(s));
