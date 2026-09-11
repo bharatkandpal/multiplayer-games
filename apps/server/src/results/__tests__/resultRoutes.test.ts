@@ -9,6 +9,7 @@ import { createMemoryStore } from "../../store/memory/index.js";
 import type { Store } from "../../store/ports.js";
 import { SESSION_HEADER, createSessionMiddleware } from "../../sessions/sessionMiddleware.js";
 import { createResultRouter } from "../resultRoutes.js";
+import { createStoreSink } from "../../analytics/sink.js";
 
 /**
  * `POST /api/results` (MPG-131) — the local-play result path.
@@ -46,7 +47,7 @@ describe("turn-based result submission (MPG-131)", () => {
     const app = express();
     app.use(express.json());
     app.use(createSessionMiddleware(store));
-    app.use("/api", createResultRouter(store));
+    app.use("/api", createResultRouter(store, createStoreSink(store.events)));
 
     server = await new Promise<Server>((resolve) => {
       const s = app.listen(0, () => resolve(s));

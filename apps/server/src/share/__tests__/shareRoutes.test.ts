@@ -7,6 +7,7 @@ import { createMemoryStore } from "../../store/memory/index.js";
 import type { GameResult, Store } from "../../store/ports.js";
 import { SESSION_HEADER, createSessionMiddleware } from "../../sessions/sessionMiddleware.js";
 import { createShareRouter } from "../shareRoutes.js";
+import { createStoreSink } from "../../analytics/sink.js";
 
 describe("share link routes (MPG-056)", () => {
   let store: Store;
@@ -21,7 +22,7 @@ describe("share link routes (MPG-056)", () => {
     const app = express();
     app.use(express.json());
     app.use(createSessionMiddleware(store));
-    app.use("/api", createShareRouter(store));
+    app.use("/api", createShareRouter(store, createStoreSink(store.events)));
 
     server = await new Promise<Server>((resolve) => {
       const s = app.listen(0, () => resolve(s));
@@ -146,6 +147,11 @@ describe("share link routes (MPG-056)", () => {
     expect((await mint({ kind: "everything", targetId: result.id })).status).toBe(400);
     expect((await mint({ kind: "result" })).status).toBe(400);
     expect((await mint({ kind: "result", targetId: result.id, expiresInMs: -5 })).status).toBe(400);
+  });
+
+  it("rejects an over-long targetId (MPG-021 length cap)", async () => {
+    const res = await mint({ kind: "result", targetId: "x".repeat(257) });
+    expect(res.status).toBe(400);
   });
 
   it("honors an expiry: the link resolves before it lapses and 404s after", async () => {

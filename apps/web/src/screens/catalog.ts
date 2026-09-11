@@ -50,7 +50,27 @@ export type GameTag =
 /** The subset of `GameTag` an entry may author (the rest are derived). */
 export type AuthoredGameTag = Exclude<GameTag, "solo" | "2-player" | "multiplayer">;
 
-export interface GameCatalogEntry {
+/**
+ * Discovery metadata every entry carries, whatever family it belongs to
+ * (MPG-090). Both fields are editorial or historical facts about the entry, not
+ * derived signal — `trending` is deliberately absent here, because trending is
+ * measured, not authored (see `buildHomeShelves`).
+ */
+interface DiscoveryFields {
+  /**
+   * Hand-picked for the Featured shelf. Curation — not popularity — is what
+   * carries the cold start: with no play data at all, an editor's shortlist is
+   * the only honest way to answer "what should I play?" (PRD FR-25).
+   */
+  readonly featured?: boolean;
+  /**
+   * ISO date the game became playable on Home. Backs the New shelf, and is the
+   * real date from the entry's commit rather than a guess, so "New" stays true.
+   */
+  readonly addedOn: string;
+}
+
+export interface GameCatalogEntry extends DiscoveryFields {
   readonly id: GameId;
   readonly title: string;
   readonly description: string;
@@ -60,13 +80,16 @@ export interface GameCatalogEntry {
   readonly tags: readonly AuthoredGameTag[];
 }
 
-export interface RealtimeCatalogEntry {
+export interface RealtimeCatalogEntry extends DiscoveryFields {
   readonly id: RealtimeGameId;
   readonly title: string;
   readonly description: string;
   readonly kind: "realtime";
   readonly tags: readonly AuthoredGameTag[];
 }
+
+/** Either family's entry — what Home actually renders a card from. */
+export type CatalogEntry = GameCatalogEntry | RealtimeCatalogEntry;
 
 // Partial, not exhaustive: a game can exist in the engine registry before it's
 // surfaced in the UI (e.g. a new variant whose board/route land in a later task).
@@ -79,6 +102,8 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
     playerCount: ticTacToe.playerCount,
     kind: "turn-based",
     tags: ["vs-bot", "online", "watch", "quick"],
+    addedOn: "2026-08-25",
+    featured: true,
   },
   connect4: {
     id: "connect4",
@@ -87,6 +112,8 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
     playerCount: connectFour.playerCount,
     kind: "turn-based",
     tags: ["vs-bot", "online", "watch"],
+    addedOn: "2026-08-25",
+    featured: true,
   },
   "tictactoe-move": {
     id: "tictactoe-move",
@@ -96,6 +123,7 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
     playerCount: ticTacToeMove.playerCount,
     kind: "turn-based",
     tags: ["vs-bot", "online", "watch"],
+    addedOn: "2026-08-26",
   },
   nim: {
     id: "nim",
@@ -105,6 +133,7 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
     playerCount: nim.playerCount,
     kind: "turn-based",
     tags: ["vs-bot", "online", "watch", "quick"],
+    addedOn: "2026-08-31",
   },
   gomoku: {
     id: "gomoku",
@@ -114,6 +143,7 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
     playerCount: gomoku.playerCount,
     kind: "turn-based",
     tags: ["vs-bot", "online", "watch"],
+    addedOn: "2026-09-08",
   },
 };
 
@@ -127,6 +157,8 @@ export const REALTIME_CATALOG: Partial<Record<RealtimeGameId, RealtimeCatalogEnt
       "Tap to flap and thread the bird through the pipes. One player, one life — chase a high score.",
     kind: "realtime",
     tags: ["endless"],
+    addedOn: "2026-08-27",
+    featured: true,
   },
   "drunk-walk": {
     id: "drunk-walk",
@@ -135,6 +167,8 @@ export const REALTIME_CATALOG: Partial<Record<RealtimeGameId, RealtimeCatalogEnt
       "Balance a wobbly walker down an endless path. Tap the side opposite your lean to correct it — the wrong side makes it worse.",
     kind: "realtime",
     tags: ["endless"],
+    addedOn: "2026-08-30",
+    featured: true,
   },
   "reflex-test": {
     id: "reflex-test",
@@ -143,6 +177,25 @@ export const REALTIME_CATALOG: Partial<Record<RealtimeGameId, RealtimeCatalogEnt
       "Wait for red to turn green, then tap as fast as you can. Five rounds — see your best and average reaction time. Tap too early and the run is over.",
     kind: "realtime",
     tags: ["quick"],
+    addedOn: "2026-09-09",
+  },
+  "2048": {
+    id: "2048",
+    title: "2048",
+    description:
+      "Swipe to slide the tiles — equal ones merge and double. Keep going until the board fills up. Chase the biggest number and the highest score.",
+    kind: "realtime",
+    tags: ["endless"],
+    addedOn: "2026-09-10",
+  },
+  breakout: {
+    id: "breakout",
+    title: "Breakout",
+    description:
+      "Bounce the ball off your paddle to smash the wall of bricks. Clear it and a faster wall drops in. Three lives — how high can you score?",
+    kind: "realtime",
+    tags: ["endless"],
+    addedOn: "2026-09-11",
   },
 };
 
@@ -201,6 +254,137 @@ export function buildGameItems(games: GameId[], realtimeGames: RealtimeGameId[] 
       return entry ? [{ kind: "realtime", id, title: entry.title }] : [];
     }),
   ];
+}
+
+/**
+ * The same ordering as `buildGameItems`, but carrying the whole catalog entry
+ * rather than just `{kind, id, title}`. Home needs descriptions and tags to
+ * render a card; the prev/next controls don't, and keeping `GameItem` narrow
+ * means a play screen never pulls catalogue prose into its bundle.
+ */
+export function listCatalogEntries(
+  games: GameId[],
+  realtimeGames: RealtimeGameId[] = [],
+): CatalogEntry[] {
+  return [
+    ...games.flatMap((id): CatalogEntry[] => {
+      const entry = GAME_CATALOG[id];
+      return entry ? [entry] : [];
+    }),
+    ...realtimeGames.flatMap((id): CatalogEntry[] => {
+      const entry = REALTIME_CATALOG[id];
+      return entry ? [entry] : [];
+    }),
+  ];
+}
+
+/** The discovery shelves Home is built from, in render order (PRD FR-25). */
+export type HomeShelfId = "gotd" | "featured" | "trending" | "new" | "all";
+
+export interface HomeShelf {
+  readonly id: HomeShelfId;
+  /** Shelf heading as the player reads it. */
+  readonly title: string;
+  /** One quiet line under the heading explaining why these games are here. */
+  readonly blurb: string;
+  readonly entries: readonly CatalogEntry[];
+}
+
+/** How many recent additions the New shelf shows before it stops being "new". */
+const NEW_SHELF_LIMIT = 4;
+
+export interface HomeShelfOptions {
+  /**
+   * Ids ranked by the trending read model (MPG-094), most trending first.
+   *
+   * Absent or empty means **no honest signal yet**, and the Trending shelf is
+   * then not rendered at all rather than being filled with a stand-in. A
+   * "Trending" shelf that is really "the games we happen to list first" teaches
+   * the player to distrust every other shelf on the page — Featured is what
+   * carries the cold start until real data exists.
+   */
+  readonly trending?: readonly (GameId | RealtimeGameId)[];
+  /**
+   * The id spotlighted as "Game of the day" (see `gameOfTheDay.ts`). When set
+   * and listed, that one game is lifted onto its own shelf ahead of everything
+   * else and claimed out of the rest, so it's spotlighted without being shown
+   * twice. Absent means no spotlight shelf — a placeholder ahead of the real
+   * recommendation engine, so it stays opt-in rather than always-on.
+   */
+  readonly gameOfTheDay?: GameId | RealtimeGameId;
+}
+
+/**
+ * Splits the catalogue into the discovery shelves Home renders.
+ *
+ * **Every listed game appears exactly once.** A game is placed on the first
+ * shelf that claims it (Featured → Trending → New) and otherwise falls to the
+ * catch-all shelf, so curating a shelf can never make a game unreachable and no
+ * card is ever rendered twice on one page. Empty shelves are dropped, which is
+ * what lets Trending simply not exist before MPG-094 lands.
+ */
+export function buildHomeShelves(
+  games: GameId[],
+  realtimeGames: RealtimeGameId[] = [],
+  options: HomeShelfOptions = {},
+): HomeShelf[] {
+  const entries = listCatalogEntries(games, realtimeGames);
+  const claimed = new Set<string>();
+  const claim = (shelf: readonly CatalogEntry[]): readonly CatalogEntry[] => {
+    for (const entry of shelf) claimed.add(entry.id);
+    return shelf;
+  };
+  const unclaimed = (): CatalogEntry[] => entries.filter((entry) => !claimed.has(entry.id));
+
+  // Game of the day is claimed first, so the spotlighted game is lifted out of
+  // whichever shelf would otherwise hold it and never rendered twice.
+  const spotlightId = options.gameOfTheDay;
+  const gotd = claim(
+    spotlightId === undefined ? [] : unclaimed().filter((entry) => entry.id === spotlightId),
+  );
+
+  const featured = claim(unclaimed().filter((entry) => entry.featured === true));
+
+  // Ranked by the read model, not by catalogue order — and intersected with
+  // what's actually listed, so a ranking that still names a retired game
+  // degrades to a shorter shelf instead of a crash.
+  const trendingIds = options.trending ?? [];
+  const trending = claim(
+    trendingIds.flatMap((id) => unclaimed().filter((entry) => entry.id === id)),
+  );
+
+  // Newest first. `addedOn` is an ISO date, so lexicographic ordering is
+  // chronological ordering — no Date parsing, no timezone to get wrong.
+  const recent = claim(
+    unclaimed()
+      .sort((a, b) => b.addedOn.localeCompare(a.addedOn))
+      .slice(0, NEW_SHELF_LIMIT),
+  );
+
+  const shelves: HomeShelf[] = [
+    {
+      id: "gotd",
+      title: "Game of the day",
+      blurb: "Today's pick — a new one every day.",
+      entries: gotd,
+    },
+    {
+      id: "featured",
+      title: "Featured",
+      blurb: "Hand-picked places to start.",
+      entries: featured,
+    },
+    {
+      id: "trending",
+      title: "Trending",
+      blurb: "What people are playing right now.",
+      entries: trending,
+    },
+    { id: "new", title: "New", blurb: "Just added to the shelf.", entries: recent },
+    { id: "all", title: "More games", blurb: "The rest of the catalogue.", entries: unclaimed() },
+  ];
+
+  return shelves.filter((shelf) => shelf.entries.length > 0);
 }
 
 /** Index of `gameId` within `items`, or `-1` when it isn't a listed game. */

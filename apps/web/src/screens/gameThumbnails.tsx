@@ -208,6 +208,41 @@ function ReflexTestThumbnail(): React.JSX.Element {
   );
 }
 
+function Game2048Thumbnail(): React.JSX.Element {
+  return (
+    <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      {/* A 2×2 slice of the grid with two merged tiles — the game's whole idea. */}
+      <rect x="8" y="8" width="38" height="38" rx="6" className={styles.tileLow} />
+      <rect x="54" y="8" width="38" height="38" rx="6" className={styles.tileLow} />
+      <rect x="8" y="54" width="38" height="38" rx="6" className={styles.tileHigh} />
+      <rect x="54" y="54" width="38" height="38" rx="6" className={styles.tileHigh} />
+    </svg>
+  );
+}
+
+function BreakoutThumbnail(): React.JSX.Element {
+  return (
+    <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      {/* Two rows of bricks, a ball mid-flight, and the paddle below. */}
+      {[0, 1].map((r) =>
+        [0, 1, 2, 3].map((c) => (
+          <rect
+            key={`${r}-${c}`}
+            x={8 + c * 22}
+            y={12 + r * 14}
+            width="18"
+            height="10"
+            rx="2"
+            className={r === 0 ? styles.brickAccent : styles.brickSuccess}
+          />
+        )),
+      )}
+      <circle cx="58" cy="60" r="5" className={styles.breakoutBall} />
+      <rect x="36" y="84" width="28" height="7" rx="3.5" className={styles.breakoutPaddle} />
+    </svg>
+  );
+}
+
 // Partial, mirroring GAME_CATALOG's pattern (see HomeScreen.tsx): a game can
 // exist without a bespoke thumbnail yet. GenericThumbnail below covers that.
 export const GAME_THUMBNAILS: Partial<Record<GameId, () => React.JSX.Element>> = {
@@ -222,6 +257,8 @@ export const REALTIME_THUMBNAILS: Partial<Record<RealtimeGameId, () => React.JSX
   "floppy-birds": FloppyBirdsThumbnail,
   "drunk-walk": DrunkWalkThumbnail,
   "reflex-test": ReflexTestThumbnail,
+  "2048": Game2048Thumbnail,
+  breakout: BreakoutThumbnail,
 };
 
 /** Accepts either family's id (both are plain string unions); falls back to the generic mark. */

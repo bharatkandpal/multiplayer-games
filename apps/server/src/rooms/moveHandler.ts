@@ -16,6 +16,7 @@ import { applyPlayerMove } from "./gameState.js";
 import { RoomManager } from "./RoomManager.js";
 import type { Room, Seat, Slot } from "./types.js";
 import { updateLeaderboardsForTurnBasedGameOver } from "../leaderboard/leaderboardWriter.js";
+import type { EventSink } from "../analytics/sink.js";
 import { writeGameResult } from "../sessions/resultWriter.js";
 import type { Store } from "../store/ports.js";
 
@@ -51,7 +52,12 @@ function parseMovePayload(payload: unknown): MovePayload | undefined {
  * broadcast (fired on the waiting→active transition); everything else here is a
  * direct response to a client's `move` intent.
  */
-export function registerGameHandlers(io: Server, roomManager: RoomManager, store: Store): void {
+export function registerGameHandlers(
+  io: Server,
+  roomManager: RoomManager,
+  store: Store,
+  sink: EventSink,
+): void {
   // Track each room's last-seen status so we can detect the waiting→active edge
   // (all seats filled) and emit `game:start` exactly once for it.
   const lastStatus = new Map<string, Room["status"]>();
@@ -61,7 +67,7 @@ export function registerGameHandlers(io: Server, roomManager: RoomManager, store
   // `lastMove.slot` pointing at a bot seat.
   const botRunner = new BotRunner(roomManager, {
     onUpdate: (room, lastMove) => emitUpdate(io, roomManager, room, lastMove),
-    onGameOver: (room, result) => emitGameOver(io, roomManager, store, room, result),
+    onGameOver: (room, result) => emitGameOver(io, roomManager, store, sink, room, result),
   });
 
   roomManager.on("room:updated", (room: Room) => {
@@ -130,7 +136,7 @@ export function registerGameHandlers(io: Server, roomManager: RoomManager, store
       });
 
       if (outcome.result.status !== "in_progress") {
-        emitGameOver(io, roomManager, store, room, outcome.result);
+        emitGameOver(io, roomManager, store, sink, room, outcome.result);
       } else {
         // A human just moved — if the next turn belongs to a bot seat, the server-side
         // AI runner takes over (single authoritative path via `applyPlayerMove`), with a
@@ -169,12 +175,13 @@ function emitGameOver(
   io: Server,
   roomManager: RoomManager,
   store: Store,
+  sink: EventSink,
   room: Room,
   result: Result,
 ): void {
   const publicRoom = roomManager.toPublicRoom(room);
   io.to(room.id).emit("game:over", { room: publicRoom, result });
-  void persistResults(store, room, result)
+  void persistResults(store, sink, room, result)
     .then((saved) => {
       for (const { socketId, resultId } of saved) {
         // A seat that disconnected between game-over and this write has no socket
@@ -208,6 +215,7 @@ interface PersistedSeatResult {
  */
 async function persistResults(
   store: Store,
+  sink: EventSink,
   room: Room,
   result: Result,
 ): Promise<PersistedSeatResult[]> {
@@ -227,17 +235,21 @@ async function persistResults(
 
   const saved: PersistedSeatResult[] = await Promise.all(
     humanSeats.map(async (seat) => {
-      const row = await writeGameResult(store, {
-        runId: `${room.runId}:${seat.slot}`,
-        gameId: room.gameId,
-        gameFamily: "turn-based",
-        ownerToken: seat.sessionToken,
-        status: result.status,
-        winnerSlot,
-        seatsSnapshot,
-        durationMs,
-        moveLog: room.moveLog,
-      });
+      const row = await writeGameResult(
+        store,
+        {
+          runId: `${room.runId}:${seat.slot}`,
+          gameId: room.gameId,
+          gameFamily: "turn-based",
+          ownerToken: seat.sessionToken,
+          status: result.status,
+          winnerSlot,
+          seatsSnapshot,
+          durationMs,
+          moveLog: room.moveLog,
+        },
+        sink,
+      );
       // Read at write time, not at emit time: a seat that reconnects in between
       // gets a new socket, and telling the stale one is a no-op rather than a
       // misdelivery — the id still only ever travels to that seat's own socket.

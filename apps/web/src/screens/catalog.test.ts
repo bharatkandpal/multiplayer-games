@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { GameId } from "@mpg/engine";
+import type { GameId, RealtimeGameId } from "@mpg/engine";
 import {
   buildGameItems,
+  buildHomeShelves,
   gameTags,
   hasTag,
   indexOfGame,
@@ -11,6 +12,7 @@ import {
   REALTIME_CATALOG,
   type GameCatalogEntry,
   type GameItem,
+  type HomeShelf,
 } from "./catalog";
 
 describe("catalog — buildGameItems", () => {
@@ -135,5 +137,108 @@ describe("catalog — prev/next navigation", () => {
 
   it("returns undefined on an empty catalog", () => {
     expect(nextGame([], "connect4")).toBeUndefined();
+  });
+});
+
+describe("catalog — buildHomeShelves", () => {
+  const ALL_GAMES: GameId[] = ["tictactoe", "connect4", "tictactoe-move", "nim", "gomoku"];
+  const ALL_REALTIME: RealtimeGameId[] = ["floppy-birds", "drunk-walk", "reflex-test"];
+
+  function shelf(shelves: HomeShelf[], id: string): HomeShelf | undefined {
+    return shelves.find((s) => s.id === id);
+  }
+
+  function idsOn(shelves: HomeShelf[], id: string): string[] {
+    return (shelf(shelves, id)?.entries ?? []).map((entry) => entry.id);
+  }
+
+  it("puts the curated entries on Featured, in catalog order", () => {
+    const shelves = buildHomeShelves(ALL_GAMES, ALL_REALTIME);
+    expect(idsOn(shelves, "featured")).toEqual([
+      "tictactoe",
+      "connect4",
+      "floppy-birds",
+      "drunk-walk",
+    ]);
+  });
+
+  // The cold-start rule: with no play data, a shelf claiming to show what's
+  // popular would be showing catalog order with a misleading label.
+  it("omits the Trending shelf entirely when there is no ranking", () => {
+    expect(shelf(buildHomeShelves(ALL_GAMES, ALL_REALTIME), "trending")).toBeUndefined();
+    expect(
+      shelf(buildHomeShelves(ALL_GAMES, ALL_REALTIME, { trending: [] }), "trending"),
+    ).toBeUndefined();
+  });
+
+  it("orders Trending by the supplied ranking, not by catalog order", () => {
+    const shelves = buildHomeShelves(ALL_GAMES, ALL_REALTIME, { trending: ["gomoku", "nim"] });
+    expect(idsOn(shelves, "trending")).toEqual(["gomoku", "nim"]);
+  });
+
+  it("ignores a ranked id that isn't a listed game rather than breaking the shelf", () => {
+    const shelves = buildHomeShelves(["nim"], [], { trending: ["connect4", "nim"] });
+    expect(idsOn(shelves, "trending")).toEqual(["nim"]);
+  });
+
+  it("fills New with the most recent additions, newest first", () => {
+    const shelves = buildHomeShelves(ALL_GAMES, ALL_REALTIME);
+    // Featured already claimed the four oldest-but-curated entries; what's left
+    // sorts by `addedOn` descending.
+    expect(idsOn(shelves, "new")).toEqual(["reflex-test", "gomoku", "nim", "tictactoe-move"]);
+  });
+
+  // The invariant that makes curation safe: no amount of shelf editing can
+  // strand a game, and no card is ever drawn twice on one page.
+  it("places every listed game on exactly one shelf", () => {
+    const shelves = buildHomeShelves(ALL_GAMES, ALL_REALTIME, { trending: ["nim"] });
+    const ids = shelves.flatMap((s) => s.entries.map((entry) => entry.id));
+    expect(ids).toHaveLength(ALL_GAMES.length + ALL_REALTIME.length);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("falls everything through to the catch-all shelf when nothing is curated", () => {
+    const shelves = buildHomeShelves(["nim", "gomoku"], []);
+    expect(shelf(shelves, "featured")).toBeUndefined();
+    // `nim` and `gomoku` are the only two entries, so New takes both and the
+    // catch-all is correctly dropped rather than rendered empty.
+    expect(idsOn(shelves, "new")).toEqual(["gomoku", "nim"]);
+    expect(shelf(shelves, "all")).toBeUndefined();
+  });
+
+  it("returns no shelves at all when no game is listed", () => {
+    expect(buildHomeShelves([], [])).toEqual([]);
+  });
+
+  // Game of the day (simple daily randomizer, MPG placeholder): the spotlighted
+  // id is lifted onto its own shelf ahead of everything else and claimed out of
+  // the rest, so it's featured without ever being drawn twice.
+  it("lifts the game of the day onto its own shelf, first, when one is given", () => {
+    const shelves = buildHomeShelves(ALL_GAMES, ALL_REALTIME, { gameOfTheDay: "nim" });
+    expect(shelves[0]?.id).toBe("gotd");
+    expect(idsOn(shelves, "gotd")).toEqual(["nim"]);
+  });
+
+  it("claims the spotlighted game out of the shelf that would otherwise hold it", () => {
+    // `tictactoe` is curated, so it normally leads Featured. As the day's pick
+    // it moves to the spotlight and is gone from Featured.
+    const shelves = buildHomeShelves(ALL_GAMES, ALL_REALTIME, { gameOfTheDay: "tictactoe" });
+    expect(idsOn(shelves, "gotd")).toEqual(["tictactoe"]);
+    expect(idsOn(shelves, "featured")).not.toContain("tictactoe");
+  });
+
+  it("still draws every game exactly once with a spotlight in play", () => {
+    const shelves = buildHomeShelves(ALL_GAMES, ALL_REALTIME, {
+      gameOfTheDay: "connect4",
+      trending: ["nim"],
+    });
+    const ids = shelves.flatMap((s) => s.entries.map((entry) => entry.id));
+    expect(ids).toHaveLength(ALL_GAMES.length + ALL_REALTIME.length);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("renders no spotlight shelf when the pick isn't a listed game", () => {
+    const shelves = buildHomeShelves(["nim"], [], { gameOfTheDay: "gomoku" });
+    expect(shelf(shelves, "gotd")).toBeUndefined();
   });
 });

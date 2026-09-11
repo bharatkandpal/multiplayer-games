@@ -1,11 +1,12 @@
 /**
  * Drizzle table definitions — the durable persistence schema.
  *
- * Four aggregates:
+ * Five aggregates:
  *   sessions          – lightweight, no-PII identity tokens
  *   game_results      – durable record of every completed/abandoned game
  *   leaderboard_entries – per-game, per-scope standings (score or W/L/D)
  *   share_links       – unguessable tokens resolving to a result, replay, or leaderboard
+ *   analytics_events  – the product-truth funnel log (MPG-097)
  *
  * Owner-scoped via `owner_token` FK → sessions.token.
  * `event_id` is nullable — scopes to a company event when present.
@@ -123,4 +124,51 @@ export const shareLinks = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("share_links_owner_idx").on(t.ownerToken)],
+);
+
+// ---------------------------------------------------------------------------
+// analytics_events (MPG-097)
+// ---------------------------------------------------------------------------
+
+/**
+ * The funnel log — product truth, distinct from MPG-022's system health.
+ *
+ * Three shape decisions worth stating, because each is a constraint rather
+ * than a preference:
+ *
+ *  1. **`owner_token` is the only identifier, and it cascades.** It is the same
+ *     opaque no-PII token as everywhere else (ADR 0004), which is what makes
+ *     k-factor and D1/D7 computable at all — you cannot count "how many new
+ *     sessions did one share produce" without a stable anonymous id. It is an
+ *     FK with `onDelete: cascade` so deleting a session erases its funnel trail
+ *     too; analytics does not get to outlive the identity it describes.
+ *  2. **`share_link_id`, never the share token.** The token IS the capability
+ *     that authorizes reading a result, so copying it into an analytics row
+ *     would duplicate a secret into a table read by reporting queries. The
+ *     internal row id answers every funnel question the token would, and
+ *     authorizes nothing.
+ *  3. **`props` is bounded and non-identifying.** Small scalars only (see
+ *     `analytics/events.ts`, which validates before anything reaches here).
+ *     No URLs, no user agents, no free text.
+ */
+export const analyticsEvents = pgTable(
+  "analytics_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    ownerToken: text("owner_token")
+      .notNull()
+      .references(() => sessions.token, { onDelete: "cascade" }),
+    gameId: text("game_id"),
+    shareLinkId: uuid("share_link_id"),
+    eventId: text("event_id"),
+    props: jsonb("props"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Funnel counts are always "how many of event X in window W".
+    index("analytics_events_name_created_idx").on(t.name, t.createdAt),
+    // Retention (D1/D7) and per-session erasure both scan by owner.
+    index("analytics_events_owner_idx").on(t.ownerToken, t.createdAt),
+  ],
 );
