@@ -209,4 +209,36 @@ describe("catalog — buildHomeShelves", () => {
   it("returns no shelves at all when no game is listed", () => {
     expect(buildHomeShelves([], [])).toEqual([]);
   });
+
+  // Game of the day (simple daily randomizer, MPG placeholder): the spotlighted
+  // id is lifted onto its own shelf ahead of everything else and claimed out of
+  // the rest, so it's featured without ever being drawn twice.
+  it("lifts the game of the day onto its own shelf, first, when one is given", () => {
+    const shelves = buildHomeShelves(ALL_GAMES, ALL_REALTIME, { gameOfTheDay: "nim" });
+    expect(shelves[0]?.id).toBe("gotd");
+    expect(idsOn(shelves, "gotd")).toEqual(["nim"]);
+  });
+
+  it("claims the spotlighted game out of the shelf that would otherwise hold it", () => {
+    // `tictactoe` is curated, so it normally leads Featured. As the day's pick
+    // it moves to the spotlight and is gone from Featured.
+    const shelves = buildHomeShelves(ALL_GAMES, ALL_REALTIME, { gameOfTheDay: "tictactoe" });
+    expect(idsOn(shelves, "gotd")).toEqual(["tictactoe"]);
+    expect(idsOn(shelves, "featured")).not.toContain("tictactoe");
+  });
+
+  it("still draws every game exactly once with a spotlight in play", () => {
+    const shelves = buildHomeShelves(ALL_GAMES, ALL_REALTIME, {
+      gameOfTheDay: "connect4",
+      trending: ["nim"],
+    });
+    const ids = shelves.flatMap((s) => s.entries.map((entry) => entry.id));
+    expect(ids).toHaveLength(ALL_GAMES.length + ALL_REALTIME.length);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("renders no spotlight shelf when the pick isn't a listed game", () => {
+    const shelves = buildHomeShelves(["nim"], [], { gameOfTheDay: "gomoku" });
+    expect(shelf(shelves, "gotd")).toBeUndefined();
+  });
 });

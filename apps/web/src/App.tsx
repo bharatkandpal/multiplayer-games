@@ -36,6 +36,7 @@ import {
 import { GAME_CATALOG, REALTIME_CATALOG } from "./screens/HomeScreen";
 import { SharedResultScreen } from "./screens/SharedResultScreen";
 import { buildGameItems, nextGame, type GameItem } from "./screens/catalog";
+import { pickGameOfTheDay } from "./screens/gameOfTheDay";
 import { GameSwitcher } from "./screens/GameSwitcher";
 import { isAllBotRoom, publicRoomToSeats, toSeatConfigInput } from "./api/roomSeats";
 import { getStoredUsername } from "./api/username";
@@ -266,6 +267,12 @@ export default function App(): React.JSX.Element {
   // switcher on the play screens.
   const gameItems = useMemo(() => buildGameItems(games, realtimeGames), [games, realtimeGames]);
 
+  // The game spotlighted on Home as "Game of the day" — a simple daily rotation
+  // (see `gameOfTheDay.ts`) standing in until the real recommendation engine
+  // lands. Memoized so it's stable for the session; it only turns over across a
+  // local-midnight boundary, which a session doesn't outlive in practice.
+  const gameOfTheDayId = useMemo(() => pickGameOfTheDay(gameItems)?.id, [gameItems]);
+
   /**
    * Quick-start: go straight into a playable game, skipping seat setup. A
    * turn-based game starts you against the bot at its tuned strength; a
@@ -376,6 +383,7 @@ export default function App(): React.JSX.Element {
         <HomeScreen
           games={games}
           realtimeGames={realtimeGames}
+          {...(gameOfTheDayId ? { gameOfTheDay: gameOfTheDayId } : {})}
           onSelectGame={(gameId) => quickStart({ kind: "turn-based", id: gameId, title: gameId })}
           onSelectRealtimeGame={(gameId) => setRoute({ screen: "realtime", gameId })}
           onConfigureGame={(gameId) => setRoute({ screen: "setup", gameId })}

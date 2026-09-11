@@ -25,6 +25,12 @@ export interface HomeScreenProps {
    */
   trending?: readonly (GameId | RealtimeGameId)[];
   /**
+   * The id to spotlight as "Game of the day" (see `gameOfTheDay.ts`). Omit for
+   * no spotlight shelf — a placeholder recommender App opts into, kept off the
+   * default render the way `trending` is.
+   */
+  gameOfTheDay?: GameId | RealtimeGameId;
+  /**
    * Quick-start: tapping a card starts a game immediately (vs the bot for
    * turn-based games), rather than routing to seat setup.
    */
@@ -59,13 +65,17 @@ export function HomeScreen({
   games,
   realtimeGames = [],
   trending,
+  gameOfTheDay,
   onSelectGame,
   onSelectRealtimeGame,
   onConfigureGame,
   onShowGallery,
   devMode = false,
 }: HomeScreenProps): React.JSX.Element {
-  const shelves = buildHomeShelves(games, realtimeGames, trending ? { trending } : {});
+  const shelves = buildHomeShelves(games, realtimeGames, {
+    ...(trending ? { trending } : {}),
+    ...(gameOfTheDay ? { gameOfTheDay } : {}),
+  });
 
   return (
     <div className={styles.main}>
@@ -128,10 +138,22 @@ function Shelf({
   onSelectRealtimeGame,
   onConfigureGame,
 }: ShelfProps): React.JSX.Element {
+  // The Game-of-the-day shelf carries the same markup and card wiring as any
+  // other shelf — it's just dressed as a spotlight: an accent label and a card
+  // that spans the row (see `.spotlight` in the stylesheet).
+  const isSpotlight = shelf.id === "gotd";
   return (
-    <section className={styles.shelf} aria-labelledby={`shelf-${shelf.id}`}>
+    <section
+      className={isSpotlight ? `${styles.shelf} ${styles.spotlight}` : styles.shelf}
+      aria-labelledby={`shelf-${shelf.id}`}
+    >
       <div className={styles.shelfHeader}>
-        <h2 className={styles.shelfTitle} id={`shelf-${shelf.id}`}>
+        <h2
+          className={
+            isSpotlight ? `${styles.shelfTitle} ${styles.spotlightTitle}` : styles.shelfTitle
+          }
+          id={`shelf-${shelf.id}`}
+        >
           {shelf.title}
         </h2>
         <p className={styles.shelfBlurb}>{shelf.blurb}</p>

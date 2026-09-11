@@ -1,9 +1,9 @@
 // "Game of the Day" — a deliberately trivial recommender.
 //
 // A real recommendation engine (personalized, signal-driven) is a separate piece
-// of work. For now Home just spotlights one game a day. The contract this file
-// establishes is the seam that engine will slot into: `pickGameOfTheDay(items,
-// date)` in, one `GameItem` out. Swap the body, keep the signature.
+// of work. For now Home spotlights one game a day. The contract this file
+// establishes is the seam that engine will slot into: a list in, one pick out.
+// Swap the body, keep the signature.
 //
 // Two properties matter and neither needs anything more than arithmetic:
 //   1. *Stable within a day* — it must not reshuffle on every render, or the
@@ -11,8 +11,6 @@
 //      is a pure function of the calendar day, not `Math.random()`.
 //   2. *Moves on its own* — a different game surfaces tomorrow without a deploy,
 //      and it walks the whole catalog over time rather than favouring index 0.
-
-import type { GameItem } from "./catalog";
 
 /**
  * The catalog day-index: whole days since the Unix epoch in the runtime's local
@@ -27,15 +25,16 @@ function dayOrdinal(date: Date): number {
 }
 
 /**
- * The spotlighted game for `date`, or `undefined` when the catalog is empty.
+ * The spotlighted item for `date`, or `undefined` when `items` is empty.
  *
- * Deterministic: the same day always yields the same game, so every render and
- * every player on that calendar day sees one consistent pick. The stride below
- * (a step coprime-ish with typical small catalog sizes) walks the list across
- * days instead of stepping 0,1,2… so consecutive days feel varied even as the
- * catalog grows.
+ * Generic over anything with an `id` so it works on the whole catalog entry, a
+ * lighter `GameItem`, or a test stub alike. Deterministic: the same day always
+ * yields the same pick, so every render and every player on that calendar day
+ * sees one consistent spotlight. The stride (a step coprime-ish with typical
+ * small catalog sizes) walks the list across days instead of stepping 0,1,2…,
+ * so consecutive days feel varied even as the catalog grows.
  */
-export function pickGameOfTheDay(items: GameItem[], date: Date = new Date()): GameItem | undefined {
+export function pickGameOfTheDay<T>(items: readonly T[], date: Date = new Date()): T | undefined {
   if (items.length === 0) return undefined;
   // `((n % m) + m) % m` keeps the index non-negative for pre-epoch dates.
   const index = (((dayOrdinal(date) * 7) % items.length) + items.length) % items.length;
