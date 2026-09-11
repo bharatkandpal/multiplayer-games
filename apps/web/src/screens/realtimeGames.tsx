@@ -6,17 +6,24 @@
 
 import { useState, type ReactNode } from "react";
 import {
+  breakout,
   drunkWalk,
   floppyBirds,
+  game2048,
   reflexTest,
+  type BreakoutInput,
+  type BreakoutState,
   type DrunkWalkInput,
   type DrunkWalkState,
   type FloppyInput,
   type FloppyState,
+  type Game2048Input,
+  type Game2048State,
   type RealtimeGameId,
   type RealtimeModule,
   type ReflexInput,
   type ReflexState,
+  type SwipeDir,
 } from "@mpg/engine";
 import { DrunkWalkScene } from "../components/realtime/DrunkWalkScene";
 import { DrunkWalkCustomizeMenu } from "../components/realtime/DrunkWalkCustomizeMenu";
@@ -28,6 +35,8 @@ import {
 } from "../components/realtime/drunkWalkCharacter";
 import { FloppyBirdsScene } from "../components/realtime/FloppyBirdsScene";
 import { ReflexTestScene } from "../components/realtime/ReflexTestScene";
+import { Game2048Scene } from "../components/realtime/Game2048Scene";
+import { BreakoutScene } from "../components/realtime/BreakoutScene";
 import { Button, GearIcon } from "../components/ui";
 import {
   RealtimePlayScreen,
@@ -107,6 +116,67 @@ const reflexControls: RealtimeControls<ReflexInput, "tap"> = {
     "The panel holds red for a random moment, then turns green — tap as fast as you can. Five rounds. Tap while it's still red and the run ends immediately.",
 };
 
+// 2048 has four discrete swipe actions. On-screen buttons (a D-pad) give touch
+// users an unambiguous control per direction; arrows and WASD give keyboard
+// parity. A plain surface tap falls back to `primaryAction` — harmless on a
+// puzzle where a stray swipe that changes nothing is simply a no-op. When more
+// than one direction is in the pressed set for a tick (rare), a fixed priority
+// order picks one so the input stays a single well-defined swipe.
+const SWIPE_PRIORITY: readonly SwipeDir[] = ["up", "down", "left", "right"];
+const game2048Controls: RealtimeControls<Game2048Input, SwipeDir> = {
+  primaryAction: "up",
+  keyMap: {
+    ArrowUp: "up",
+    KeyW: "up",
+    ArrowDown: "down",
+    KeyS: "down",
+    ArrowLeft: "left",
+    KeyA: "left",
+    ArrowRight: "right",
+    KeyD: "right",
+  },
+  toInput: (pressed) => {
+    const swipe = SWIPE_PRIORITY.find((dir) => pressed.has(dir)) ?? null;
+    return { swipe };
+  },
+  actionHint: "Swipe with the arrows, WASD, or the buttons",
+  readyExplainer:
+    "Slide the tiles in one direction — equal tiles merge and add up. A new tile appears after every move. You lose when the board fills up with no moves left.",
+  touchActions: [
+    { action: "up", label: "↑" },
+    { action: "left", label: "←" },
+    { action: "right", label: "→" },
+    { action: "down", label: "↓" },
+  ],
+};
+
+// Breakout is a two-action game (paddle left/right). Tap zones split the surface
+// at its midpoint (mirroring Drunk Walk), on-screen buttons give an explicit
+// touch control, and ←/→ + A/D give keyboard parity. The paddle carries momentum
+// in the engine, so it glides smoothly across the gaps between key-repeat events.
+const breakoutControls: RealtimeControls<BreakoutInput, "left" | "right"> = {
+  primaryAction: "left",
+  keyMap: {
+    ArrowLeft: "left",
+    KeyA: "left",
+    ArrowRight: "right",
+    KeyD: "right",
+  },
+  toInput: (pressed) => {
+    if (pressed.has("left")) return { move: "left" };
+    if (pressed.has("right")) return { move: "right" };
+    return { move: null };
+  },
+  actionHint: "Tap left/right (or ←/→, A/D) to move the paddle",
+  readyExplainer:
+    "Bounce the ball into the bricks to clear them. Where the ball hits the paddle steers where it goes. Miss the ball and you lose a life — you have three.",
+  resolveTapAction: (fractionX) => (fractionX < 0.5 ? "left" : "right"),
+  touchActions: [
+    { action: "left", label: "◀ Left" },
+    { action: "right", label: "Right ▶" },
+  ],
+};
+
 /**
  * The real-time catalog. `Partial` like the turn-based `GAME_CATALOG`:
  * `RealtimeGameId` already includes `"lumberjack"` (MPG-041), which isn't built
@@ -127,6 +197,16 @@ export const REALTIME_GAMES: Partial<Record<RealtimeGameId, RealtimeGameWiring>>
     reflexTest,
     (props) => <ReflexTestScene {...props} />,
     reflexControls,
+  ),
+  "2048": defineRealtimeGame<Game2048State, Game2048Input, SwipeDir>(
+    game2048,
+    (props) => <Game2048Scene {...props} />,
+    game2048Controls,
+  ),
+  breakout: defineRealtimeGame<BreakoutState, BreakoutInput, "left" | "right">(
+    breakout,
+    (props) => <BreakoutScene {...props} />,
+    breakoutControls,
   ),
 };
 

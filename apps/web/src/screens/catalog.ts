@@ -144,6 +144,22 @@ export const REALTIME_CATALOG: Partial<Record<RealtimeGameId, RealtimeCatalogEnt
     kind: "realtime",
     tags: ["quick"],
   },
+  "2048": {
+    id: "2048",
+    title: "2048",
+    description:
+      "Swipe to slide the tiles — equal ones merge and double. Keep going until the board fills up. Chase the biggest number and the highest score.",
+    kind: "realtime",
+    tags: ["endless"],
+  },
+  breakout: {
+    id: "breakout",
+    title: "Breakout",
+    description:
+      "Bounce the ball off your paddle to smash the wall of bricks. Clear it and a faster wall drops in. Three lives — how high can you score?",
+    kind: "realtime",
+    tags: ["endless"],
+  },
 };
 
 /**

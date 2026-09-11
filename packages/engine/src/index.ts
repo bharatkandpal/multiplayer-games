@@ -44,6 +44,12 @@ export type { DrunkWalkState, DrunkWalkInput, SteppingLeg } from "./drunk-walk";
 export { reflexTest, REFLEX, bestTimeMs, averageTimeMs, currentReactionMs } from "./reflex-test";
 export type { ReflexState, ReflexInput, ReflexLight } from "./reflex-test";
 
+export { game2048, GAME_2048, applySwipe, highestTile } from "./game2048";
+export type { Game2048State, Game2048Input, SwipeDir } from "./game2048";
+
+export { breakout, BREAKOUT_WORLD, brickRect } from "./breakout";
+export type { BreakoutState, BreakoutInput } from "./breakout";
+
 export { builtInRealtimeGames, registerBuiltInRealtimeGames } from "./realtime-games";
 
 export { ticTacToe } from "./tictactoe";

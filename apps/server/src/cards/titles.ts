@@ -24,6 +24,8 @@ export const GAME_TITLES: Readonly<Record<string, string>> = {
   "floppy-birds": "Floppy Birds",
   "drunk-walk": "Drunk Walk",
   "reflex-test": "Reflex Test",
+  "2048": "2048",
+  breakout: "Breakout",
 };
 
 /**

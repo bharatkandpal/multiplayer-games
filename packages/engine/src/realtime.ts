@@ -15,9 +15,11 @@
 /**
  * Known real-time games. Closed union today, mirroring {@link GameId}; widens to an
  * open `string` behind the registry when games become installable plugins (MPG-031).
- * `floppy-birds` lands with MPG-040; `drunk-walk` with MPG-076; `lumberjack` with MPG-041.
+ * `floppy-birds` lands with MPG-040; `drunk-walk` with MPG-076; `lumberjack` with MPG-041;
+ * `2048` with MPG-074; `breakout` with MPG-075.
  */
-export type RealtimeGameId = "floppy-birds" | "drunk-walk" | "lumberjack" | "reflex-test";
+export type RealtimeGameId =
+  "floppy-birds" | "drunk-walk" | "lumberjack" | "reflex-test" | "2048" | "breakout";
 
 /**
  * The one interface every real-time game implements — the arcade counterpart to
