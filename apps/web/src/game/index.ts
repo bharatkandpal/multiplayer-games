@@ -40,4 +40,18 @@ export type {
 } from "./useRealtimeLoop";
 export { useRealtimeLoop } from "./useRealtimeLoop";
 
+export type {
+  InputBinding,
+  InputSource,
+  InputSourceHost,
+  InputSourceId,
+  InputSourceStatus,
+  RealtimeControls,
+  TouchAction,
+} from "./inputSource";
+export { createActionInputSource } from "./inputSource";
+
+export type { PointerAxisConfig } from "./pointerAxisInputSource";
+export { createPointerAxisInputSource } from "./pointerAxisInputSource";
+
 export { clearPersonalBest, loadPersonalBest, recordPersonalBest } from "./personalBest";

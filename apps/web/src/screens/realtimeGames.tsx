@@ -4,19 +4,29 @@
 // { module, renderer }"). Kept small and mechanical: all orchestration lives in
 // the shared, engine- and renderer-agnostic `RealtimePlayScreen`.
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
+  breakout,
   drunkWalk,
   floppyBirds,
+  game2048,
+  game2048_3,
+  game2048_5,
   reflexTest,
+  type BreakoutInput,
+  type BreakoutState,
   type DrunkWalkInput,
   type DrunkWalkState,
   type FloppyInput,
   type FloppyState,
+  type Game2048Input,
+  type Game2048Size,
+  type Game2048State,
   type RealtimeGameId,
   type RealtimeModule,
   type ReflexInput,
   type ReflexState,
+  type SwipeDir,
 } from "@mpg/engine";
 import { DrunkWalkScene } from "../components/realtime/DrunkWalkScene";
 import { DrunkWalkCustomizeMenu } from "../components/realtime/DrunkWalkCustomizeMenu";
@@ -28,6 +38,10 @@ import {
 } from "../components/realtime/drunkWalkCharacter";
 import { FloppyBirdsScene } from "../components/realtime/FloppyBirdsScene";
 import { ReflexTestScene } from "../components/realtime/ReflexTestScene";
+import { Game2048Scene } from "../components/realtime/Game2048Scene";
+import { Game2048CustomizeMenu } from "../components/realtime/Game2048CustomizeMenu";
+import { loadStored2048Size, store2048Size } from "../components/realtime/game2048Size";
+import { BreakoutScene } from "../components/realtime/BreakoutScene";
 import { Button, GearIcon } from "../components/ui";
 import {
   RealtimePlayScreen,
@@ -38,6 +52,7 @@ import { REALTIME_CATALOG } from "./HomeScreen";
 import { RankPreview } from "./RankPreview";
 import { submitRealtimeScore } from "../api/leaderboard";
 import { mintResultShareUrl } from "../api/share";
+import { createActionInputSource, createPointerAxisInputSource, type InputSource } from "../game";
 import type { RunComplete } from "../game/useRealtimeLoop";
 import { recordPersonalBest } from "../game/personalBest";
 
@@ -52,15 +67,40 @@ import { recordPersonalBest } from "../game/personalBest";
 export interface RealtimeGameWiring {
   readonly module: RealtimeModule<unknown, unknown>;
   readonly renderScene: (props: RealtimeSceneProps<unknown>) => ReactNode;
-  readonly controls: RealtimeControls<unknown>;
+  /**
+   * Builds this game's input source (MPG-120). A fresh source per call — it owns
+   * mutable input state, so the route memoises one per mount. Most games use the
+   * discrete-action source; axis games (e.g. Breakout) use `pointer-axis`.
+   */
+  readonly makeInputSource: () => InputSource<unknown>;
+  /**
+   * The discrete-action config, present only for games that use the action
+   * source. Kept on the wiring for introspection/tests; axis games omit it.
+   */
+  readonly controls?: RealtimeControls<unknown>;
 }
 
+/** An action (keys/taps/buttons) game — wraps its `controls` in the action source. */
 function defineRealtimeGame<S, I, A extends string>(
   module: RealtimeModule<S, I>,
   renderScene: (props: RealtimeSceneProps<S>) => ReactNode,
   controls: RealtimeControls<I, A>,
 ): RealtimeGameWiring {
-  return { module, renderScene, controls } as unknown as RealtimeGameWiring;
+  return {
+    module,
+    renderScene,
+    controls,
+    makeInputSource: () => createActionInputSource(controls),
+  } as unknown as RealtimeGameWiring;
+}
+
+/** An axis game (pointer position + keyboard parity) — supplies its own source factory. */
+function defineRealtimeAxisGame<S, I>(
+  module: RealtimeModule<S, I>,
+  renderScene: (props: RealtimeSceneProps<S>) => ReactNode,
+  makeInputSource: () => InputSource<I>,
+): RealtimeGameWiring {
+  return { module, renderScene, makeInputSource } as unknown as RealtimeGameWiring;
 }
 
 const floppyControls: RealtimeControls<FloppyInput, "flap"> = {
@@ -108,6 +148,57 @@ const reflexControls: RealtimeControls<ReflexInput, "tap"> = {
     "The panel holds red for a random moment, then turns green — tap as fast as you can. Five rounds. Tap while it's still red and the run ends immediately.",
 };
 
+// 2048 has four discrete swipe actions. On-screen buttons (a D-pad) give touch
+// users an unambiguous control per direction; arrows and WASD give keyboard
+// parity. A plain surface tap falls back to `primaryAction` — harmless on a
+// puzzle where a stray swipe that changes nothing is simply a no-op. When more
+// than one direction is in the pressed set for a tick (rare), a fixed priority
+// order picks one so the input stays a single well-defined swipe.
+const SWIPE_PRIORITY: readonly SwipeDir[] = ["up", "down", "left", "right"];
+const game2048Controls: RealtimeControls<Game2048Input, SwipeDir> = {
+  primaryAction: "up",
+  keyMap: {
+    ArrowUp: "up",
+    KeyW: "up",
+    ArrowDown: "down",
+    KeyS: "down",
+    ArrowLeft: "left",
+    KeyA: "left",
+    ArrowRight: "right",
+    KeyD: "right",
+  },
+  toInput: (pressed) => {
+    const swipe = SWIPE_PRIORITY.find((dir) => pressed.has(dir)) ?? null;
+    return { swipe };
+  },
+  actionHint: "Swipe with the arrows, WASD, or the buttons",
+  readyExplainer:
+    "Slide the tiles in one direction — equal tiles merge and add up. A new tile appears after every move. You lose when the board fills up with no moves left.",
+  touchActions: [
+    { action: "up", label: "↑" },
+    { action: "left", label: "←" },
+    { action: "right", label: "→" },
+    { action: "down", label: "↓" },
+  ],
+};
+
+// Breakout is POSITION-controlled (MPG-121): the paddle tracks the pointer
+// directly — mouse hover or touch drag — with arrow/A-D keyboard parity. This
+// fixed the lag of the old left/right nudge. The pointer x-fraction becomes the
+// paddle's target; the engine's convex face does the reflection steering.
+const BREAKOUT_KEY_STEP = 0.02; // ~0.8s to traverse the field on the keyboard
+function makeBreakoutInputSource(): InputSource<BreakoutInput> {
+  return createPointerAxisInputSource<BreakoutInput>({
+    toInput: (axis) => ({ targetX: axis }),
+    axis: "x",
+    keyStepPerTick: BREAKOUT_KEY_STEP,
+    hint: "Move the mouse or drag to steer the paddle (or ←/→, A/D)",
+    readyExplainer:
+      "Bounce the ball into the bricks to clear them. The paddle's curved face steers the ball — hit near an edge to angle it, dead centre to send it straight up. Miss and you lose a life; you have three.",
+    label: "Mouse & keys",
+  });
+}
+
 /**
  * The real-time catalog. `Partial` like the turn-based `GAME_CATALOG`:
  * `RealtimeGameId` already includes `"lumberjack"` (MPG-041), which isn't built
@@ -128,6 +219,16 @@ export const REALTIME_GAMES: Partial<Record<RealtimeGameId, RealtimeGameWiring>>
     reflexTest,
     (props) => <ReflexTestScene {...props} />,
     reflexControls,
+  ),
+  "2048": defineRealtimeGame<Game2048State, Game2048Input, SwipeDir>(
+    game2048,
+    (props) => <Game2048Scene {...props} />,
+    game2048Controls,
+  ),
+  breakout: defineRealtimeAxisGame<BreakoutState, BreakoutInput>(
+    breakout,
+    (props) => <BreakoutScene {...props} />,
+    makeBreakoutInputSource,
   ),
 };
 
@@ -253,9 +354,19 @@ export function RealtimeGameRoute({
   const [character, setCharacter] = useState<DrunkWalkCharacter>(() =>
     gameId === "drunk-walk" ? loadStoredDrunkWalkCharacter() : DEFAULT_DRUNK_WALK_CHARACTER,
   );
+  // Only meaningful for "2048" (its grid size is customizable), declared
+  // unconditionally to keep hook order stable, like `character` above.
+  const [size, setSize] = useState<Game2048Size>(() =>
+    gameId === "2048" ? loadStored2048Size() : 4,
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const wiring = REALTIME_GAMES[gameId];
-  if (!wiring) return null;
+  // This game's input source (MPG-120). Built once per game: a source owns mutable
+  // input state (the action source's pressed set, the pointer source's axis ref),
+  // so it must be stable across the screen's re-renders. `wiring` is a stable
+  // module-level reference, so the memo recomputes only when the game changes.
+  const inputSource = useMemo(() => (wiring ? wiring.makeInputSource() : null), [wiring]);
+  if (!wiring || !inputSource) return null;
 
   const title = REALTIME_CATALOG[gameId]?.title ?? gameId;
 
@@ -277,11 +388,11 @@ export function RealtimeGameRoute({
     };
     return (
       <>
-        <RealtimePlayScreen<DrunkWalkState, DrunkWalkInput, "left" | "right">
+        <RealtimePlayScreen<DrunkWalkState, DrunkWalkInput>
           module={drunkWalk}
           gameTitle={title}
           seed={seed}
-          controls={drunkWalkControls}
+          inputSource={inputSource as InputSource<DrunkWalkInput>}
           renderScene={(props) => <DrunkWalkScene {...props} character={character} />}
           onExit={onExit}
           onRunComplete={onRunComplete}
@@ -308,12 +419,66 @@ export function RealtimeGameRoute({
     );
   }
 
+  if (gameId === "2048") {
+    // The selected size chooses which registered module plays — and therefore
+    // which leaderboard the run submits to (the loop reads `module.id`, so the
+    // submit id follows automatically; only the rank read needs it explicitly).
+    const module2048 = size === 3 ? game2048_3 : size === 5 ? game2048_5 : game2048;
+    const rank2048 =
+      onViewLeaderboard && settled ? (
+        <RankPreview
+          key={runKey}
+          gameId={module2048.id}
+          metric="score"
+          onViewLeaderboard={onViewLeaderboard}
+        />
+      ) : null;
+    const handleChangeSize = (next: Game2048Size): void => {
+      setSize(next);
+      store2048Size(next);
+    };
+    return (
+      <>
+        <RealtimePlayScreen<Game2048State, Game2048Input>
+          // Remount on a size change: a different grid is a different game, so the
+          // run resets cleanly to a fresh `ready` state built by the new module.
+          key={size}
+          module={module2048}
+          gameTitle={title}
+          seed={seed}
+          inputSource={inputSource as InputSource<Game2048Input>}
+          renderScene={(props) => <Game2048Scene {...props} />}
+          onExit={onExit}
+          onRunComplete={onRunComplete}
+          shareUrl={shareToken ?? buildShareUrl(gameId)}
+          resultExtra={rank2048}
+          surfaceExtra={
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Change board size"
+            >
+              <GearIcon />
+            </Button>
+          }
+        />
+        <Game2048CustomizeMenu
+          isOpen={menuOpen}
+          size={size}
+          onChange={handleChangeSize}
+          onClose={() => setMenuOpen(false)}
+        />
+      </>
+    );
+  }
+
   return (
     <RealtimePlayScreen
       module={wiring.module}
       gameTitle={title}
       seed={seed}
-      controls={wiring.controls}
+      inputSource={inputSource}
       renderScene={wiring.renderScene}
       onExit={onExit}
       onRunComplete={onRunComplete}

@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useRef,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
 import type { RealtimeModule } from "@mpg/engine";
 import {
   BackArrowIcon,
@@ -16,9 +9,20 @@ import {
   VisuallyHidden,
 } from "../components/ui";
 import { cx } from "../components/ui/cx";
-import { type RealtimeLoopPhase, type RunComplete, useRealtimeLoop } from "../game";
+import {
+  type InputSource,
+  type InputSourceHost,
+  type RealtimeLoopPhase,
+  type RunComplete,
+  useRealtimeLoop,
+} from "../game";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import styles from "./RealtimePlayScreen.module.css";
+
+// `RealtimeControls`/`TouchAction` moved to the input seam (`game/inputSource`)
+// in MPG-120 — they are the discrete-action source's config now, not the
+// screen's only input concept. Re-exported here so existing import paths hold.
+export type { RealtimeControls, TouchAction } from "../game";
 
 /**
  * MPG-040d — the shipped, arcade play surface (ADR 0002): the real-time
@@ -28,11 +32,12 @@ import styles from "./RealtimePlayScreen.module.css";
  * input parity, visible focus, and `prefers-reduced-motion` handling per ADR §5.
  *
  * Engine- AND renderer-agnostic, exactly like `GamePlayScreen`: the concrete
- * per-game drawing is supplied by `renderScene` (the Floppy Birds Canvas/DOM
- * renderer + the id→{module,renderer} wiring land in MPG-040e). Input is
- * generalized through `controls`: a game maps its action union `A` to
- * keys/taps and to the module's per-tick input `I`, so a second game
- * (Lumberjack, MPG-041) drops in against the same screen unchanged.
+ * per-game drawing is supplied by `renderScene`. Input is generalized through
+ * an `InputSource` (MPG-120, ADR 0008 §1): the screen samples the source once
+ * per tick for the loop and renders the source's own controls/overlay/hint via
+ * `useBinding`. Today's discrete-action path is `createActionInputSource`; a
+ * pointer/keyboard axis and a camera source drop in against the same seam with
+ * no change here.
  */
 
 /** What the per-game renderer is handed each frame. Read-only view of the run. */
@@ -44,57 +49,19 @@ export interface RealtimeSceneProps<S> {
   reducedMotion: boolean;
 }
 
-/** An on-screen touch control (used for games with more than one action, e.g. chop L/R). */
-export interface TouchAction<A extends string> {
-  readonly action: A;
-  readonly label: string;
-}
-
-/**
- * Maps a game's abstract action union `A` (e.g. `"flap"`, or `"left" | "right"`)
- * onto concrete input: which keys trigger it, what a plain tap does, and how a
- * set of actions pressed since the last tick becomes the module's input `I`.
- * Keeping this game-supplied is what lets one screen serve every real-time game.
- */
-export interface RealtimeControls<I, A extends string = string> {
-  /** The action a plain tap / Space maps to — the single "primary" gameplay input. */
-  readonly primaryAction: A;
-  /** `KeyboardEvent.code` → action (e.g. `{ Space: "flap", ArrowUp: "flap" }`). */
-  readonly keyMap: Readonly<Record<string, A>>;
-  /** Build the next tick's input from the actions pressed since the last sample. */
-  readonly toInput: (pressed: ReadonlySet<A>) => I;
-  /** Short, plain-language control hint, e.g. "Tap, Space, or ↑ to flap". */
-  readonly actionHint: string;
-  /**
-   * Optional longer explainer shown once, only on the `ready` overlay, in
-   * addition to `actionHint` — for a game whose mechanic isn't obvious from a
-   * short hint alone (e.g. "tap the side OPPOSITE your lean; the same side
-   * makes it worse"). Omit for a self-explanatory game like a single tap-to-act.
-   */
-  readonly readyExplainer?: string;
-  /**
-   * On-screen buttons for touch play. Omit for a single-action game — the whole
-   * play surface is then the tap target. Supply one per action for multi-action
-   * games so touch users get an unambiguous control per action.
-   */
-  readonly touchActions?: readonly TouchAction<A>[];
-  /**
-   * For a play surface split into tap zones (e.g. left half / right half),
-   * resolves a plain tap's horizontal position — as a fraction of the surface
-   * width, `0` (left edge) to `1` (right edge) — to the action it triggers.
-   * Takes priority over `primaryAction` for plain taps on the surface; keyboard
-   * input is unaffected (driven entirely by `keyMap`). Omit for a game where
-   * every tap on the surface means the same thing.
-   */
-  readonly resolveTapAction?: (fractionX: number) => A;
-}
-
-export interface RealtimePlayScreenProps<S, I, A extends string = string> {
+export interface RealtimePlayScreenProps<S, I> {
   module: RealtimeModule<S, I>;
   gameTitle: string;
   /** Seed for the first run. Deterministic — tests pass a fixed value. */
   seed: number;
-  controls: RealtimeControls<I, A>;
+  /**
+   * How the run is controlled (MPG-120, ADR 0008 §1). The discrete-action
+   * source (`createActionInputSource(controls)`) is today's only one; a
+   * pointer/keyboard axis and a camera source slot in later against the same
+   * seam with no change here. The screen consumes `sample()` for the loop and
+   * `useBinding()` for the source's own controls/overlay/hint.
+   */
+  inputSource: InputSource<I>;
   renderScene: (props: RealtimeSceneProps<S>) => ReactNode;
   onExit: () => void;
   /** Fired once when a run ends (score + seed + input log) — leaderboard seam (ADR §4). */
@@ -141,11 +108,11 @@ function defaultNextSeed(): number {
   return Date.now() & 0xffff || 1;
 }
 
-export function RealtimePlayScreen<S, I, A extends string = string>({
+export function RealtimePlayScreen<S, I>({
   module,
   gameTitle,
   seed,
-  controls,
+  inputSource,
   renderScene,
   onExit,
   onRunComplete,
@@ -154,62 +121,22 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
   surfaceExtra,
   shareUrl,
   resultExtra,
-}: RealtimePlayScreenProps<S, I, A>): React.JSX.Element {
+}: RealtimePlayScreenProps<S, I>): React.JSX.Element {
   const reducedMotion = usePrefersReducedMotion();
-
-  // Rising-edge input: actions pressed (via key or tap) since the last tick,
-  // consumed and cleared once per fixed tick by the controller.
-  const pressedRef = useRef<Set<A>>(new Set());
-  const sampleInput = useCallback((): I => {
-    const input = controls.toInput(pressedRef.current);
-    pressedRef.current.clear();
-    return input;
-    // `controls` is game-static; toInput reads the live set. Re-created on each
-    // render is fine — the loop stores it in a ref and always calls the latest.
-  }, [controls]);
 
   const { state, score, phase, start, pause, resume, restart } = useRealtimeLoop<S, I>({
     module,
     seed,
-    sampleInput,
+    // The loop's one input dependency: sample the source once per fixed tick.
+    sampleInput: inputSource.sample,
     ...(onRunComplete ? { onRunComplete } : {}),
     autoPauseOnBlur,
   });
 
-  // The key/pointer handlers close over `phase`; a ref keeps them correct
-  // without re-binding the window listener on every phase change.
+  // A ref keeps `startIfReady` correct for the source's handlers without
+  // re-binding anything on every phase change.
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
-
-  // A gameplay press: starts a `ready` run (and counts as the first input, so a
-  // tap both starts and flaps), or feeds the next tick while `running`. Ignored
-  // while paused/over — those states are driven by their overlay buttons.
-  const handlePress = useCallback(
-    (action: A) => {
-      if (phaseRef.current === "ready") {
-        start();
-        pressedRef.current.add(action);
-      } else if (phaseRef.current === "running") {
-        pressedRef.current.add(action);
-      }
-    },
-    [start],
-  );
-
-  // Keyboard input (Space/Arrow parity with tap). We let a focused <button>
-  // handle its own activation keys (Space/Enter fire Start/Resume/Play again),
-  // and route every other mapped key into gameplay.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (document.activeElement instanceof HTMLButtonElement) return;
-      const action = controls.keyMap[e.code];
-      if (action === undefined) return;
-      e.preventDefault();
-      handlePress(action);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [controls, handlePress]);
 
   // Focus the one primary action for each state, so keyboard/AT users always
   // land on the obvious next control (mirrors GamePlayScreen's rematch focus).
@@ -218,30 +145,15 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
   const playAgainBtnRef = useRef<HTMLButtonElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
 
-  const onSurfacePointerDown = useCallback(
-    (e: ReactPointerEvent): void => {
-      // Only a plain tap on the surface itself triggers gameplay; taps on the
-      // overlay buttons (Start/Resume/Play again) bubble here but are handled
-      // by the button itself. `e.target` is whatever element
-      // was actually hit, which for a button containing child markup (e.g. an
-      // icon span) is often that child, not the <button> — `instanceof
-      // HTMLButtonElement` alone missed that case, so a tap on a swatch's
-      // inner span fell through to `handlePress` and started/fed the run
-      // instead of triggering the swatch's own onClick. `closest("button")`
-      // catches the button regardless of which descendant was hit.
-      if (e.target instanceof Element && e.target.closest("button")) return;
-      if (controls.resolveTapAction) {
-        // Tap-zone games (e.g. left/right halves): resolve from the tap's
-        // horizontal position within the surface, not a single fixed action.
-        const rect = surfaceRef.current?.getBoundingClientRect();
-        const fractionX = rect && rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0.5;
-        handlePress(controls.resolveTapAction(fractionX));
-        return;
-      }
-      handlePress(controls.primaryAction);
-    },
-    [controls, handlePress],
-  );
+  // Starts a `ready` run on the source's first gameplay input; a no-op
+  // otherwise. The source owns *how* an input is acquired; the screen owns the
+  // run lifecycle it feeds into.
+  const startIfReady = useCallback(() => {
+    if (phaseRef.current === "ready") start();
+  }, [start]);
+
+  const host: InputSourceHost = { phase, onGameplayInput: startIfReady, surfaceRef };
+  const binding = inputSource.useBinding(host);
 
   const handlePlayAgain = useCallback(() => {
     restart(nextSeed());
@@ -263,7 +175,7 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
   const announcement = (() => {
     switch (phase) {
       case "ready":
-        return `${gameTitle} ready. ${controls.actionHint} to start.`;
+        return `${gameTitle} ready. ${binding.hint} to start.`;
       case "running":
         return "Game started.";
       case "paused":
@@ -305,17 +217,21 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
         aria-label={`${gameTitle} play area`}
         aria-describedby={hintId}
         tabIndex={0}
-        onPointerDown={onSurfacePointerDown}
+        onPointerDown={binding.onSurfacePointerDown ?? undefined}
       >
         {renderScene({ state, phase, score, reducedMotion })}
+
+        {/* Source-owned in-surface UI (e.g. a camera preview / tracking dot for
+            the vision source); `null` for the discrete-action source. */}
+        {binding.overlay}
 
         {phase !== "running" ? (
           <div className={cx(styles.overlay, phase === "over" && styles.overlayOver)}>
             {phase === "ready" ? (
               <div className={styles.overlayInner}>
-                <p className={styles.overlayText}>{controls.actionHint}</p>
-                {controls.readyExplainer ? (
-                  <p className={styles.overlayText}>{controls.readyExplainer}</p>
+                <p className={styles.overlayText}>{binding.hint}</p>
+                {binding.readyExplainer ? (
+                  <p className={styles.overlayText}>{binding.readyExplainer}</p>
                 ) : null}
                 <Button ref={startBtnRef} variant="primary" onClick={start}>
                   Start
@@ -368,27 +284,18 @@ export function RealtimePlayScreen<S, I, A extends string = string>({
         {surfaceExtra ? <div className={styles.surfaceExtra}>{surfaceExtra}</div> : null}
       </div>
 
-      {/* On-screen touch controls for multi-action games; single-action games
-          use the whole surface as the tap target (no buttons rendered). */}
-      {controls.touchActions && controls.touchActions.length > 0 ? (
+      {/* Source-owned on-screen touch controls (the action source's per-action
+          buttons for a multi-action game); `null` for single-action games,
+          which use the whole surface as the tap target. The screen owns the
+          styled group wrapper so the layout stays identical across sources. */}
+      {binding.controls ? (
         <div className={styles.touchControls} role="group" aria-label="Game controls">
-          {controls.touchActions.map(({ action, label }) => (
-            <Button
-              key={action}
-              variant="secondary"
-              onPointerDown={(e) => {
-                e.preventDefault();
-                handlePress(action);
-              }}
-            >
-              {label}
-            </Button>
-          ))}
+          {binding.controls}
         </div>
       ) : null}
 
       <p id={hintId} className={styles.hint}>
-        {controls.actionHint}. Pause anytime.
+        {binding.hint}. Pause anytime.
       </p>
 
       <div aria-live="polite" role="status">

@@ -297,3 +297,29 @@
 .footerLink {
   margin-top: var(--space-2);
 }
+
+/* ── Game of the day ───────────────────────────────────────────────────────
+   The spotlight shelf. Structurally an ordinary shelf (same header, same card,
+   same routing and a11y wiring), dressed up: an accent label and a single card
+   that spans the row as a wide hero. It stays first, above Featured, so the
+   day's pick is the first thing a returning player sees. */
+.spotlightTitle {
+  color: var(--color-accent);
+}
+
+/* One full-width column — the shelf holds exactly one game, so the card spans
+   the row as a hero rather than sitting in a grid track. The card keeps its
+   normal stacked structure (thumbnail over copy); we just cap the thumbnail so
+   a full-width banner doesn't blow it up to a 3:2 wall, and enlarge the title. */
+.spotlight .gameGrid {
+  grid-template-columns: 1fr;
+}
+
+.spotlight .gameThumbnail {
+  aspect-ratio: auto;
+  height: 10rem;
+}
+
+.spotlight .gameTitle {
+  font-size: var(--font-size-500);
+}

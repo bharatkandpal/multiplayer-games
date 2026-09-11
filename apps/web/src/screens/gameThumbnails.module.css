@@ -89,3 +89,33 @@
 .reflexLampGreen {
   fill: var(--color-success);
 }
+
+/* 2048 — a 2×2 tile slice, reusing the accent ramp the live Canvas reads so the
+   preview matches the game in both themes. */
+.tileLow {
+  fill: var(--color-accent);
+  opacity: 0.4;
+}
+
+.tileHigh {
+  fill: var(--color-accent);
+  opacity: 0.9;
+}
+
+/* Breakout — a two-tone brick wall, ball, and paddle, using the same tokens the
+   live Canvas renderer reads. */
+.brickAccent {
+  fill: var(--color-accent);
+}
+
+.brickSuccess {
+  fill: var(--color-success);
+}
+
+.breakoutBall {
+  fill: var(--color-text);
+}
+
+.breakoutPaddle {
+  fill: var(--color-warning);
+}

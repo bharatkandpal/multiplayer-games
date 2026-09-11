@@ -179,6 +179,24 @@ export const REALTIME_CATALOG: Partial<Record<RealtimeGameId, RealtimeCatalogEnt
     tags: ["quick"],
     addedOn: "2026-09-09",
   },
+  "2048": {
+    id: "2048",
+    title: "2048",
+    description:
+      "Swipe to slide the tiles — equal ones merge and double. Keep going until the board fills up. Chase the biggest number and the highest score.",
+    kind: "realtime",
+    tags: ["endless"],
+    addedOn: "2026-09-10",
+  },
+  breakout: {
+    id: "breakout",
+    title: "Breakout",
+    description:
+      "Bounce the ball off your paddle to smash the wall of bricks. Clear it and a faster wall drops in. Three lives — how high can you score?",
+    kind: "realtime",
+    tags: ["endless"],
+    addedOn: "2026-09-11",
+  },
 };
 
 /**
@@ -261,7 +279,7 @@ export function listCatalogEntries(
 }
 
 /** The discovery shelves Home is built from, in render order (PRD FR-25). */
-export type HomeShelfId = "featured" | "trending" | "new" | "all";
+export type HomeShelfId = "gotd" | "featured" | "trending" | "new" | "all";
 
 export interface HomeShelf {
   readonly id: HomeShelfId;
@@ -286,6 +304,14 @@ export interface HomeShelfOptions {
    * carries the cold start until real data exists.
    */
   readonly trending?: readonly (GameId | RealtimeGameId)[];
+  /**
+   * The id spotlighted as "Game of the day" (see `gameOfTheDay.ts`). When set
+   * and listed, that one game is lifted onto its own shelf ahead of everything
+   * else and claimed out of the rest, so it's spotlighted without being shown
+   * twice. Absent means no spotlight shelf — a placeholder ahead of the real
+   * recommendation engine, so it stays opt-in rather than always-on.
+   */
+  readonly gameOfTheDay?: GameId | RealtimeGameId;
 }
 
 /**
@@ -310,6 +336,13 @@ export function buildHomeShelves(
   };
   const unclaimed = (): CatalogEntry[] => entries.filter((entry) => !claimed.has(entry.id));
 
+  // Game of the day is claimed first, so the spotlighted game is lifted out of
+  // whichever shelf would otherwise hold it and never rendered twice.
+  const spotlightId = options.gameOfTheDay;
+  const gotd = claim(
+    spotlightId === undefined ? [] : unclaimed().filter((entry) => entry.id === spotlightId),
+  );
+
   const featured = claim(unclaimed().filter((entry) => entry.featured === true));
 
   // Ranked by the read model, not by catalogue order — and intersected with
@@ -329,6 +362,12 @@ export function buildHomeShelves(
   );
 
   const shelves: HomeShelf[] = [
+    {
+      id: "gotd",
+      title: "Game of the day",
+      blurb: "Today's pick — a new one every day.",
+      entries: gotd,
+    },
     {
       id: "featured",
       title: "Featured",

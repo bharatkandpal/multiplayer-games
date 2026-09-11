@@ -260,6 +260,57 @@ describe("HomeScreen", () => {
     });
   });
 
+  // ── Game of the day (simple daily randomizer; a real recommender is later) ──
+  describe("game of the day", () => {
+    it("renders no spotlight shelf when no pick is supplied", () => {
+      render(
+        <HomeScreen
+          games={["tictactoe", "connect4"]}
+          onSelectGame={vi.fn()}
+          onShowGallery={vi.fn()}
+        />,
+      );
+      expect(screen.queryByRole("region", { name: "Game of the day" })).not.toBeInTheDocument();
+    });
+
+    it("spotlights the supplied pick, first, without drawing it twice", () => {
+      render(
+        <HomeScreen
+          games={["tictactoe", "connect4"]}
+          gameOfTheDay="connect4"
+          onSelectGame={vi.fn()}
+          onShowGallery={vi.fn()}
+        />,
+      );
+
+      const spotlight = screen.getByRole("region", { name: "Game of the day" });
+      const card = within(spotlight).getByRole("button");
+      expect(cardTitle(card)).toBe("Connect Four");
+
+      // Claimed out of the other shelves — exactly one Connect Four on the page.
+      expect(allCards().filter((c) => cardTitle(c) === "Connect Four")).toHaveLength(1);
+    });
+
+    it("plays the spotlighted game through the normal card routing", async () => {
+      const user = userEvent.setup();
+      const onSelectRealtimeGame = vi.fn();
+      render(
+        <HomeScreen
+          games={["tictactoe"]}
+          realtimeGames={["2048"]}
+          gameOfTheDay="2048"
+          onSelectGame={vi.fn()}
+          onSelectRealtimeGame={onSelectRealtimeGame}
+          onShowGallery={vi.fn()}
+        />,
+      );
+
+      const spotlight = screen.getByRole("region", { name: "Game of the day" });
+      await user.click(within(spotlight).getByRole("button"));
+      expect(onSelectRealtimeGame).toHaveBeenCalledExactlyOnceWith("2048");
+    });
+  });
+
   // ── Tag chips (UI-4, reading UI-3's data) ──────────────────────────────
   it("renders the derived seat tag and the authored tags on each card", () => {
     render(<HomeScreen games={["connect4"]} onSelectGame={vi.fn()} onShowGallery={vi.fn()} />);
