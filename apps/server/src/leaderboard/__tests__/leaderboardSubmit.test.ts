@@ -6,6 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { floppyBirds, hasRealtimeGame, registerBuiltInRealtimeGames } from "@mpg/engine";
 import type { FloppyInput } from "@mpg/engine";
 
+import { JSON_BODY_LIMIT } from "../../config.js";
 import { createMemoryStore } from "../../store/memory/index.js";
 import type { LeaderboardEntry, Store } from "../../store/ports.js";
 import { SESSION_HEADER, createSessionMiddleware } from "../../sessions/sessionMiddleware.js";
@@ -41,7 +42,7 @@ describe("POST /api/leaderboard/:gameId/submit", () => {
   async function startApp(withSession: boolean): Promise<void> {
     store = createMemoryStore();
     const app = express();
-    app.use(express.json());
+    app.use(express.json({ limit: JSON_BODY_LIMIT }));
     if (withSession) app.use(createSessionMiddleware(store));
     app.use("/api", createLeaderboardRouter(store, createStoreSink(store.events)));
 
@@ -61,6 +62,23 @@ describe("POST /api/leaderboard/:gameId/submit", () => {
 
   afterEach(async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  it("rejects an over-long inputLog before replaying it (MPG-021 CPU-abuse cap)", async () => {
+    // 50_001 entries — one past MAX_INPUT_LOG_LENGTH. The length guard rejects it
+    // before the O(n) re-simulation runs; element shape is irrelevant here, so we
+    // use bare booleans to keep the body well under the JSON limit.
+    const inputLog = new Array(50_001).fill(false);
+
+    const res = await fetch(`${baseUrl}/api/leaderboard/floppy-birds/submit`, {
+      method: "POST",
+      headers: { "content-type": "application/json", [SESSION_HEADER]: "tok-huge" },
+      body: JSON.stringify({ seed: 7, inputLog, runId: "run-huge", score: 0 }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("INVALID_REQUEST");
   });
 
   it("accepts a genuine replayable run and writes the leaderboard entry", async () => {

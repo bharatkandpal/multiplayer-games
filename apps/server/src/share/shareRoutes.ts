@@ -25,7 +25,11 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 
 import { emit, type EventSink } from "../analytics/sink.js";
+import { noopLimit, type RateLimitFor } from "../middleware/rateLimit.js";
 import type { GameResult, ShareLink, Store } from "../store/ports.js";
+
+/** Cap on `targetId` length — an id is a token or a game id, never a payload. */
+const MAX_TARGET_ID_LENGTH = 256;
 
 /** What a token can point at. Mirrors the `kind` column's documented values. */
 const SHARE_KINDS = ["result", "replay", "leaderboard"] as const;
@@ -83,11 +87,15 @@ function toPublicLink(link: ShareLink): Record<string, unknown> {
   };
 }
 
-export function createShareRouter(store: Store, sink: EventSink): Router {
+export function createShareRouter(
+  store: Store,
+  sink: EventSink,
+  limit: RateLimitFor = noopLimit,
+): Router {
   const router = Router();
 
   // POST /api/share — mint a durable link to something this session owns.
-  router.post("/share", async (req: Request, res: Response) => {
+  router.post("/share", limit("share_mint"), async (req: Request, res: Response) => {
     const token = req.sessionToken;
     if (!token) {
       res.status(400).json({ error: "no_session" });
@@ -98,7 +106,12 @@ export function createShareRouter(store: Store, sink: EventSink): Router {
     const kind = body?.kind;
     const targetId = body?.targetId;
 
-    if (!isShareKind(kind) || typeof targetId !== "string" || targetId.length === 0) {
+    if (
+      !isShareKind(kind) ||
+      typeof targetId !== "string" ||
+      targetId.length === 0 ||
+      targetId.length > MAX_TARGET_ID_LENGTH
+    ) {
       res.status(400).json({ error: "INVALID_REQUEST" });
       return;
     }
@@ -201,7 +214,7 @@ export function createShareRouter(store: Store, sink: EventSink): Router {
   });
 
   // DELETE /api/share/:token — revoke. Owner-only; the repo enforces it.
-  router.delete("/share/:token", async (req: Request, res: Response) => {
+  router.delete("/share/:token", limit("share_revoke"), async (req: Request, res: Response) => {
     const token = req.sessionToken;
     if (!token) {
       res.status(400).json({ error: "no_session" });

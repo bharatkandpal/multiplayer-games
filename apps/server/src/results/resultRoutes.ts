@@ -27,6 +27,7 @@ import { getGame, IllegalMoveError } from "@mpg/engine";
 import type { GameId } from "@mpg/engine";
 
 import type { EventSink } from "../analytics/sink.js";
+import { noopLimit, type RateLimitFor } from "../middleware/rateLimit.js";
 import { writeGameResult } from "../sessions/resultWriter.js";
 import type { Store } from "../store/ports.js";
 
@@ -34,8 +35,9 @@ import type { Store } from "../store/ports.js";
  * Replay length ceiling. Well past any real game in the catalogue (Gomoku's 9x9
  * board tops out at 81 moves; move-mode Tic-Tac-Toe can shuffle for a while but
  * draws by threefold repetition long before this), and low enough that the
- * synchronous replay below can't be turned into a CPU-exhaustion lever on an
- * endpoint that is, until MPG-021 lands, unauthenticated and unthrottled.
+ * synchronous replay below can't be turned into a CPU-exhaustion lever. The
+ * endpoint is now rate-limited (MPG-021) as well as bounded here — defence in
+ * depth, since it remains unauthenticated by design (anonymous-first play).
  */
 const MAX_MOVES = 500;
 
@@ -107,11 +109,15 @@ function parseDurationMs(raw: unknown): number | null | undefined {
   return Math.round(raw);
 }
 
-export function createResultRouter(store: Store, sink: EventSink): Router {
+export function createResultRouter(
+  store: Store,
+  sink: EventSink,
+  limit: RateLimitFor = noopLimit,
+): Router {
   const router = Router();
 
   // POST /api/results — persist a finished LOCAL turn-based game, validated by replay.
-  router.post("/results", async (req: Request, res: Response) => {
+  router.post("/results", limit("result_save"), async (req: Request, res: Response) => {
     const token = req.sessionToken;
     if (!token) {
       res.status(400).json({ error: "no_session" });

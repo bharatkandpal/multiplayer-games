@@ -13,7 +13,10 @@ import { ENGINE_VERSION, registerBuiltInGames, registerBuiltInRealtimeGames } fr
 
 import { createEventRouter } from "./analytics/eventRoutes.js";
 import { createStoreSink } from "./analytics/sink.js";
+import { JSON_BODY_LIMIT } from "./config.js";
 import { createLeaderboardRouter } from "./leaderboard/leaderboardRoutes.js";
+import { parseCorsOrigin } from "./middleware/cors.js";
+import { createRateLimiter } from "./middleware/rateLimit.js";
 import { registerGameHandlers } from "./rooms/moveHandler.js";
 import { registerRematchHandlers } from "./rooms/rematchHandler.js";
 import { RoomManager, RoomManagerError } from "./rooms/RoomManager.js";
@@ -36,13 +39,29 @@ const mode = process.env["DATABASE_URL"] ? "postgres" : "memory";
 
 console.log(`@mpg/server — engine v${ENGINE_VERSION}, store: ${mode}`);
 
-// Configurable for prod; defaults wide open for dev, matching docs/TDD.md §11
-// ("CORS locked to the app origin" is an operator concern via CORS_ORIGIN, not code).
-const corsOrigin = process.env["CORS_ORIGIN"] ?? "*";
+// CORS lock-down (MPG-021, docs/TDD.md §11). `CORS_ORIGIN` is a comma-separated
+// allowlist of app origins; unset defaults to `*` for dev convenience. In
+// production a wildcard is almost certainly a misconfiguration, so we warn
+// loudly on startup rather than shipping an open API silently — but we don't
+// hard-crash, because the origin allowlist is an operator concern.
+const corsOrigin = parseCorsOrigin(process.env["CORS_ORIGIN"]);
+if (process.env["NODE_ENV"] === "production" && corsOrigin === "*") {
+  console.warn(
+    "[cors] CORS_ORIGIN is unset in production — the API is accepting requests from ANY " +
+      "origin. Set CORS_ORIGIN to your app origin(s) to lock this down.",
+  );
+}
 
 const app = express();
 app.use(cors({ origin: corsOrigin, credentials: true }));
-app.use(express.json());
+// Bound the request body (see config.ts). Input logs are the largest legitimate
+// payload and sit under this; an unbounded body is a cheap memory-pressure vector.
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
+
+// In-house rate limiter (MPG-021). Disabled (no-op) unless RATE_LIMITER_URL is
+// set, and fail-open when the service is unreachable — see middleware/rateLimit.ts.
+const rateLimiter = createRateLimiter();
+console.log(`@mpg/server — rate limiter: ${rateLimiter.enabled ? "enabled" : "disabled"}`);
 
 // Loop analytics (MPG-097). Behind the `EventSink` seam, so swapping in a
 // hosted vendor later is a change here and nowhere else. The sink never throws:
@@ -53,17 +72,21 @@ const eventSink = createStoreSink(store.events);
 app.use(createSessionMiddleware(store));
 
 // Session routes (GET/DELETE /api/session, GET /api/session/history).
-app.use("/api", createSessionRouter(store));
+app.use("/api", createSessionRouter(store, rateLimiter.limit.bind(rateLimiter)));
 
 // Leaderboard routes (GET /api/leaderboard/:gameId, GET /api/leaderboard/:gameId/rank).
-app.use("/api", createLeaderboardRouter(store, eventSink));
+// Both cross-cutting deps are threaded in: the analytics `eventSink` (MPG-097)
+// and the rate limiter (MPG-021). The routers apply the limiter to their write
+// paths and emit funnel events through the sink.
+const limit = rateLimiter.limit.bind(rateLimiter);
+app.use("/api", createLeaderboardRouter(store, eventSink, limit));
 
 // Client-reported turn-based results (POST /api/results) — MPG-131. Local play
 // never touches a room, so this is the only way a local game becomes shareable.
-app.use("/api", createResultRouter(store, eventSink));
+app.use("/api", createResultRouter(store, eventSink, limit));
 
 // Durable share links (POST /api/share, GET/DELETE /api/share/:token) — MPG-056.
-app.use("/api", createShareRouter(store, eventSink));
+app.use("/api", createShareRouter(store, eventSink, limit));
 
 // Client-reported funnel events (POST /api/events) — MPG-097. Only events the
 // server cannot observe itself are accepted here; see `analytics/events.ts`.
@@ -99,7 +122,7 @@ function isSeatConfigArray(v: unknown): v is SeatConfig[] {
 // docs/API_SPEC.md §2 — `POST /api/rooms`. Room creation is also available over
 // Socket.IO (`room:create`, see roomHandlers.ts) for clients that prefer a single
 // transport end-to-end; both paths share the same RoomManager.
-app.post("/api/rooms", (req: Request, res: Response) => {
+app.post("/api/rooms", rateLimiter.limit("room_create"), (req: Request, res: Response) => {
   const body = req.body as Record<string, unknown>;
   const gameId = body["gameId"];
   const seats = body["seats"];
@@ -153,6 +176,7 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 const httpServer = createServer(app);
 
 const io = new SocketIOServer(httpServer, {
+  // Same allowlist as the HTTP layer so the two transports can't drift.
   cors: { origin: corsOrigin },
 });
 
