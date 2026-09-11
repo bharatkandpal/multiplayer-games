@@ -37,7 +37,7 @@ Three facts from the trunk shape the answer:
    (`apps/server/src/share/shareRoutes.ts`) requires no session by design and returns exactly
    what an unfurl needs: `{ kind, result }` for `result`/`replay`, and
    `{ kind: "leaderboard", gameId, eventId }` for a leaderboard link. Nothing new has to be
-   built to *know* what a token points at.
+   built to _know_ what a token points at.
 
 2. **The `og:image` is already a deterministic server asset.** The card renderer lives in
    `apps/server/src/cards/` (MPG-085-a: `renderResultCard(result) → SVG`, pure and
@@ -58,7 +58,7 @@ Two pillars constrain any answer:
   link must still land in a working app; the scraper simply gets the generic shell. No share
   route may become a hard dependency on this layer being up.
 - **Keep the SPA a SPA.** The interactive app is client-rendered and works well that way.
-  Whatever we add must serve *scrapers* their `<head>` and *humans* the same SPA they get
+  Whatever we add must serve _scrapers_ their `<head>` and _humans_ the same SPA they get
   today — it must not fork the app into a second, server-rendered rendering path we then have
   to keep in sync.
 
@@ -99,14 +99,14 @@ in sync. It is the smallest thing that puts correct tags in front of a scraper.
 already lands at the frontend host, so the shim needs no cross-origin CDN→backend rewrite, and
 — critically — it has the built `index.html` (with the correct hashed asset filenames) sitting
 right next to it to inject into. A shim living on the Express backend instead would force the
-CDN to proxy `/s/*` to another origin *and* would need a copy of, or hardcoded knowledge of,
+CDN to proxy `/s/*` to another origin _and_ would need a copy of, or hardcoded knowledge of,
 the frontend's hashed asset names — coupling the backend to the frontend build across the
 one-way import boundary. Co-location avoids both. The shim still reads the backend only through
 its existing public API, so no share/data logic moves off the backend.
 
 **Dependency this imposes on MPG-023 (deploy):** the chosen frontend host must be able to run a
 function with a path rewrite (Vercel / Netlify / Cloudflare Pages all do). This is a
-requirement on that task, recorded here. See *Fallback* below for the static-only case.
+requirement on that task, recorded here. See _Fallback_ below for the static-only case.
 
 ## Options considered
 
@@ -139,7 +139,7 @@ backend, the CDN proxies the share prefixes to it, and the backend is given the 
 Move share routes wholesale to an independent edge function that renders the unfurl (and
 possibly the resolve) at the edge.
 
-Rejected *as a separate owner of share logic*: the resolve logic and data already live on the
+Rejected _as a separate owner of share logic_: the resolve logic and data already live on the
 backend behind a public endpoint, and the card image is already a backend asset. A function that
 re-implements resolution splits that logic and adds a hop; a function that just calls the
 existing endpoint is exactly the chosen shim. The decision keeps the edge/serverless function as
@@ -148,29 +148,32 @@ a **thin `<head>` injector over the existing public API**, not as a second home 
 ## Consequences
 
 **Positive**
+
 - MPG-086 becomes Ready: it implements this shim, then verifies against the real scrapers
   (FB debugger, X card validator, Slack, Discord, iMessage) rather than by reading local HTML.
 - The SPA stays a SPA. No hydration, no server React, one rendering path for humans.
 - No new data path: the shim reads `GET /api/share/:token` and points at
   `GET /api/cards/:token.png` — both already built or already scoped (MPG-085-b).
-- Offline/degradation pillar is satisfied structurally: the failure branch *is* today's static
+- Offline/degradation pillar is satisfied structurally: the failure branch _is_ today's static
   shell, so a dead metadata layer degrades to absence, never to a broken share route.
 - `og:image:alt`: the SVG card carries a `<title>` but a PNG cannot, so the shim owns
   `og:image:alt` / `twitter:image:alt` text — resolving the open item flagged in MPG-085-b.
 
 **Negative / watch-outs**
+
 - Adds a function to the frontend deployment, and thus a hard requirement on MPG-023's host
   choice (or the fallback shape above). This ADR is a blocker on that decision, by design.
-- The shim duplicates the *title/description phrasing* the card renderer already encodes. Share
+- The shim duplicates the _title/description phrasing_ the card renderer already encodes. Share
   the source (`cards/titles.ts` and the game catalog labels) rather than re-authoring copy, so
   the unfurl text and the card image can never drift.
 - One security note carried from the write-path work (MPG-021): the shim takes a `:token` from
   the URL and calls the backend with it — it must pass it as an opaque parameter to the existing
   resolve endpoint (which already validates and is rate-limited), never interpolate it into the
-  returned HTML. Injected tag *values* come from the resolved record's known fields and must be
+  returned HTML. Injected tag _values_ come from the resolved record's known fields and must be
   HTML-attribute-escaped.
 
 **Scope**
+
 - Applies to `/s/:token` with `kind ∈ { result, replay, leaderboard }` now, and the future
   `variant` kind (MPG-089) via the same prefix mechanism. Room links are out of scope
   (ephemeral, private, not unfurl targets).

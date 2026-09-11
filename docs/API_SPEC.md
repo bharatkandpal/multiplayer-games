@@ -305,6 +305,52 @@ simply updates the stored casing — it is never treated as a collision with its
 - `409 { "error": "USERNAME_TAKEN" }` — another session already holds this name
   (case-insensitive).
 
+### `POST /api/events` (MPG-097)
+
+Client-reported loop-analytics events. Session-scoped via `x-session-token`.
+
+**Request**
+
+```json
+{
+  "events": [
+    {
+      "name": "first_input",
+      "occurredAt": 1788000071451,
+      "gameId": "connect-four",
+      "props": { "msSinceArrival": 3500, "viaShare": true }
+    }
+  ]
+}
+```
+
+**Response `202`** → `{ "accepted": 1, "dropped": 0 }`
+
+Three things are deliberate here:
+
+- **Only client-reportable events are accepted.** `first_input` is the whole allowlist
+  today. `result_saved`, `share_minted` and `share_opened` are recorded server-side where
+  they happen; posting them here drops them silently rather than letting a browser inflate
+  the share rate.
+- **Unknown names and malformed props are dropped, not rejected.** They are counted in
+  `dropped` and the call still returns `202` — a background flush has no UI to show an
+  error to and no retry that would help. Only a structurally invalid body is a `400`.
+- **`occurredAt` is honoured, within reason.** A batch can be delivered late, so the
+  client stamps each event; a timestamp more than 6h stale or 5m in the future falls back
+  to server-now rather than being dropped.
+
+`props` values must be strings (≤64 chars), finite numbers, or booleans — at most 8 keys,
+no nesting. That is a privacy boundary, not a size limit: it is what keeps URLs, user
+agents and free text out of the table.
+
+A `sendBeacon` flush on page teardown cannot set headers, so this route also accepts a
+`text/plain` body carrying `sessionToken` alongside `events`.
+
+**Errors:**
+
+- `400 { "error": "INVALID_REQUEST" }` — `events` is missing or not an array.
+- `413 { "error": "BATCH_TOO_LARGE", "max": 50 }` — more than 50 events in one request.
+
 ### `GET /healthz`
 
 `200 { "status": "ok" }` for liveness/readiness.
