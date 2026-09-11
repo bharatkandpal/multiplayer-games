@@ -131,6 +131,17 @@ function initialRoute(): Route {
   return { screen: "join", gameId: parsed.gameId, roomId: parsed.roomId };
 }
 
+/**
+ * True when the URL carries `?dev`, which is the only thing that puts developer
+ * chrome (the engine build stamp, the design-system kit) on Home. Default-off
+ * because Home is where a stranger following a shared link lands, and a build
+ * stamp is not what should greet them (`DESIGN_LANGUAGE.md` §1).
+ */
+function isDevMode(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).has("dev");
+}
+
 function buildInviteUrl(gameId: GameId, roomId: string): string {
   const path = `/${gameId}/room/${roomId}`;
   if (typeof window === "undefined") return path;
@@ -369,6 +380,7 @@ export default function App(): React.JSX.Element {
           onSelectRealtimeGame={(gameId) => setRoute({ screen: "realtime", gameId })}
           onConfigureGame={(gameId) => setRoute({ screen: "setup", gameId })}
           onShowGallery={() => setRoute({ screen: "gallery" })}
+          devMode={isDevMode()}
         />
       ) : null}
 

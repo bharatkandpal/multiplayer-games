@@ -39,3 +39,5 @@ export type {
   UseRealtimeLoopResult,
 } from "./useRealtimeLoop";
 export { useRealtimeLoop } from "./useRealtimeLoop";
+
+export { clearPersonalBest, loadPersonalBest, recordPersonalBest } from "./personalBest";

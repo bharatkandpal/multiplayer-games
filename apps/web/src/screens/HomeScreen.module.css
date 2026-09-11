@@ -11,12 +11,6 @@
   font-family: var(--font-family-base);
 }
 
-.topBar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: var(--space-2);
-}
-
 .heading {
   font-family: var(--font-family-display);
   font-size: var(--font-size-700);
@@ -32,29 +26,54 @@
   max-width: 34rem;
 }
 
-.sectionHeading {
-  font-size: var(--font-size-300);
+/* ── Shelves ──────────────────────────────────────────────────────────────
+   One discovery grouping (Featured / Trending / New / More). The rule that
+   separates them is the quietest mark on the page by design — a hairline and
+   a mono micro-caps label, stating a fact without competing with the cards
+   (DESIGN_LANGUAGE §4). The first shelf gets no rule: there is nothing above
+   it to separate it from. */
+.shelf + .shelf {
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
+  border-top: var(--border-width-hairline) solid var(--color-table-line);
+}
+
+.shelfHeader {
+  margin-bottom: var(--space-4);
+}
+
+.shelfTitle {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-100);
   font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
   color: var(--color-text-muted);
-  margin: 0 0 var(--space-4);
+  margin: 0;
+}
+
+.shelfBlurb {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-200);
 }
 
 .gameGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
   /* Every row shares the tallest card's height, so tiles read as one uniform
-     set regardless of title length or the optional "Solo arcade" tag. */
+     set regardless of description length or an optional personal-best chip. */
   grid-auto-rows: 1fr;
   gap: var(--space-4);
   list-style: none;
-  margin: 0 0 var(--space-8);
+  margin: 0;
   padding: 0;
 }
 
 /* Stretch the list item and its card to fill the equal-height grid row. The
    cell is a positioning context so Options can sit inside the card's corner —
    it can't be a descendant of the card, since that's itself a <button>. */
-.gameGrid > li {
+.gameCell {
   display: flex;
   position: relative;
 }
@@ -67,14 +86,16 @@
   position: absolute;
   top: var(--space-2);
   right: var(--space-2);
-  /* Above the card's ::before sheen, which would otherwise swallow clicks. */
   z-index: 1;
 }
 
-/* Liquid glass: a frosted, translucent tile — blurred backdrop, a soft sheen
-   along the top edge (::before), and a light-catching rim border. The solid
-   @supports fallback below keeps it readable where backdrop-filter is absent. */
-.gameCard {
+/* ── Cards: two temperatures, one system ──────────────────────────────────
+   Shared geometry and behaviour; the two grounds differ only in colour.
+   NOTE: no `backdrop-filter` anywhere on this screen. These cards sit over a
+   flat page ground, and blurring a solid colour returns that solid colour —
+   cost paid, effect absent (DESIGN_LANGUAGE §3, glass rule). */
+.tableCard,
+.cabinetCard {
   position: relative;
   display: flex;
   width: 100%;
@@ -83,56 +104,60 @@
   gap: var(--space-2);
   min-height: var(--size-touch-target);
   padding: var(--space-5);
-  overflow: hidden;
-  border: var(--border-width-thin) solid var(--glass-border);
   border-radius: var(--radius-lg);
-  background-color: var(--glass-bg);
-  background-image: linear-gradient(160deg, var(--glass-highlight) 0%, rgba(255, 255, 255, 0) 42%);
-  box-shadow: var(--glass-shadow);
-  color: var(--color-text);
   text-align: left;
   cursor: pointer;
+  font-family: inherit;
   transition:
-    background-color var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard),
     box-shadow var(--duration-base) var(--ease-standard),
     transform var(--duration-fast) var(--ease-standard);
 }
 
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .gameCard {
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
-    backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
-  }
+/* The table: matte, ruled, unlit. A surface you place pieces on. */
+.tableCard {
+  border: var(--border-width-hairline) solid var(--color-table-line);
+  background-color: var(--color-table);
+  color: var(--color-text);
 }
 
-/* Top-edge sheen — the highlight that sells the "glass" read. */
-.gameCard::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 40%;
-  background: linear-gradient(to bottom, var(--glass-highlight), rgba(255, 255, 255, 0));
-  opacity: 0.6;
-  pointer-events: none;
+/* The cabinet: an emissive panel in a dark bezel. This is a card, not a play
+   surface, so it stays theme-aware in the sense that matters — its own
+   contrast is AA in both themes because it carries its own ground with it. */
+.cabinetCard {
+  border: var(--border-width-hairline) solid var(--color-cabinet-line);
+  background-color: var(--color-cabinet);
+  color: var(--color-on-cabinet);
 }
 
-.gameCard:hover {
-  background-color: var(--glass-bg-hover);
+.tableCard:hover,
+.cabinetCard:hover {
   border-color: var(--color-accent);
-  box-shadow:
-    var(--glass-shadow),
-    0 0 0 var(--border-width-thin) var(--color-accent);
   transform: translateY(-2px);
 }
 
-.gameCard:active {
+.tableCard:active,
+.cabinetCard:active {
   transform: translateY(0);
 }
 
-.gameCard:focus-visible {
+.tableCard:focus-visible,
+.cabinetCard:focus-visible {
   outline: var(--border-width-thick) solid var(--color-focus-ring);
   outline-offset: 2px;
+}
+
+/* Motion is an accent, never the message (UX_PRINCIPLES §4). */
+@media (prefers-reduced-motion: reduce) {
+  .tableCard,
+  .cabinetCard {
+    transition: none;
+  }
+
+  .tableCard:hover,
+  .cabinetCard:hover {
+    transform: none;
+  }
 }
 
 .gameThumbnail {
@@ -144,39 +169,112 @@
   aspect-ratio: 3 / 2;
   padding: var(--space-2);
   border-radius: var(--radius-md);
-  border: var(--border-width-thin) solid var(--glass-border);
-  background-color: var(--glass-bg);
 }
 
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .gameThumbnail {
-    -webkit-backdrop-filter: blur(calc(var(--glass-blur) / 2));
-    backdrop-filter: blur(calc(var(--glass-blur) / 2));
-  }
+.tableCard .gameThumbnail {
+  border: var(--border-width-hairline) solid var(--color-table-line);
+  background-color: var(--color-surface);
+}
+
+.cabinetCard .gameThumbnail {
+  border: var(--border-width-hairline) solid var(--color-cabinet-line);
+  background-color: var(--color-cabinet-raised);
 }
 
 .gameTitle {
+  font-family: var(--font-family-display);
   font-size: var(--font-size-400);
   font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-display);
 }
 
-/* Marks a real-time (solo arcade) card so the family reads at a glance — these
-   skip seat setup and go straight to play. Small, muted; part of the card's
-   accessible name (not aria-hidden) so it's conveyed to assistive tech too. */
-.gameKindTag {
-  align-self: flex-start;
-  /* Pin to the bottom of the card so the title baseline lines up whether or
-     not a card carries this tag — part of keeping every tile uniform. */
-  margin-top: auto;
-  padding: var(--space-1) var(--space-2);
-  border: var(--border-width-thin) solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background-color: var(--glass-bg);
+/* The line every game already had written and nobody ever saw (DESIGN_LANGUAGE
+   §1). Clamped so one long description can't stretch a whole grid row. */
+.gameDescription {
+  font-size: var(--font-size-200);
+  line-height: var(--line-height-base);
   color: var(--color-text-muted);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+.cabinetCard .gameDescription {
+  /* The muted neutral is tuned for the page ground and goes under AA on the
+     cabinet. Dim the panel's own ink instead, which stays above 4.5:1. */
+  color: var(--color-on-cabinet);
+  opacity: 0.82;
+}
+
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  /* Pin the chips to the bottom so titles and descriptions stay aligned across
+     a row whatever each card carries below them. */
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.seatChip,
+.tagChip,
+.kindChip {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family-mono);
   font-size: var(--font-size-100);
   font-weight: var(--font-weight-medium);
-  letter-spacing: 0.02em;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Chip hierarchy (DESIGN_LANGUAGE §4): the seat tag is the ONLY filled chip —
+   it answers "can I play this with someone?" at a glance. Everything else is a
+   hairline outline so the row doesn't turn into confetti. */
+.seatChip {
+  border: var(--border-width-hairline) solid transparent;
+  background-color: var(--color-text);
+  color: var(--color-bg);
+}
+
+.cabinetCard .seatChip {
+  background-color: var(--color-on-cabinet);
+  color: var(--color-cabinet);
+}
+
+.tagChip,
+.kindChip {
+  border: var(--border-width-hairline) solid var(--color-table-line);
+  background-color: transparent;
+  color: var(--color-text-muted);
+}
+
+.cabinetCard .tagChip,
+.cabinetCard .kindChip {
+  border-color: var(--color-cabinet-line);
+  color: var(--color-on-cabinet);
+  opacity: 0.82;
+}
+
+/* The player's own best, read locally so it renders offline (see
+   `game/personalBest`). Data voice: mono + tabular figures, mandatory for every
+   score on the platform (DESIGN_LANGUAGE §3). */
+.personalBest {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-100);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  color: var(--color-on-cabinet);
+  opacity: 0.82;
+}
+
+.personalBestValue {
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  opacity: 1;
 }
 
 .empty {
@@ -187,9 +285,11 @@
   margin-bottom: var(--space-8);
 }
 
+/* Developer chrome — only ever rendered under `?dev` (see HomeScreen). */
 .footer {
+  margin-top: var(--space-8);
   padding-top: var(--space-6);
-  border-top: var(--border-width-thin) solid var(--color-border);
+  border-top: var(--border-width-hairline) solid var(--color-border);
   color: var(--color-text-muted);
   font-size: var(--font-size-200);
 }
