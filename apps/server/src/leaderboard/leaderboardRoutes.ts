@@ -16,8 +16,17 @@ import type { Request, Response } from "express";
 import { getRealtimeGame } from "@mpg/engine";
 import type { RealtimeGameId } from "@mpg/engine";
 
+import { noopLimit, type RateLimitFor } from "../middleware/rateLimit.js";
 import { writeGameResult } from "../sessions/resultWriter.js";
 import type { LeaderboardEntry, LeaderboardFilter, Store } from "../store/ports.js";
+
+/**
+ * Cap on a submitted input log's length. The log is re-simulated in an O(n) loop,
+ * so an unbounded array is a cheap CPU-abuse vector. 50k ticks is ~14 minutes at
+ * 60fps — far past any legitimate run — and stays under the JSON body limit
+ * (config.ts) so this length check, not the body parser, is the guard that fires.
+ */
+const MAX_INPUT_LOG_LENGTH = 50_000;
 import { updateLeaderboardForScore } from "./leaderboardWriter.js";
 
 const DEFAULT_LIMIT = 10;
@@ -69,7 +78,7 @@ function parseOptionalString(raw: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-export function createLeaderboardRouter(store: Store): Router {
+export function createLeaderboardRouter(store: Store, limit: RateLimitFor = noopLimit): Router {
   const router = Router();
 
   // GET /api/leaderboard/:gameId — top N entries + the requester's rank.
@@ -127,7 +136,7 @@ export function createLeaderboardRouter(store: Store): Router {
   // Server re-simulates {seed, inputLog} through the deterministic engine module and
   // only trusts the client-declared `score` if it matches the replayed outcome AND the
   // replayed run actually reached game over — never the client's word alone.
-  router.post("/leaderboard/:gameId/submit", async (req: Request, res: Response) => {
+  router.post("/leaderboard/:gameId/submit", limit("score_submit"), async (req: Request, res: Response) => {
     const token = req.sessionToken;
     if (!token) {
       res.status(400).json({ error: "no_session" });
@@ -147,6 +156,7 @@ export function createLeaderboardRouter(store: Store): Router {
       typeof seed !== "number" ||
       !Number.isFinite(seed) ||
       !Array.isArray(inputLog) ||
+      inputLog.length > MAX_INPUT_LOG_LENGTH ||
       typeof runId !== "string" ||
       runId.length === 0 ||
       typeof score !== "number" ||

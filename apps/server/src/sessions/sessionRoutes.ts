@@ -8,6 +8,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 
+import { noopLimit, type RateLimitFor } from "../middleware/rateLimit.js";
 import { forgetMe } from "../retention/retention.js";
 import type { Store } from "../store/ports.js";
 import { SESSION_COOKIE } from "./sessionMiddleware.js";
@@ -28,7 +29,7 @@ function parseNonNegativeInt(raw: unknown, fallback: number, max?: number): numb
   return typeof max === "number" ? Math.min(parsed, max) : parsed;
 }
 
-export function createSessionRouter(store: Store): Router {
+export function createSessionRouter(store: Store, limit: RateLimitFor = noopLimit): Router {
   const router = Router();
 
   // GET /api/session — current (or newly-minted) session identity.
@@ -48,7 +49,7 @@ export function createSessionRouter(store: Store): Router {
   });
 
   // POST /api/session/username — claim/update a case-insensitively unique username.
-  router.post("/session/username", async (req: Request, res: Response) => {
+  router.post("/session/username", limit("username_set"), async (req: Request, res: Response) => {
     const token = req.sessionToken;
     if (!token) {
       res.status(400).json({ error: "no_session" });

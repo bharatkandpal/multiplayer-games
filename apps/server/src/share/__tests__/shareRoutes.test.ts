@@ -148,6 +148,11 @@ describe("share link routes (MPG-056)", () => {
     expect((await mint({ kind: "result", targetId: result.id, expiresInMs: -5 })).status).toBe(400);
   });
 
+  it("rejects an over-long targetId (MPG-021 length cap)", async () => {
+    const res = await mint({ kind: "result", targetId: "x".repeat(257) });
+    expect(res.status).toBe(400);
+  });
+
   it("honors an expiry: the link resolves before it lapses and 404s after", async () => {
     const result = await saveResult();
     const { token } = (await (
