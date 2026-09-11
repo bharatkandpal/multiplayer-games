@@ -3,6 +3,7 @@
  * (MPG-011) and by the real-time track (e.g. Floppy Birds) on run end.
  */
 
+import { emit, type EventSink } from "../analytics/sink.js";
 import type { GameResult, NewGameResult, Store } from "../store/ports.js";
 
 export interface GameOverData {
@@ -23,8 +24,26 @@ export interface GameOverData {
   readonly eventId?: string | null;
 }
 
-/** Persist a game-over result. Idempotent on `runId`. */
-export async function writeGameResult(store: Store, data: GameOverData): Promise<GameResult> {
+/**
+ * Persist a game-over result. Idempotent on `runId`.
+ *
+ * Optionally emits `result_saved` (MPG-097) — instrumented here rather than at
+ * the two call sites because this is the one choke point every finished game
+ * passes through, local and room-backed alike. A denominator that only counted
+ * one of those would make the share rate meaningless.
+ *
+ * The `findByRunId` pre-check exists to keep that denominator honest: `save` is
+ * idempotent, so a retried write returns the existing row and would otherwise
+ * emit a second `result_saved` for one game. It costs one indexed lookup per
+ * completed game — rare enough to be free, and only paid when a sink is wired.
+ */
+export async function writeGameResult(
+  store: Store,
+  data: GameOverData,
+  sink?: EventSink,
+): Promise<GameResult> {
+  const alreadyExisted = sink ? Boolean(await store.results.findByRunId(data.runId)) : false;
+
   const input: NewGameResult = {
     runId: data.runId,
     gameId: data.gameId,
@@ -39,5 +58,18 @@ export async function writeGameResult(store: Store, data: GameOverData): Promise
     moveLog: data.moveLog ?? null,
   };
 
-  return store.results.save(input);
+  const saved = await store.results.save(input);
+
+  if (sink && !alreadyExisted) {
+    // Leg 4 denominator: share rate is `share_minted / result_saved`.
+    emit(sink, {
+      name: "result_saved",
+      ownerToken: data.ownerToken,
+      gameId: data.gameId,
+      eventId: data.eventId ?? null,
+      props: { gameFamily: data.gameFamily ?? "turn-based", status: data.status },
+    });
+  }
+
+  return saved;
 }

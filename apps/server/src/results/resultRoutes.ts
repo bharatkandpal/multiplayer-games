@@ -26,6 +26,7 @@ import type { Request, Response } from "express";
 import { getGame, IllegalMoveError } from "@mpg/engine";
 import type { GameId } from "@mpg/engine";
 
+import type { EventSink } from "../analytics/sink.js";
 import { noopLimit, type RateLimitFor } from "../middleware/rateLimit.js";
 import { writeGameResult } from "../sessions/resultWriter.js";
 import type { Store } from "../store/ports.js";
@@ -108,7 +109,11 @@ function parseDurationMs(raw: unknown): number | null | undefined {
   return Math.round(raw);
 }
 
-export function createResultRouter(store: Store, limit: RateLimitFor = noopLimit): Router {
+export function createResultRouter(
+  store: Store,
+  sink: EventSink,
+  limit: RateLimitFor = noopLimit,
+): Router {
   const router = Router();
 
   // POST /api/results — persist a finished LOCAL turn-based game, validated by replay.
@@ -197,18 +202,22 @@ export function createResultRouter(store: Store, limit: RateLimitFor = noopLimit
       return;
     }
 
-    const saved = await writeGameResult(store, {
-      runId: storedRunId,
-      gameId,
-      gameFamily: "turn-based",
-      ownerToken: token,
-      // Derived from the server's own replayed position, never from the request.
-      status: result.status,
-      winnerSlot: result.status === "win" ? result.winner : null,
-      seatsSnapshot,
-      durationMs,
-      moveLog,
-    });
+    const saved = await writeGameResult(
+      store,
+      {
+        runId: storedRunId,
+        gameId,
+        gameFamily: "turn-based",
+        ownerToken: token,
+        // Derived from the server's own replayed position, never from the request.
+        status: result.status,
+        winnerSlot: result.status === "win" ? result.winner : null,
+        seatsSnapshot,
+        durationMs,
+        moveLog,
+      },
+      sink,
+    );
 
     // `resultId` is what a durable share link points at (MPG-056) — the client
     // knows only its own `runId`, so returning it here saves a lookup it has no

@@ -36,10 +36,13 @@ import {
 import { GAME_CATALOG, REALTIME_CATALOG } from "./screens/HomeScreen";
 import { SharedResultScreen } from "./screens/SharedResultScreen";
 import { buildGameItems, nextGame, type GameItem } from "./screens/catalog";
+import { pickGameOfTheDay } from "./screens/gameOfTheDay";
 import { GameSwitcher } from "./screens/GameSwitcher";
 import { isAllBotRoom, publicRoomToSeats, toSeatConfigInput } from "./api/roomSeats";
 import { getStoredUsername } from "./api/username";
 import { initSession } from "./api/session";
+import { installFlushOnHide } from "./api/events";
+import { markColdArrival } from "./analytics/firstInput";
 import { getStoredCreatorToken } from "./api/watchSession";
 import { useRoom } from "./hooks/useRoom";
 import { useUsernameGate } from "./hooks/useUsernameGate";
@@ -117,7 +120,12 @@ function initialRoute(): Route {
   // A share link is checked FIRST: it is the one entry point reached by people
   // who have never used the app, so it must not fall through to Home.
   const shareToken = parseSharePath(window.location.pathname);
-  if (shareToken) return { screen: "shared", token: shareToken };
+  if (shareToken) {
+    // MPG-097 leg 5: start the time-to-first-input clock here, at the only
+    // entry point a stranger can arrive through.
+    markColdArrival();
+    return { screen: "shared", token: shareToken };
+  }
   const parsed = parseRoomPath(window.location.pathname);
   if (!parsed) return { screen: "home" };
   // MPG-025: a reload of this tab's own all-bot watch room — its creator
@@ -129,6 +137,17 @@ function initialRoute(): Route {
     return { screen: "watch", gameId: parsed.gameId, roomId: parsed.roomId };
   }
   return { screen: "join", gameId: parsed.gameId, roomId: parsed.roomId };
+}
+
+/**
+ * True when the URL carries `?dev`, which is the only thing that puts developer
+ * chrome (the engine build stamp, the design-system kit) on Home. Default-off
+ * because Home is where a stranger following a shared link lands, and a build
+ * stamp is not what should greet them (`DESIGN_LANGUAGE.md` §1).
+ */
+function isDevMode(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).has("dev");
 }
 
 function buildInviteUrl(gameId: GameId, roomId: string): string {
@@ -255,6 +274,12 @@ export default function App(): React.JSX.Element {
   // switcher on the play screens.
   const gameItems = useMemo(() => buildGameItems(games, realtimeGames), [games, realtimeGames]);
 
+  // The game spotlighted on Home as "Game of the day" — a simple daily rotation
+  // (see `gameOfTheDay.ts`) standing in until the real recommendation engine
+  // lands. Memoized so it's stable for the session; it only turns over across a
+  // local-midnight boundary, which a session doesn't outlive in practice.
+  const gameOfTheDayId = useMemo(() => pickGameOfTheDay(gameItems)?.id, [gameItems]);
+
   /**
    * Quick-start: go straight into a playable game, skipping seat setup. A
    * turn-based game starts you against the bot at its tuned strength; a
@@ -322,6 +347,12 @@ export default function App(): React.JSX.Element {
     });
   }, []);
 
+  // MPG-097: flush queued funnel events when the page goes away. Same
+  // fire-and-forget posture as the session bootstrap above — a visitor who
+  // bounces in under the flush interval is exactly the datapoint worth
+  // keeping, and losing it silently is the worst outcome available here.
+  useEffect(() => installFlushOnHide(), []);
+
   // Direct invite-link opens (`/:gameId/room/:roomId`) land straight on
   // "join" from `initialRoute()`, but the browser back/forward buttons can
   // also produce one — keep the route in sync with the URL either way.
@@ -365,10 +396,12 @@ export default function App(): React.JSX.Element {
         <HomeScreen
           games={games}
           realtimeGames={realtimeGames}
+          {...(gameOfTheDayId ? { gameOfTheDay: gameOfTheDayId } : {})}
           onSelectGame={(gameId) => quickStart({ kind: "turn-based", id: gameId, title: gameId })}
           onSelectRealtimeGame={(gameId) => setRoute({ screen: "realtime", gameId })}
           onConfigureGame={(gameId) => setRoute({ screen: "setup", gameId })}
           onShowGallery={() => setRoute({ screen: "gallery" })}
+          devMode={isDevMode()}
         />
       ) : null}
 

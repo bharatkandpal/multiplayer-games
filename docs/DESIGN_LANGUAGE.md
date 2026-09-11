@@ -4,8 +4,8 @@ Visual direction for `apps/web`. Complements [UX_PRINCIPLES.md](UX_PRINCIPLES.md
 that document sets the quality bar every screen must clear, this one sets what the
 screens should look like while clearing it.
 
-- **Status:** adopted. Foundations (UI-1…UI-3) shipped in `32bc7f2`; UI-4…UI-12 are
-  on the backlog as MPG-111…MPG-119.
+- **Status:** adopted. Foundations (UI-1…UI-3) shipped in `32bc7f2`; UI-4 shipped
+  with MPG-090; UI-5…UI-12 are on the backlog as MPG-112…MPG-119.
 - **Baseline it was written against:** `main @ 10ec79b` (MPG-056).
 - **Source:** originally drafted as a rendered proposal —
   <https://claude.ai/code/artifact/f4c79e7a-8878-425d-9615-f32b653c5002> — which
@@ -110,26 +110,36 @@ hairline outline so the row doesn't turn into confetti.
 a fact, it doesn't compete with the cards. Hence `--border-width-hairline`, and a
 label in the same mono micro-caps as the shelf headers.
 
+**Which axis the shelves split on (decided with UI-4 / MPG-090).** This section
+originally assumed shelves split by _family_ — table above, cabinet below.
+MPG-090 needs them to split by _discovery_ (Featured / Trending / New), and both
+can't be the top-level grouping. Discovery won: it is what a player arriving cold
+is actually asking, and a Featured shelf that couldn't mix a board game with an
+arcade game would be a worse shortlist. The family signal moved down onto the card
+itself — turn-based cards are matte table stock, real-time cards are lit cabinet
+panels — so a mixed shelf still reads as two temperatures at a glance, and a
+"Solo arcade" chip keeps that signal in text rather than colour alone.
+
 ## 5. Rollout slices
 
 Ordered so each ships on its own; nothing is a big-bang rewrite. UI-9…UI-12 are
 in-game work and can run in parallel with the shell slices — they touch no shared
 screens.
 
-| Slice | Backlog | What changes                                                                                                                                 | Touches                                                          | Size | Status       |
-| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---- | ------------ |
-| UI-1  | —       | Accent off blue; violet-biased neutrals; `--color-table`, `--color-cabinet`, `--field-page`; contrast table re-verified                      | `styles/tokens.css`                                              | S    | ✅ `32bc7f2` |
-| UI-2  | —       | `--font-family-display`; every score/time/rank/countdown to mono + `tabular-nums`                                                            | `tokens.css` · Reflex/Floppy scenes · Leaderboard · RankPreview  | S    | ✅ `32bc7f2` |
-| UI-3  | —       | `GameTag` + `tags` on both entry types; seat tag derived via `gameTags()`; `--border-width-hairline`. Data + token only                      | `screens/catalog.ts` · `styles/tokens.css`                       | S    | ✅ `32bc7f2` |
-| UI-4  | MPG-111 | Home rebuilt: two shelves split by the hairline, tag chips, descriptions rendered, matte cards, personal-best chip, dev footer behind `?dev` | `HomeScreen.tsx` + `.module.css` · `App.tsx`                     | M    | Backlog      |
-| UI-5  | MPG-112 | Tag filter row on Home reading the same `gameTags()` output                                                                                  | `HomeScreen.tsx` + `.module.css`                                 | S    | Backlog      |
-| UI-6  | MPG-113 | Extract a shared `SeatRail`; board surfaces move onto the table ground                                                                       | `components/ui/SeatRail` · GamePlay/OnlineGamePlay/WatchGamePlay | M    | Backlog      |
-| UI-7  | MPG-114 | Cabinet treatment + glass HUD; ghost bar vs personal best; glass removed where it has no backdrop                                            | `RealtimePlayScreen` · Floppy/DrunkWalk/Reflex scenes            | M    | Backlog      |
-| UI-8  | MPG-115 | Result card unified so post-game and shared-link views render one component; rank delta; leaderboard pins your row                           | `SharedResultScreen` · `LeaderboardScreen` · `RankPreview`       | L    | Backlog      |
-| UI-9  | MPG-116 | Tier-2 material tokens: promote Connect Four's fifteen `rgba()` literals to `--game-*`. Pure refactor, pixel-identical                       | `tokens.css` · `ConnectFourBoard.module.css`                     | S    | Backlog      |
-| UI-10 | MPG-117 | Shared `BoardGrid` primitive; all five boards onto one cell grammar. Kills radius/gap drift                                                  | `components/board/BoardGrid` · all five `*Board.module.css`      | M    | Backlog      |
-| UI-11 | MPG-118 | Tier-3 scene ramp + memoised `readSceneTokens()`; semantic tokens reserved for state                                                         | `tokens.css` · `lib/sceneTokens.ts` · `FloppyBirdsScene`         | M    | Backlog      |
-| UI-12 | MPG-119 | Drunk Walk detox: ~75 baked-in literals → scene ramp; tree sprites re-authored to take `currentColor`                                        | `DrunkWalkScene` · character · glyph · cosmetics                 | L    | Backlog      |
+| Slice | Backlog | What changes                                                                                                                             | Touches                                                                              | Size | Status                  |
+| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---- | ----------------------- |
+| UI-1  | —       | Accent off blue; violet-biased neutrals; `--color-table`, `--color-cabinet`, `--field-page`; contrast table re-verified                  | `styles/tokens.css`                                                                  | S    | ✅ `32bc7f2`            |
+| UI-2  | —       | `--font-family-display`; every score/time/rank/countdown to mono + `tabular-nums`                                                        | `tokens.css` · Reflex/Floppy scenes · Leaderboard · RankPreview                      | S    | ✅ `32bc7f2`            |
+| UI-3  | —       | `GameTag` + `tags` on both entry types; seat tag derived via `gameTags()`; `--border-width-hairline`. Data + token only                  | `screens/catalog.ts` · `styles/tokens.css`                                           | S    | ✅ `32bc7f2`            |
+| UI-4  | MPG-111 | Home rebuilt: shelves split by the hairline, tag chips, descriptions rendered, matte cards, personal-best chip, dev footer behind `?dev` | `HomeScreen.tsx` + `.module.css` · `App.tsx` · `catalog.ts` · `game/personalBest.ts` | M    | ✅ shipped with MPG-090 |
+| UI-5  | MPG-112 | Tag filter row on Home reading the same `gameTags()` output                                                                              | `HomeScreen.tsx` + `.module.css`                                                     | S    | Backlog                 |
+| UI-6  | MPG-113 | Extract a shared `SeatRail`; board surfaces move onto the table ground                                                                   | `components/ui/SeatRail` · GamePlay/OnlineGamePlay/WatchGamePlay                     | M    | Backlog                 |
+| UI-7  | MPG-114 | Cabinet treatment + glass HUD; ghost bar vs personal best; glass removed where it has no backdrop                                        | `RealtimePlayScreen` · Floppy/DrunkWalk/Reflex scenes                                | M    | Backlog                 |
+| UI-8  | MPG-115 | Result card unified so post-game and shared-link views render one component; rank delta; leaderboard pins your row                       | `SharedResultScreen` · `LeaderboardScreen` · `RankPreview`                           | L    | Backlog                 |
+| UI-9  | MPG-116 | Tier-2 material tokens: promote Connect Four's fifteen `rgba()` literals to `--game-*`. Pure refactor, pixel-identical                   | `tokens.css` · `ConnectFourBoard.module.css`                                         | S    | Backlog                 |
+| UI-10 | MPG-117 | Shared `BoardGrid` primitive; all five boards onto one cell grammar. Kills radius/gap drift                                              | `components/board/BoardGrid` · all five `*Board.module.css`                          | M    | Backlog                 |
+| UI-11 | MPG-118 | Tier-3 scene ramp + memoised `readSceneTokens()`; semantic tokens reserved for state                                                     | `tokens.css` · `lib/sceneTokens.ts` · `FloppyBirdsScene`                             | M    | Backlog                 |
+| UI-12 | MPG-119 | Drunk Walk detox: ~75 baked-in literals → scene ramp; tree sprites re-authored to take `currentColor`                                    | `DrunkWalkScene` · character · glyph · cosmetics                                     | L    | Backlog                 |
 
 **Gate for every slice:** the UX Definition of Done in
 [UX_PRINCIPLES.md](UX_PRINCIPLES.md) §6 — all required states, AA contrast

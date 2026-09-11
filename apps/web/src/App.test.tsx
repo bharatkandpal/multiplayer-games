@@ -40,11 +40,13 @@ async function advanceBotStep(): Promise<void> {
 }
 
 describe("App", () => {
-  it("renders engine-backed content (version + registered games, both families)", () => {
+  it("renders engine-backed content (registered games, both families)", () => {
     render(<App />);
 
-    expect(screen.getByText("Engine version:")).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "Available games" })).toBeInTheDocument();
+    // The engine build stamp is developer chrome and now sits behind `?dev`
+    // (UI-4) — what Home owes a player is the games themselves.
+    expect(screen.queryByText("Engine version:")).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Featured games" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tic-Tac-Toe" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connect Four" })).toBeInTheDocument();
     // MPG-040f: the real-time family shows up in the same grid.
@@ -227,7 +229,7 @@ describe("MPG-056: a durable share link is its own entry point", () => {
 
     // The visitor lands on the result, not on the game grid.
     expect(await screen.findByText("Scored 42")).toBeInTheDocument();
-    expect(screen.queryByRole("list", { name: "Available games" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Featured games" })).not.toBeInTheDocument();
   });
 
   it("a dead link still lands somewhere with a way into a game", async () => {
@@ -237,6 +239,6 @@ describe("MPG-056: a durable share link is its own entry point", () => {
 
     expect(await screen.findByText("Link no longer works")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Browse games" }));
-    expect(screen.getByRole("list", { name: "Available games" })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Featured games" })).toBeInTheDocument();
   });
 });

@@ -231,6 +231,63 @@ export interface ShareLinkRepo {
 }
 
 // ---------------------------------------------------------------------------
+// Analytics Event (MPG-097)
+// ---------------------------------------------------------------------------
+
+export interface AnalyticsEvent {
+  readonly id: string;
+  readonly name: string;
+  readonly ownerToken: string;
+  readonly gameId: string | null;
+  readonly shareLinkId: string | null;
+  readonly eventId: string | null;
+  readonly props: unknown;
+  readonly createdAt: Date;
+}
+
+export interface NewAnalyticsEvent {
+  readonly name: string;
+  readonly ownerToken: string;
+  readonly gameId?: string | null;
+  readonly shareLinkId?: string | null;
+  readonly eventId?: string | null;
+  readonly props?: unknown;
+  /**
+   * When the event actually happened. Omitted for server-side events (the
+   * write *is* the moment). Client batches may deliver late, so they carry
+   * their own timestamp rather than being credited to flush time — a funnel
+   * that timestamps at flush would smear every metric by the batch interval.
+   */
+  readonly createdAt?: Date;
+}
+
+export interface EventCount {
+  readonly name: string;
+  readonly count: number;
+}
+
+export interface EventRepo {
+  /**
+   * Append events. Batched because the client flushes in batches and because
+   * one round-trip per event would make instrumentation cost more than the
+   * thing it measures. Append-only: no update, no delete-by-id.
+   */
+  record(events: readonly NewAnalyticsEvent[]): Promise<void>;
+
+  /** Count events by name in `[since, until)`. The primitive every funnel rate is built from. */
+  countByName(since: Date, until: Date): Promise<EventCount[]>;
+
+  /** Distinct sessions that emitted `name` in `[since, until)`. Denominator for per-user rates. */
+  countDistinctOwners(name: string, since: Date, until: Date): Promise<number>;
+
+  /** Delete all events owned by a token. Returns count deleted. */
+  deleteByOwner(ownerToken: string): Promise<number>;
+
+  /** Delete events older than `cutoff`. Returns count deleted. */
+  deleteOlderThan(cutoff: Date): Promise<number>;
+}
+
+// ---------------------------------------------------------------------------
 // Store (bundle of all repos)
 // ---------------------------------------------------------------------------
 
@@ -239,4 +296,5 @@ export interface Store {
   readonly results: ResultRepo;
   readonly leaderboard: LeaderboardRepo;
   readonly shareLinks: ShareLinkRepo;
+  readonly events: EventRepo;
 }

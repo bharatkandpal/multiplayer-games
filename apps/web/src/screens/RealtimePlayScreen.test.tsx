@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { RealtimeModule } from "@mpg/engine";
 import { RealtimePlayScreen, type RealtimeControls } from "./RealtimePlayScreen";
+import { createActionInputSource } from "../game";
 
 /**
  * A minimal fake RealtimeModule standing in for a concrete game (the real
@@ -94,12 +95,15 @@ afterEach(() => {
 });
 
 function renderScreen(overrides: Partial<Parameters<typeof RealtimePlayScreen>[0]> = {}) {
+  // Built once per render call so the source's pressed-set survives re-renders
+  // (mirrors production, where the source is memoised per game).
+  const inputSource = createActionInputSource(flapControls);
   return render(
-    <RealtimePlayScreen<FakeState, FakeInput, "flap">
+    <RealtimePlayScreen<FakeState, FakeInput>
       module={fakeModule}
       gameTitle="Floppy Birds"
       seed={42}
-      controls={flapControls}
+      inputSource={inputSource}
       renderScene={({ score }) => <div data-testid="scene">scene score {score}</div>}
       onExit={vi.fn()}
       nextSeed={() => 7}
@@ -270,12 +274,13 @@ describe("RealtimePlayScreen — tap-zone controls (resolveTapAction)", () => {
   };
 
   function renderZoneScreen() {
+    const inputSource = createActionInputSource(zoneControls);
     return render(
-      <RealtimePlayScreen<ZoneState, ZoneInput, "left" | "right">
+      <RealtimePlayScreen<ZoneState, ZoneInput>
         module={zoneModule}
         gameTitle="Zone Game"
         seed={1}
-        controls={zoneControls}
+        inputSource={inputSource}
         renderScene={({ score }) => <div data-testid="scene">scene score {score}</div>}
         onExit={vi.fn()}
         nextSeed={() => 7}
@@ -365,11 +370,11 @@ describe("RealtimePlayScreen — prefers-reduced-motion (ADR 0002 §5)", () => {
     stubReducedMotion(true);
     const seen: boolean[] = [];
     const { container } = render(
-      <RealtimePlayScreen<FakeState, FakeInput, "flap">
+      <RealtimePlayScreen<FakeState, FakeInput>
         module={fakeModule}
         gameTitle="Floppy Birds"
         seed={1}
-        controls={flapControls}
+        inputSource={createActionInputSource(flapControls)}
         renderScene={({ reducedMotion }) => {
           seen.push(reducedMotion);
           return <div data-testid="scene" />;
@@ -392,11 +397,11 @@ describe("RealtimePlayScreen — prefers-reduced-motion (ADR 0002 §5)", () => {
     stubReducedMotion(false);
     const seen: boolean[] = [];
     render(
-      <RealtimePlayScreen<FakeState, FakeInput, "flap">
+      <RealtimePlayScreen<FakeState, FakeInput>
         module={fakeModule}
         gameTitle="Floppy Birds"
         seed={1}
-        controls={flapControls}
+        inputSource={createActionInputSource(flapControls)}
         renderScene={({ reducedMotion }) => {
           seen.push(reducedMotion);
           return <div data-testid="scene" />;

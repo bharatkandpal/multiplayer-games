@@ -11,6 +11,8 @@ import { Server as SocketIOServer } from "socket.io";
 
 import { ENGINE_VERSION, registerBuiltInGames, registerBuiltInRealtimeGames } from "@mpg/engine";
 
+import { createEventRouter } from "./analytics/eventRoutes.js";
+import { createStoreSink } from "./analytics/sink.js";
 import { JSON_BODY_LIMIT } from "./config.js";
 import { createLeaderboardRouter } from "./leaderboard/leaderboardRoutes.js";
 import { parseCorsOrigin } from "./middleware/cors.js";
@@ -61,6 +63,11 @@ app.use(express.json({ limit: JSON_BODY_LIMIT }));
 const rateLimiter = createRateLimiter();
 console.log(`@mpg/server — rate limiter: ${rateLimiter.enabled ? "enabled" : "disabled"}`);
 
+// Loop analytics (MPG-097). Behind the `EventSink` seam, so swapping in a
+// hosted vendor later is a change here and nowhere else. The sink never throws:
+// instrumentation is not allowed to break the thing it measures.
+const eventSink = createStoreSink(store.events);
+
 // Session identity — mints or resolves an opaque token on every request.
 app.use(createSessionMiddleware(store));
 
@@ -68,14 +75,22 @@ app.use(createSessionMiddleware(store));
 app.use("/api", createSessionRouter(store, rateLimiter.limit.bind(rateLimiter)));
 
 // Leaderboard routes (GET /api/leaderboard/:gameId, GET /api/leaderboard/:gameId/rank).
-app.use("/api", createLeaderboardRouter(store, rateLimiter.limit.bind(rateLimiter)));
+// Both cross-cutting deps are threaded in: the analytics `eventSink` (MPG-097)
+// and the rate limiter (MPG-021). The routers apply the limiter to their write
+// paths and emit funnel events through the sink.
+const limit = rateLimiter.limit.bind(rateLimiter);
+app.use("/api", createLeaderboardRouter(store, eventSink, limit));
 
 // Client-reported turn-based results (POST /api/results) — MPG-131. Local play
 // never touches a room, so this is the only way a local game becomes shareable.
-app.use("/api", createResultRouter(store, rateLimiter.limit.bind(rateLimiter)));
+app.use("/api", createResultRouter(store, eventSink, limit));
 
 // Durable share links (POST /api/share, GET/DELETE /api/share/:token) — MPG-056.
-app.use("/api", createShareRouter(store, rateLimiter.limit.bind(rateLimiter)));
+app.use("/api", createShareRouter(store, eventSink, limit));
+
+// Client-reported funnel events (POST /api/events) — MPG-097. Only events the
+// server cannot observe itself are accepted here; see `analytics/events.ts`.
+app.use("/api", createEventRouter(eventSink));
 
 const startedAt = Date.now();
 
@@ -167,7 +182,7 @@ const io = new SocketIOServer(httpServer, {
 
 io.use(createSocketSessionMiddleware(store));
 registerRoomHandlers(io, roomManager);
-registerGameHandlers(io, roomManager, store);
+registerGameHandlers(io, roomManager, store, eventSink);
 registerRematchHandlers(io, roomManager);
 
 const port = Number(process.env["PORT"] ?? 3001);
