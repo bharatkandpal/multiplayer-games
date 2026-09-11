@@ -43,6 +43,15 @@ export type {
   RealtimeSceneProps,
   TouchAction,
 } from "./RealtimePlayScreen";
+export { createActionInputSource, createPointerAxisInputSource } from "../game";
+export type {
+  InputBinding,
+  InputSource,
+  InputSourceHost,
+  InputSourceId,
+  InputSourceStatus,
+  PointerAxisConfig,
+} from "../game";
 
 export {
   TicTacToeRoute,

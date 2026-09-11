@@ -5,11 +5,23 @@ import { registerRealtimeGame } from "./realtime-registry";
 import { floppyBirds } from "./floppy-birds";
 import { drunkWalk } from "./drunk-walk";
 import { reflexTest } from "./reflex-test";
-import { game2048 } from "./game2048";
+import { game2048, game2048_3, game2048_5 } from "./game2048";
 import { breakout } from "./breakout";
 
-/** All real-time modules shipped with the platform. */
-export const builtInRealtimeGames = [floppyBirds, drunkWalk, reflexTest, game2048, breakout];
+/**
+ * All real-time modules shipped with the platform. The 2048 grid-size variants
+ * (`2048@3` / `2048@5`) register as their own modules so both the web registry
+ * and the server's re-simulation resolve the right board dimension by id.
+ */
+export const builtInRealtimeGames = [
+  floppyBirds,
+  drunkWalk,
+  reflexTest,
+  game2048,
+  game2048_3,
+  game2048_5,
+  breakout,
+];
 
 /** Register every built-in real-time game. Call once at platform startup. */
 export function registerBuiltInRealtimeGames(): void {

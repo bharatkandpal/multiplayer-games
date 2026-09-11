@@ -2,7 +2,12 @@ import { describe, it, expect } from "vitest";
 import {
   GAME_2048,
   applySwipe,
+  createGame2048,
   game2048,
+  game2048IdForSize,
+  game2048Size,
+  game2048_3,
+  game2048_5,
   highestTile,
   type Game2048Input,
   type Game2048State,
@@ -144,12 +149,60 @@ describe("2048 module", () => {
   });
 });
 
+describe("2048 selectable grid size (MPG-096)", () => {
+  it("maps each size to a distinct id, 4 being the canonical `2048`", () => {
+    expect(game2048IdForSize(3)).toBe("2048@3");
+    expect(game2048IdForSize(4)).toBe("2048");
+    expect(game2048IdForSize(5)).toBe("2048@5");
+    expect(game2048.id).toBe("2048");
+    expect(game2048_3.id).toBe("2048@3");
+    expect(game2048_5.id).toBe("2048@5");
+  });
+
+  it.each([3, 4, 5] as const)("builds a %i×%i board carrying its own size", (size) => {
+    const module = createGame2048(size);
+    const state = module.createInitialState(42);
+    expect(state.board).toHaveLength(size * size);
+    expect(game2048Size(state)).toBe(size);
+    expect(tileCount(state)).toBe(2); // two starting tiles at every size
+  });
+
+  it("slides and merges a 3×3 line the same way, at the smaller width", () => {
+    // 3×3, top row [2,2,4] swiped left -> [4,4,0], scoring 4.
+    const board = [2, 2, 4, 0, 0, 0, 0, 0, 0];
+    const { board: after, gained, moved } = applySwipe(board, "left", 3);
+    expect(after.slice(0, 3)).toEqual([4, 4, 0]);
+    expect(gained).toBe(4);
+    expect(moved).toBe(true);
+  });
+
+  it("ends a 3×3 run of greedy swipes (the smaller board locks quickly)", () => {
+    const cycle: SwipeDir[] = ["up", "left", "down", "right"];
+    let state = game2048_3.createInitialState(2024);
+    let ended = false;
+    for (let i = 0; i < 5000 && !ended; i += 1) {
+      state = game2048_3.tick(state, { swipe: cycle[i % cycle.length] ?? "up" });
+      ended = state.over;
+    }
+    expect(ended).toBe(true);
+    expect(game2048_3.getScore(state)).toBeGreaterThan(0);
+  });
+});
+
 describe("2048 registry wiring", () => {
-  it("is registered as a realtime game", () => {
+  it("registers the default board and both size variants", () => {
     clearRealtimeRegistry();
     registerBuiltInRealtimeGames();
-    const module = getRealtimeGame("2048");
-    expect(module.id).toBe("2048");
-    expect(module.kind).toBe("realtime");
+    for (const [id, size] of [
+      ["2048", 4],
+      ["2048@3", 3],
+      ["2048@5", 5],
+    ] as const) {
+      const module = getRealtimeGame(id);
+      expect(module.id).toBe(id);
+      expect(module.kind).toBe("realtime");
+      // The registered module builds a board of the right dimension for re-sim.
+      expect(module.createInitialState(1).board).toHaveLength(size * size);
+    }
   });
 });

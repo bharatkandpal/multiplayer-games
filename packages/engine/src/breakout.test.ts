@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   BREAKOUT_WORLD,
+  bounceOffPaddle,
   breakout,
   brickRect,
   type BreakoutInput,
@@ -9,9 +10,9 @@ import {
 import { clearRealtimeRegistry, getRealtimeGame } from "./realtime-registry";
 import { registerBuiltInRealtimeGames } from "./realtime-games";
 
-const IDLE: BreakoutInput = { move: null };
-const LEFT: BreakoutInput = { move: "left" };
-const RIGHT: BreakoutInput = { move: "right" };
+const IDLE: BreakoutInput = { targetX: null };
+/** Target the paddle at a 0..1 fraction of the playfield width. */
+const to = (fraction: number): BreakoutInput => ({ targetX: fraction });
 
 function brickCount(state: BreakoutState): number {
   return state.bricks.filter((b) => b === 1).length;
@@ -28,33 +29,49 @@ describe("breakout module", () => {
     expect(state.ballY).toBeLessThan(BREAKOUT_WORLD.paddleY);
   });
 
-  it("moves the paddle under input and clamps it to the walls", () => {
+  it("snaps the paddle to the target fraction and clamps it to the walls", () => {
     let state = breakout.createInitialState(1);
-    const start = state.paddleX;
-    state = breakout.tick(state, RIGHT);
-    expect(state.paddleX).toBeGreaterThan(start);
+    const HALF = BREAKOUT_WORLD.paddleWidth / 2;
 
-    // Drive it hard right for many ticks — it must stop at the wall, not pass it.
-    for (let i = 0; i < 200; i += 1) state = breakout.tick(state, RIGHT);
-    expect(state.paddleX).toBeLessThanOrEqual(
-      BREAKOUT_WORLD.width - BREAKOUT_WORLD.paddleWidth / 2,
-    );
-    expect(state.paddleX).toBeCloseTo(BREAKOUT_WORLD.width - BREAKOUT_WORLD.paddleWidth / 2, 5);
+    // Position control: one tick puts the paddle centre exactly at the fraction.
+    state = breakout.tick(state, to(0.25));
+    expect(state.paddleX).toBeCloseTo(0.25 * BREAKOUT_WORLD.width, 5);
 
-    // ...and all the way left.
-    for (let i = 0; i < 200; i += 1) state = breakout.tick(state, LEFT);
-    expect(state.paddleX).toBeCloseTo(BREAKOUT_WORLD.paddleWidth / 2, 5);
+    // Beyond the edges, the whole paddle is clamped inside the walls.
+    state = breakout.tick(state, to(1.5));
+    expect(state.paddleX).toBeCloseTo(BREAKOUT_WORLD.width - HALF, 5);
+    state = breakout.tick(state, to(-0.5));
+    expect(state.paddleX).toBeCloseTo(HALF, 5);
   });
 
-  it("coasts after the last input, then stops", () => {
+  it("holds the paddle position when the target is null", () => {
     let state = breakout.createInitialState(1);
-    state = breakout.tick(state, RIGHT);
-    expect(state.paddleVX).toBeGreaterThan(0);
-    // No further input: velocity persists through the coast window, then zeroes.
-    for (let i = 0; i < BREAKOUT_WORLD.paddleCoastTicks; i += 1) {
-      state = breakout.tick(state, IDLE);
-    }
-    expect(state.paddleVX).toBe(0);
+    state = breakout.tick(state, to(0.3));
+    const held = state.paddleX;
+    state = breakout.tick(state, IDLE);
+    expect(state.paddleX).toBe(held);
+  });
+
+  it("reflects off the convex paddle: centre goes ~straight up, edges fan out", () => {
+    const speed = 2;
+    const HALF = BREAKOUT_WORLD.paddleWidth / 2;
+    const paddleX = 50;
+
+    // Dead centre → straight up (vx ~ 0), speed preserved.
+    const centre = bounceOffPaddle(paddleX, paddleX, speed);
+    expect(centre.vx).toBeCloseTo(0, 6);
+    expect(centre.vy).toBeCloseTo(-speed, 6);
+
+    // Far right edge → max fan angle to the right, still upward, same speed.
+    const right = bounceOffPaddle(paddleX + HALF, paddleX, speed);
+    const maxAngle = (BREAKOUT_WORLD.maxBounceDeg * Math.PI) / 180;
+    expect(right.vx).toBeCloseTo(speed * Math.sin(maxAngle), 6);
+    expect(right.vy).toBeLessThan(0);
+    expect(Math.hypot(right.vx, right.vy)).toBeCloseTo(speed, 6);
+
+    // Left edge mirrors the right.
+    const left = bounceOffPaddle(paddleX - HALF, paddleX, speed);
+    expect(left.vx).toBeCloseTo(-right.vx, 6);
   });
 
   it("bounces the ball off a side wall (vx flips sign)", () => {
@@ -157,11 +174,11 @@ describe("breakout module", () => {
 
   it("freezes once over — further ticks are no-ops", () => {
     const over: BreakoutState = { ...breakout.createInitialState(1), over: true };
-    expect(breakout.tick(over, RIGHT)).toBe(over);
+    expect(breakout.tick(over, to(0.9))).toBe(over);
   });
 
   it("is deterministic: same seed + inputs reproduce the run exactly", () => {
-    const inputs: BreakoutInput[] = [RIGHT, RIGHT, IDLE, LEFT, IDLE, LEFT, RIGHT, IDLE];
+    const inputs: BreakoutInput[] = [to(0.6), to(0.7), IDLE, to(0.3), IDLE, to(0.2), to(0.8), IDLE];
     const run = (): BreakoutState => {
       let s = breakout.createInitialState(24680);
       for (let i = 0; i < 300; i += 1) s = breakout.tick(s, inputs[i % inputs.length] ?? IDLE);

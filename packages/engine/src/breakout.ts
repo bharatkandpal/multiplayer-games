@@ -6,6 +6,13 @@
 // (contrast Floppy Birds' discrete flap: this is continuous paddle + ball
 // physics, MPG-075's reason to exist).
 //
+// The paddle is POSITION-controlled (MPG-121): each tick's input names the
+// target paddle centre as a 0..1 fraction of the playfield width, and the paddle
+// snaps there. A mouse/finger hovers the paddle to exactly where you point it;
+// keyboard parity feeds the same fraction, integrated at a fixed step per tick by
+// the web input source. (This replaced the old left/right nudge + coast model,
+// which lagged behind the pointer.)
+//
 // PURE, exactly like the other realtime modules: no clock, no rAF, no
 // Math.random. The only randomness is the ball's launch angle, drawn from the
 // seeded PRNG carried in state (see ./prng); every bounce is deterministic
@@ -17,15 +24,18 @@
 import { nextFloat, seedPrng, type PrngState } from "./prng";
 import type { RealtimeModule } from "./realtime";
 
-/** Per-tick input: nudge the paddle left/right, or `null` to coast this tick. */
+/**
+ * Per-tick input: the target paddle centre as a fraction of the playfield width
+ * (`0` = left wall, `1` = right wall), or `null` to hold position this tick. A
+ * fraction (not world units) keeps the input modality-neutral — pointer and
+ * keyboard both produce the same 0..1 axis, so both replay identically.
+ */
 export interface BreakoutInput {
-  readonly move: "left" | "right" | null;
+  readonly targetX: number | null;
 }
 
 export interface BreakoutState {
   readonly paddleX: number; // center x of the paddle
-  readonly paddleVX: number; // current paddle velocity (momentum between inputs)
-  readonly coast: number; // ticks the paddle keeps gliding after the last input
   readonly ballX: number;
   readonly ballY: number;
   readonly ballVX: number;
@@ -51,13 +61,18 @@ export const BREAKOUT_WORLD = {
   paddleY: 92,
   paddleWidth: 16,
   paddleHeight: 2.5,
-  paddleSpeed: 2.4, // per tick
-  paddleCoastTicks: 8, // momentum after the last directional input
   ballRadius: 1.4,
   baseBallSpeed: 1.05, // per tick, level 0
   ballSpeedRampPerLevel: 0.08, // added to speed per cleared wall
-  /** Fraction of the ball's speed the paddle can steer into horizontal motion. */
+  /** Fraction of the ball's speed the seeded launch lean can steer horizontally. */
   paddleSteer: 0.85,
+  /**
+   * Convex-paddle reflection: the curved face fans the ball out by up to this
+   * many degrees from vertical at the paddle's edges (centre → straight up).
+   * This is the "true physics of reflection" a convex bar gives — the outgoing
+   * angle tracks the surface normal at the hit point, not a flat linear steer.
+   */
+  maxBounceDeg: 60,
   cols: 8,
   rows: 5,
   brickMarginX: 4,
@@ -71,6 +86,7 @@ export const BREAKOUT_WORLD = {
 const TICK_HZ = 60;
 const HALF_PADDLE = BREAKOUT_WORLD.paddleWidth / 2;
 const BRICK_WIDTH = (BREAKOUT_WORLD.width - 2 * BREAKOUT_WORLD.brickMarginX) / BREAKOUT_WORLD.cols;
+const MAX_BOUNCE_ANGLE = (BREAKOUT_WORLD.maxBounceDeg * Math.PI) / 180;
 
 /** The x/y bounds of brick cell `index` (row-major). Pure geometry. */
 export function brickRect(index: number): {
@@ -96,6 +112,11 @@ function speedForLevel(level: number): number {
   return BREAKOUT_WORLD.baseBallSpeed + level * BREAKOUT_WORLD.ballSpeedRampPerLevel;
 }
 
+/** Clamps the paddle centre to keep the whole paddle inside the walls. */
+function clampPaddle(x: number): number {
+  return Math.max(HALF_PADDLE, Math.min(BREAKOUT_WORLD.width - HALF_PADDLE, x));
+}
+
 /**
  * Places the ball just above the paddle and launches it upward at `speed`, with
  * a seeded left/right lean so no two lives start identically. Pure: advances the
@@ -119,16 +140,21 @@ function launchBall(
   };
 }
 
-/** Reflects the ball off the paddle, steering vx by where it struck. */
-function bounceOffPaddle(
+/**
+ * Reflects the ball off the CONVEX paddle. The hit offset `t` in `[-1, 1]` (where
+ * on the face the ball struck) becomes an outgoing angle from vertical, so the
+ * centre sends the ball straight up and the edges fan it out by up to
+ * `maxBounceDeg`. Speed magnitude is preserved. This is the curved-face physics —
+ * the outgoing direction follows the paddle's surface normal at the hit point.
+ */
+export function bounceOffPaddle(
   ballX: number,
   paddleX: number,
   speed: number,
 ): { vx: number; vy: number } {
-  const offset = Math.max(-1, Math.min(1, (ballX - paddleX) / HALF_PADDLE));
-  const vx = offset * BREAKOUT_WORLD.paddleSteer * speed;
-  const vy = -Math.sqrt(Math.max(speed * speed - vx * vx, 0.0001));
-  return { vx, vy };
+  const t = Math.max(-1, Math.min(1, (ballX - paddleX) / HALF_PADDLE));
+  const angle = t * MAX_BOUNCE_ANGLE;
+  return { vx: speed * Math.sin(angle), vy: -speed * Math.cos(angle) };
 }
 
 export const breakout: RealtimeModule<BreakoutState, BreakoutInput> = {
@@ -142,8 +168,6 @@ export const breakout: RealtimeModule<BreakoutState, BreakoutInput> = {
     const launched = launchBall(paddleX, speed, seedPrng(seed));
     return {
       paddleX,
-      paddleVX: 0,
-      coast: 0,
       ballX: launched.ballX,
       ballY: launched.ballY,
       ballVX: launched.ballVX,
@@ -162,27 +186,11 @@ export const breakout: RealtimeModule<BreakoutState, BreakoutInput> = {
     // Once over, the run is frozen — ticks are a no-op (score is final).
     if (state.over) return state;
 
-    // Paddle: a directional input sets velocity and refreshes the coast timer;
-    // with no input the paddle keeps gliding until the timer runs out, so the
-    // motion stays smooth across the gaps between key-repeat events.
-    let paddleVX = state.paddleVX;
-    let coast = state.coast;
-    if (input.move === "left") {
-      paddleVX = -BREAKOUT_WORLD.paddleSpeed;
-      coast = BREAKOUT_WORLD.paddleCoastTicks;
-    } else if (input.move === "right") {
-      paddleVX = BREAKOUT_WORLD.paddleSpeed;
-      coast = BREAKOUT_WORLD.paddleCoastTicks;
-    } else if (coast > 0) {
-      coast -= 1;
-      if (coast === 0) paddleVX = 0;
-    } else {
-      paddleVX = 0;
-    }
-    const paddleX = Math.max(
-      HALF_PADDLE,
-      Math.min(BREAKOUT_WORLD.width - HALF_PADDLE, state.paddleX + paddleVX),
-    );
+    // Paddle: position control. A target (0..1 fraction of the width) snaps the
+    // paddle centre there this tick; `null` holds the current position. Direct,
+    // so the paddle sits exactly where the pointer/keys point — no momentum lag.
+    const paddleX =
+      input.targetX === null ? state.paddleX : clampPaddle(input.targetX * BREAKOUT_WORLD.width);
 
     const r = BREAKOUT_WORLD.ballRadius;
     const prevY = state.ballY;
@@ -276,8 +284,6 @@ export const breakout: RealtimeModule<BreakoutState, BreakoutInput> = {
 
     return {
       paddleX,
-      paddleVX,
-      coast,
       ballX,
       ballY,
       ballVX,

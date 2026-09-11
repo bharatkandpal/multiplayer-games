@@ -25,6 +25,9 @@ export const GAME_TITLES: Readonly<Record<string, string>> = {
   "drunk-walk": "Drunk Walk",
   "reflex-test": "Reflex Test",
   "2048": "2048",
+  // 2048 grid-size variants (MPG-096) — separate leaderboards, one shared name.
+  "2048@3": "2048 (3×3)",
+  "2048@5": "2048 (5×5)",
   breakout: "Breakout",
 };
 

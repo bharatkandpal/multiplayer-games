@@ -66,11 +66,27 @@ function draw(
     ctx.fillRect(px(x0) + 1, px(y0) + 1, px(x1 - x0) - 2, px(y1 - y0) - 2);
   }
 
-  // Paddle.
+  // Paddle — drawn with a CONVEX top face so its shape reads the way it now
+  // reflects (edges fan the ball out, centre sends it straight up). The bulge is
+  // a quadratic curve peaking above the flat base by `bulge` world units.
   const pw = px(BREAKOUT_WORLD.paddleWidth);
   const ph = px(BREAKOUT_WORLD.paddleHeight);
+  const cx = px(state.paddleX);
+  const top = px(BREAKOUT_WORLD.paddleY);
+  const left = cx - pw / 2;
+  const right = cx + pw / 2;
+  const base = top + ph;
+  const bulge = px(2.6); // how far the crown rises above the flat top edge
   ctx.fillStyle = palette.paddle;
-  ctx.fillRect(px(state.paddleX) - pw / 2, px(BREAKOUT_WORLD.paddleY), pw, ph);
+  ctx.beginPath();
+  ctx.moveTo(left, base);
+  ctx.lineTo(left, top);
+  // Convex crown: a single quadratic from the left top corner to the right,
+  // with the control point lifted above the corners so the middle bows upward.
+  ctx.quadraticCurveTo(cx, top - bulge, right, top);
+  ctx.lineTo(right, base);
+  ctx.closePath();
+  ctx.fill();
 
   // Ball. A short motion trail adds speed feel — decorative, dropped under
   // reduced motion.

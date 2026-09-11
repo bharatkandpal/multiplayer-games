@@ -4,7 +4,7 @@
 // { module, renderer }"). Kept small and mechanical: all orchestration lives in
 // the shared, engine- and renderer-agnostic `RealtimePlayScreen`.
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   breakout,
   drunkWalk,
@@ -47,6 +47,7 @@ import { REALTIME_CATALOG } from "./HomeScreen";
 import { RankPreview } from "./RankPreview";
 import { submitRealtimeScore } from "../api/leaderboard";
 import { mintResultShareUrl } from "../api/share";
+import { createActionInputSource, createPointerAxisInputSource, type InputSource } from "../game";
 import type { RunComplete } from "../game/useRealtimeLoop";
 
 /**
@@ -60,15 +61,40 @@ import type { RunComplete } from "../game/useRealtimeLoop";
 export interface RealtimeGameWiring {
   readonly module: RealtimeModule<unknown, unknown>;
   readonly renderScene: (props: RealtimeSceneProps<unknown>) => ReactNode;
-  readonly controls: RealtimeControls<unknown>;
+  /**
+   * Builds this game's input source (MPG-120). A fresh source per call — it owns
+   * mutable input state, so the route memoises one per mount. Most games use the
+   * discrete-action source; axis games (e.g. Breakout) use `pointer-axis`.
+   */
+  readonly makeInputSource: () => InputSource<unknown>;
+  /**
+   * The discrete-action config, present only for games that use the action
+   * source. Kept on the wiring for introspection/tests; axis games omit it.
+   */
+  readonly controls?: RealtimeControls<unknown>;
 }
 
+/** An action (keys/taps/buttons) game — wraps its `controls` in the action source. */
 function defineRealtimeGame<S, I, A extends string>(
   module: RealtimeModule<S, I>,
   renderScene: (props: RealtimeSceneProps<S>) => ReactNode,
   controls: RealtimeControls<I, A>,
 ): RealtimeGameWiring {
-  return { module, renderScene, controls } as unknown as RealtimeGameWiring;
+  return {
+    module,
+    renderScene,
+    controls,
+    makeInputSource: () => createActionInputSource(controls),
+  } as unknown as RealtimeGameWiring;
+}
+
+/** An axis game (pointer position + keyboard parity) — supplies its own source factory. */
+function defineRealtimeAxisGame<S, I>(
+  module: RealtimeModule<S, I>,
+  renderScene: (props: RealtimeSceneProps<S>) => ReactNode,
+  makeInputSource: () => InputSource<I>,
+): RealtimeGameWiring {
+  return { module, renderScene, makeInputSource } as unknown as RealtimeGameWiring;
 }
 
 const floppyControls: RealtimeControls<FloppyInput, "flap"> = {
@@ -150,32 +176,22 @@ const game2048Controls: RealtimeControls<Game2048Input, SwipeDir> = {
   ],
 };
 
-// Breakout is a two-action game (paddle left/right). Tap zones split the surface
-// at its midpoint (mirroring Drunk Walk), on-screen buttons give an explicit
-// touch control, and ←/→ + A/D give keyboard parity. The paddle carries momentum
-// in the engine, so it glides smoothly across the gaps between key-repeat events.
-const breakoutControls: RealtimeControls<BreakoutInput, "left" | "right"> = {
-  primaryAction: "left",
-  keyMap: {
-    ArrowLeft: "left",
-    KeyA: "left",
-    ArrowRight: "right",
-    KeyD: "right",
-  },
-  toInput: (pressed) => {
-    if (pressed.has("left")) return { move: "left" };
-    if (pressed.has("right")) return { move: "right" };
-    return { move: null };
-  },
-  actionHint: "Tap left/right (or ←/→, A/D) to move the paddle",
-  readyExplainer:
-    "Bounce the ball into the bricks to clear them. Where the ball hits the paddle steers where it goes. Miss the ball and you lose a life — you have three.",
-  resolveTapAction: (fractionX) => (fractionX < 0.5 ? "left" : "right"),
-  touchActions: [
-    { action: "left", label: "◀ Left" },
-    { action: "right", label: "Right ▶" },
-  ],
-};
+// Breakout is POSITION-controlled (MPG-121): the paddle tracks the pointer
+// directly — mouse hover or touch drag — with arrow/A-D keyboard parity. This
+// fixed the lag of the old left/right nudge. The pointer x-fraction becomes the
+// paddle's target; the engine's convex face does the reflection steering.
+const BREAKOUT_KEY_STEP = 0.02; // ~0.8s to traverse the field on the keyboard
+function makeBreakoutInputSource(): InputSource<BreakoutInput> {
+  return createPointerAxisInputSource<BreakoutInput>({
+    toInput: (axis) => ({ targetX: axis }),
+    axis: "x",
+    keyStepPerTick: BREAKOUT_KEY_STEP,
+    hint: "Move the mouse or drag to steer the paddle (or ←/→, A/D)",
+    readyExplainer:
+      "Bounce the ball into the bricks to clear them. The paddle's curved face steers the ball — hit near an edge to angle it, dead centre to send it straight up. Miss and you lose a life; you have three.",
+    label: "Mouse & keys",
+  });
+}
 
 /**
  * The real-time catalog. `Partial` like the turn-based `GAME_CATALOG`:
@@ -203,10 +219,10 @@ export const REALTIME_GAMES: Partial<Record<RealtimeGameId, RealtimeGameWiring>>
     (props) => <Game2048Scene {...props} />,
     game2048Controls,
   ),
-  breakout: defineRealtimeGame<BreakoutState, BreakoutInput, "left" | "right">(
+  breakout: defineRealtimeAxisGame<BreakoutState, BreakoutInput>(
     breakout,
     (props) => <BreakoutScene {...props} />,
-    breakoutControls,
+    makeBreakoutInputSource,
   ),
 };
 
@@ -330,7 +346,12 @@ export function RealtimeGameRoute({
   );
   const [menuOpen, setMenuOpen] = useState(false);
   const wiring = REALTIME_GAMES[gameId];
-  if (!wiring) return null;
+  // This game's input source (MPG-120). Built once per game: a source owns mutable
+  // input state (the action source's pressed set, the pointer source's axis ref),
+  // so it must be stable across the screen's re-renders. `wiring` is a stable
+  // module-level reference, so the memo recomputes only when the game changes.
+  const inputSource = useMemo(() => (wiring ? wiring.makeInputSource() : null), [wiring]);
+  if (!wiring || !inputSource) return null;
 
   const title = REALTIME_CATALOG[gameId]?.title ?? gameId;
 
@@ -352,11 +373,11 @@ export function RealtimeGameRoute({
     };
     return (
       <>
-        <RealtimePlayScreen<DrunkWalkState, DrunkWalkInput, "left" | "right">
+        <RealtimePlayScreen<DrunkWalkState, DrunkWalkInput>
           module={drunkWalk}
           gameTitle={title}
           seed={seed}
-          controls={drunkWalkControls}
+          inputSource={inputSource as InputSource<DrunkWalkInput>}
           renderScene={(props) => <DrunkWalkScene {...props} character={character} />}
           onExit={onExit}
           onRunComplete={onRunComplete}
@@ -388,7 +409,7 @@ export function RealtimeGameRoute({
       module={wiring.module}
       gameTitle={title}
       seed={seed}
-      controls={wiring.controls}
+      inputSource={inputSource}
       renderScene={wiring.renderScene}
       onExit={onExit}
       onRunComplete={onRunComplete}

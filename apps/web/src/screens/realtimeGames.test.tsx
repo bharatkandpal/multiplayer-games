@@ -77,7 +77,9 @@ describe("REALTIME_GAMES wiring map", () => {
     expect(wiring!.module).toBe(floppyBirds);
     expect(wiring!.module.id).toBe("floppy-birds");
     expect(typeof wiring!.renderScene).toBe("function");
-    expect(wiring!.controls.primaryAction).toBe("flap");
+    expect(wiring!.controls!.primaryAction).toBe("flap");
+    // Action games build the discrete-action source.
+    expect(wiring!.makeInputSource().id).toBe("actions");
   });
 
   it("resolves 'drunk-walk' to the real engine module + a renderer + tap-zone controls", () => {
@@ -87,17 +89,26 @@ describe("REALTIME_GAMES wiring map", () => {
     expect(wiring!.module.id).toBe("drunk-walk");
     expect(typeof wiring!.renderScene).toBe("function");
     // Left/right tap-zone resolution, not a single fixed primary action.
-    expect(typeof wiring!.controls.resolveTapAction).toBe("function");
-    const resolve = wiring!.controls.resolveTapAction!;
+    expect(typeof wiring!.controls!.resolveTapAction).toBe("function");
+    const resolve = wiring!.controls!.resolveTapAction!;
     expect(resolve(0.1)).toBe("left");
     expect(resolve(0.9)).toBe("right");
     // Keyboard parity: arrows AND A/D map to the same left/right actions.
-    expect(wiring!.controls.keyMap.ArrowLeft).toBe("left");
-    expect(wiring!.controls.keyMap.KeyA).toBe("left");
-    expect(wiring!.controls.keyMap.ArrowRight).toBe("right");
-    expect(wiring!.controls.keyMap.KeyD).toBe("right");
+    expect(wiring!.controls!.keyMap.ArrowLeft).toBe("left");
+    expect(wiring!.controls!.keyMap.KeyA).toBe("left");
+    expect(wiring!.controls!.keyMap.ArrowRight).toBe("right");
+    expect(wiring!.controls!.keyMap.KeyD).toBe("right");
     // A rules explainer is offered — the mechanic isn't a trivial "tap to act".
-    expect(wiring!.controls.readyExplainer).toBeTruthy();
+    expect(wiring!.controls!.readyExplainer).toBeTruthy();
+  });
+
+  it("resolves 'breakout' to a pointer-axis (position-controlled) source", () => {
+    const wiring = REALTIME_GAMES["breakout"];
+    expect(wiring).toBeDefined();
+    expect(wiring!.module.id).toBe("breakout");
+    // Position control, not discrete actions — the paddle tracks the pointer.
+    expect(wiring!.controls).toBeUndefined();
+    expect(wiring!.makeInputSource().id).toBe("pointer-axis");
   });
 });
 
