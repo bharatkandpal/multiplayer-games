@@ -39,6 +39,7 @@ import { RankPreview } from "./RankPreview";
 import { submitRealtimeScore } from "../api/leaderboard";
 import { mintResultShareUrl } from "../api/share";
 import type { RunComplete } from "../game/useRealtimeLoop";
+import { recordPersonalBest } from "../game/personalBest";
 
 /**
  * One row of real-time wiring — the behavioral half (module + renderer +
@@ -216,6 +217,10 @@ function useSettledRun(): {
   const [shareToken, setShareToken] = useState<string | undefined>(undefined);
 
   const onRunComplete = (result: RunComplete<unknown>): void => {
+    // Local first, and synchronously: the Home personal-best chip must reflect
+    // the run the player just finished even if the score submission never
+    // reaches the server. This write touches no network and cannot throw.
+    recordPersonalBest(result.gameId, result.score);
     setRun((prev) => ({ ...prev, settled: false }));
     setShareToken(undefined);
     void submitRun(result).then(async (resultId) => {
