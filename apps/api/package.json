@@ -1,0 +1,21 @@
+{
+  "name": "@mpg/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Serverless HTTP API (Vercel functions): the stateless endpoints (sessions, leaderboard, results, share, events) from @mpg/server, backed by Neon. Rooms + Socket.IO stay on the long-running @mpg/server container.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "test:fast": "vitest run --passWithNoTests",
+    "dev": "vercel dev",
+    "build": "echo \"[@mpg/api] built by Vercel\""
+  },
+  "dependencies": {
+    "@mpg/engine": "workspace:*",
+    "@mpg/server": "workspace:*"
+  },
+  "devDependencies": {
+    "@vercel/node": "^5.0.0"
+  }
+}

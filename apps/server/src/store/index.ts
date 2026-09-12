@@ -32,12 +32,13 @@ export async function createStore(): Promise<Store> {
   const dbUrl = process.env["DATABASE_URL"];
 
   if (dbUrl) {
-    const { createSql } = await import("../db/connection.js");
-    const { createDatabase } = await import("../db/drizzle.js");
+    // Driver (Neon serverless vs postgres.js) is chosen from the environment —
+    // see `db/index.ts`. The store repos are driver-agnostic, so this is the
+    // only place the choice is made.
+    const { createDatabaseFromEnv } = await import("../db/index.js");
     const { createPgStore } = await import("./pg/index.js");
 
-    const sql = createSql();
-    const db = createDatabase(sql);
+    const db = await createDatabaseFromEnv();
     return createPgStore(db);
   }
 

@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit -p tsconfig.json && vite build",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.api.json",
     "test": "vitest run --passWithNoTests",
     "test:fast": "vitest run --passWithNoTests",
     "dev": "vite",
@@ -22,8 +22,10 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.6",
+    "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "@vercel/node": "^5.0.0",
     "@vitejs/plugin-react": "^6.1.0",
     "jsdom": "^30.0.1",
     "vite": "^8.2.2"
