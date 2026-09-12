@@ -118,52 +118,38 @@
   line-height: 1;
 }
 
-/* MPG-050: secondary "play again vs a different opponent" group — visually
-   subordinate to the primary Rematch action above it. */
-.playAgainGroup {
+/* The two secondary "where to next" actions on one row (MPG-050): swap
+   opponent and leave to the next game, side by side so both stay on screen
+   without scrolling past the finished board on mobile. Subordinate to the
+   primary Rematch above. The buttons share the row equally and wrap only when
+   the viewport is too narrow to fit them. */
+.endActions {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-/* Sits below the same-game actions (Rematch / play again vs…): moving on to a
-   different game is a deliberate step away, so it reads after them. A
-   hairline + top padding (rather than just `.resultActions`'s flex `gap`)
-   visually separates it from `.playAgainGroup` right above — without it,
-   "Next game" (ghost) sat close enough under "or play again vs…" that it
-   read as a third option in that group instead of an unrelated action. */
-.nextGameRow {
-  display: flex;
+  flex-wrap: wrap;
   justify-content: center;
+  gap: var(--space-2);
   width: 100%;
   max-width: 20rem;
   padding-top: var(--space-3);
   border-top: var(--border-width-hairline) solid var(--color-border);
 }
 
-/* MPG-131: the share affordance sits below the "play again" options — it's the
-   optional brag on top of a finished game, never the primary action, and it
+.endAction {
+  flex: 1 1 0;
+  /* Keep each button legible before the row wraps on very narrow screens. */
+  min-width: 8rem;
+}
+
+/* MPG-131: the share affordance sits below the "where to next" options — it's
+   the optional brag on top of a finished game, never the primary action, and it
    appears a beat late (the link is minted after the result persists). Sized to
-   the same 20rem column as `.nextGameRow` so its arrival doesn't widen the
+   the same 20rem column as `.endActions` so its arrival doesn't widen the
    actions block. */
 .shareRow {
   display: flex;
   justify-content: center;
   width: 100%;
   max-width: 20rem;
-}
-
-.playAgainLabel {
-  font-size: var(--font-size-200);
-  color: var(--color-text-muted);
-}
-
-.playAgainButtons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-2);
 }
 
 /* MPG-015: online rematch negotiation state, shown under the Rematch button

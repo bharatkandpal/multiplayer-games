@@ -9,6 +9,8 @@
 
 import type { Difficulty, GameId } from "@mpg/engine";
 
+import { pickBotName } from "./botNames.js";
+
 export interface HumanSeatConfig {
   readonly kind: "human";
 }
@@ -16,6 +18,13 @@ export interface HumanSeatConfig {
 export interface BotSeatConfig {
   readonly kind: "bot";
   readonly difficulty: Difficulty;
+  /**
+   * A display name from the fixed bot roster (see `botNames.ts`), assigned when
+   * the seat is created for real play so the opponent reads as a named
+   * character. Optional: hand-built configs (mostly tests) leave it unset and
+   * fall back to the generic "Bot" in {@link describeSeat}.
+   */
+  readonly name?: string;
 }
 
 export type SeatConfig = HumanSeatConfig | BotSeatConfig;
@@ -82,9 +91,32 @@ export function botDifficultyFor(gameId?: string): Difficulty {
  */
 export function createDefaultSeats(seatCount = 2, gameId?: string): SeatsConfig {
   const difficulty = botDifficultyFor(gameId);
-  return Array.from({ length: seatCount }, (_, index) =>
-    index === 0 ? { kind: "human" } : { kind: "bot", difficulty },
+  return assignBotNames(
+    Array.from({ length: seatCount }, (_, index) =>
+      index === 0 ? { kind: "human" } : { kind: "bot", difficulty },
+    ),
   );
+}
+
+/**
+ * Give every bot seat that lacks one a distinct name from the roster (see
+ * `botNames.ts`), leaving already-named bots and all human seats untouched.
+ * Applied wherever real-play seats are built (defaults, presets, the Setup
+ * toggle) so a bot is always a named character on screen; hand-built configs
+ * that skip this stay anonymous "Bot"s. `rng` is injectable for deterministic
+ * tests.
+ */
+export function assignBotNames(seats: SeatsConfig, rng: () => number = Math.random): SeatsConfig {
+  const used = new Set<string>();
+  for (const seat of seats) {
+    if (seat.kind === "bot" && seat.name) used.add(seat.name);
+  }
+  return seats.map((seat) => {
+    if (seat.kind !== "bot" || seat.name) return seat;
+    const name = pickBotName(used, rng);
+    used.add(name);
+    return { ...seat, name };
+  });
 }
 
 /**
@@ -132,6 +164,7 @@ export function describeSeat(seats: SeatsConfig, seatIndex: number): string {
     throw new Error(`describeSeat: no seat at index ${seatIndex} (${seats.length} seat(s) total)`);
   }
   if (seat.kind === "bot") {
+    if (seat.name) return seat.name;
     const botCount = seats.filter((s) => s.kind === "bot").length;
     return botCount === 1 ? "Bot" : `Bot (Player ${seatIndex + 1})`;
   }

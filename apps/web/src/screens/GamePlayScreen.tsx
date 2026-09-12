@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { DrawReason, GameModule, Player, Result } from "@mpg/engine";
 import {
   BackArrowIcon,
@@ -439,7 +439,6 @@ export function GamePlayScreenView<S, M, L = unknown>({
   const playAgainPresets: readonly OpponentPreset[] = (["bot", "human"] as const).filter(
     (preset) => !sameSeatKinds(presetSeats(preset, seats.length), seats),
   );
-  const playAgainHeadingId = useId();
 
   // MPG-044: the result banner is inline (no modal to dismiss before the
   // board is visible), so on game-over move focus straight to Rematch — the
@@ -466,6 +465,8 @@ export function GamePlayScreenView<S, M, L = unknown>({
       key={indexInSeats}
       seatIndex={indexInSeats}
       kind={seat.kind}
+      // A bot shows its roster name; humans keep the positional "Player N".
+      name={seat.kind === "bot" ? seat.name : undefined}
       active={!isGameOver && turnSeatIndex === indexInSeats}
       thinking={thinkingSeatIndex === indexInSeats}
       winner={winnerSeatIndex === indexInSeats}
@@ -600,44 +601,39 @@ export function GamePlayScreenView<S, M, L = unknown>({
             </>
           ) : null}
 
-          {onPlayAgain && playAgainPresets.length > 0 ? (
-            <div
-              className={styles.playAgainGroup}
-              role="group"
-              aria-labelledby={playAgainHeadingId}
-            >
-              <span id={playAgainHeadingId} className={styles.playAgainLabel}>
-                or play again vs…
-              </span>
-              <div className={styles.playAgainButtons}>
-                {playAgainPresets.map((preset) => {
-                  const { icon, label } = PLAY_AGAIN_PRESET_COPY[preset];
-                  return (
-                    <Button
-                      key={preset}
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => onPlayAgain(presetSeats(preset, seats.length, gameId))}
-                    >
-                      <span aria-hidden="true">{icon}</span> {label}
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
+          {/* The two "where to next" actions on one row, side by side, so both
+              are reachable on a phone without scrolling past the finished board:
+              swap opponent ("Play a friend"/"Play vs Bot") and leave to the next
+              game. Rematch stays the primary action above; these are the
+              secondary paths. Wraps to two lines only on the very narrowest
+              viewports. */}
+          {(onPlayAgain && playAgainPresets.length > 0) || onNextGame ? (
+            <div className={styles.endActions} role="group" aria-label="Play again or move on">
+              {onPlayAgain
+                ? playAgainPresets.map((preset) => {
+                    const { icon, label } = PLAY_AGAIN_PRESET_COPY[preset];
+                    return (
+                      <Button
+                        key={preset}
+                        variant="secondary"
+                        size="sm"
+                        className={styles.endAction}
+                        onClick={() => onPlayAgain(presetSeats(preset, seats.length, gameId))}
+                      >
+                        <span aria-hidden="true">{icon}</span> {label}
+                      </Button>
+                    );
+                  })
+                : null}
 
-          {onNextGame ? (
-            <div className={styles.nextGameRow}>
-              {/* `ghost` (not `secondary`) deliberately: "Next game" sits
-                  right under the "or play again vs…" group, which also uses
-                  `secondary` buttons — matching that style made it read as a
-                  third same-game option instead of the unrelated "leave to a
-                  different game" action it actually is. The divider above
-                  (`.nextGameRow`) does the rest of that separation. */}
-              <Button variant="ghost" onClick={onNextGame}>
-                Next game <span aria-hidden="true">›</span>
-              </Button>
+              {onNextGame ? (
+                // `ghost` (not `secondary`) deliberately: "Next game" is the
+                // unrelated "leave to a different game" action, not a third
+                // same-game option — the lighter weight keeps that distinction.
+                <Button variant="ghost" size="sm" className={styles.endAction} onClick={onNextGame}>
+                  Next game <span aria-hidden="true">›</span>
+                </Button>
+              ) : null}
             </div>
           ) : null}
 

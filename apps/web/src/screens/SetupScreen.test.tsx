@@ -30,7 +30,7 @@ describe("SetupScreen", () => {
 
     expect(onStart).toHaveBeenCalledExactlyOnceWith([
       { kind: "human" },
-      { kind: "bot", difficulty: "medium" },
+      expect.objectContaining({ kind: "bot", difficulty: "medium" }),
     ] satisfies SeatsConfig);
   });
 
@@ -74,7 +74,7 @@ describe("SetupScreen", () => {
 
     expect(onStart).toHaveBeenCalledExactlyOnceWith([
       { kind: "human" },
-      { kind: "bot", difficulty: "hard" },
+      expect.objectContaining({ kind: "bot", difficulty: "hard" }),
     ] satisfies SeatsConfig);
   });
 
@@ -93,8 +93,8 @@ describe("SetupScreen", () => {
     await user.click(screen.getByRole("button", { name: "Start game" }));
     // Both seats are bots now; tictactoe is capped at medium so it stays winnable.
     expect(onStart).toHaveBeenCalledExactlyOnceWith([
-      { kind: "bot", difficulty: "medium" },
-      { kind: "bot", difficulty: "medium" },
+      expect.objectContaining({ kind: "bot", difficulty: "medium" }),
+      expect.objectContaining({ kind: "bot", difficulty: "medium" }),
     ] satisfies SeatsConfig);
   });
 
@@ -107,7 +107,7 @@ describe("SetupScreen", () => {
 
     expect(onStart).toHaveBeenCalledExactlyOnceWith([
       { kind: "human" },
-      { kind: "bot", difficulty: "hard" },
+      expect.objectContaining({ kind: "bot", difficulty: "hard" }),
     ] satisfies SeatsConfig);
   });
 
@@ -175,7 +175,7 @@ describe("SetupScreen", () => {
       // tictactoe's bot is capped at medium (see `botDifficultyFor`).
       expect(onPlayOnline).toHaveBeenCalledExactlyOnceWith([
         { kind: "human" },
-        { kind: "bot", difficulty: "medium" },
+        expect.objectContaining({ kind: "bot", difficulty: "medium" }),
       ] satisfies SeatsConfig);
     });
 
@@ -204,8 +204,8 @@ describe("SetupScreen", () => {
       await user.click(watchButton);
 
       expect(onPlayOnline).toHaveBeenCalledExactlyOnceWith([
-        { kind: "bot", difficulty: "medium" },
-        { kind: "bot", difficulty: "medium" },
+        expect.objectContaining({ kind: "bot", difficulty: "medium" }),
+        expect.objectContaining({ kind: "bot", difficulty: "medium" }),
       ] satisfies SeatsConfig);
     });
 

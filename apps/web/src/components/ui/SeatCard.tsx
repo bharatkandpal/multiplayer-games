@@ -9,6 +9,11 @@ export interface SeatCardProps {
   seatIndex: number;
   /** Whether this seat is a human or a bot — shown as an avatar emoji (🤖 / 👤). */
   kind: SeatCardKind;
+  /**
+   * Optional display name (e.g. a bot's roster name) shown in place of the
+   * default "Player N". Omit to keep the positional label.
+   */
+  name?: string | undefined;
   /** True when it's currently this seat's turn — the primary turn-ownership signal. */
   active: boolean;
   /**
@@ -39,6 +44,7 @@ export interface SeatCardProps {
 export function SeatCard({
   seatIndex,
   kind,
+  name,
   active,
   thinking = false,
   winner = false,
@@ -73,7 +79,7 @@ export function SeatCard({
         {active && thinking ? <span className={styles.spinner} aria-hidden="true" /> : null}
       </span>
       <span className={styles.info}>
-        <span className={styles.name}>Player {seatIndex + 1}</span>
+        <span className={styles.name}>{name ?? `Player ${seatIndex + 1}`}</span>
       </span>
       {/*
         MPG-051: the crown emoji above is purely decorative (aria-hidden) — it
