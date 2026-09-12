@@ -501,3 +501,57 @@ describe("RealtimePlayScreen — game-over share (MPG-087)", () => {
     expect(field).toHaveValue("https://example.test/floppy-birds");
   });
 });
+
+describe("RealtimePlayScreen — challenge to beat (MPG-087)", () => {
+  function startRun(): void {
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    primeClock();
+  }
+
+  it("shows NO challenge chrome for an ordinary solo run (no target given)", () => {
+    renderScreen();
+    startRun();
+    advanceTicks(OVER_TICKS);
+    expect(screen.queryByText("Target")).not.toBeInTheDocument();
+    expect(screen.queryByText(/beat the challenge|to beat|matched/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Game over")).toBeInTheDocument();
+  });
+
+  it("shows a live Target readout before it is passed", () => {
+    renderScreen({ challengeTarget: 1 });
+    startRun();
+    // Score 0 (< target 1): the chip reads Target, not Passed.
+    expect(screen.getByText("Target")).toBeInTheDocument();
+    expect(screen.queryByText("Passed")).not.toBeInTheDocument();
+  });
+
+  it("flips to Passed and announces once when the score crosses the target", () => {
+    renderScreen({ challengeTarget: 1 });
+    startRun();
+    // +1 per idle tick: after 2 ticks score is 2 > 1 → passed.
+    advanceTicks(2);
+    expect(screen.getByText("Passed")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/passed the target score of 1/i);
+  });
+
+  it("GAME-OVER (beat): 'you won the challenge' verdict", () => {
+    renderScreen({ challengeTarget: 1 });
+    startRun();
+    advanceTicks(OVER_TICKS); // final score 3 > 1
+
+    expect(screen.getByText("You won the challenge!")).toBeInTheDocument();
+    // Exact string targets the visible verdict <p>; a regex would also match the
+    // (longer) hidden live-region announcement that embeds the same phrase.
+    expect(screen.getByText("You beat the challenge — topped 1 by 2.")).toBeInTheDocument();
+  });
+
+  it("GAME-OVER (fell short): a 'so close' verdict, not a win", () => {
+    renderScreen({ challengeTarget: 100 });
+    startRun();
+    advanceTicks(OVER_TICKS); // final score 3 < 100
+
+    expect(screen.getByText("Game over")).toBeInTheDocument();
+    expect(screen.queryByText("You won the challenge!")).not.toBeInTheDocument();
+    expect(screen.getByText("So close — 100 to beat.")).toBeInTheDocument();
+  });
+});

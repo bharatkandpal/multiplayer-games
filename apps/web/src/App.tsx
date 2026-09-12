@@ -71,7 +71,10 @@ type Route =
   | { screen: "play"; gameId: GameId; seats: SeatsConfig }
   // Real-time (solo arcade) games skip Setup entirely — nothing to configure
   // for a solo run — and go straight to the realtime play surface (ADR 0002 §2).
-  | { screen: "realtime"; gameId: RealtimeGameId }
+  // MPG-087: `challenge` carries a score to beat when the player arrived from a
+  // friend's shared result via "Beat this score" — the realtime play surface
+  // shows it as a target and turns the result into "you beat the challenge".
+  | { screen: "realtime"; gameId: RealtimeGameId; challenge?: { score: number } }
   | { screen: "gallery" }
   // MPG-012: the room creator waits here for the invite link to be opened.
   | { screen: "invite"; gameId: GameId; roomId: string; inviteUrl: string }
@@ -98,6 +101,7 @@ type Route =
 
 const ROOM_PATH_RE = /^\/([^/]+)\/room\/([^/]+)\/?$/;
 const SHARE_PATH_RE = /^\/s\/([^/]+)\/?$/;
+const GAME_SLUG_RE = /^\/([^/]+)\/?$/;
 
 /** Parses `/s/:token` out of a pathname (MPG-056). */
 function parseSharePath(pathname: string): string | undefined {
@@ -115,6 +119,35 @@ function parseRoomPath(pathname: string): { gameId: GameId; roomId: string } | u
   return { gameId: gameId as GameId, roomId: decodeURIComponent(roomId) };
 }
 
+/**
+ * Parses a bare `/:gameId` deep link into the route that OPENS that game
+ * (MPG-087). This is the destination the shared score link points at when no
+ * durable `/s/:token` could be minted (the offline / backend-down fallback in
+ * `buildShareUrl`): "here's the game" has to actually land IN the game, not on
+ * Home. It needs no session and no network — a real-time game goes straight to
+ * its solo play surface; a turn-based game opens quick-started against the bot,
+ * exactly as tapping it on Home would. Returns `undefined` for anything that
+ * isn't a registered game id, so unknown single-segment paths still fall to Home.
+ */
+function parseGameSlug(pathname: string): Route | undefined {
+  const match = GAME_SLUG_RE.exec(pathname);
+  const slug = match?.[1];
+  if (!slug) return undefined;
+  const gameId = decodeURIComponent(slug);
+  if (hasRealtimeGame(gameId as RealtimeGameId)) {
+    return { screen: "realtime", gameId: gameId as RealtimeGameId };
+  }
+  if (hasGame(gameId as GameId)) {
+    const playerCount = GAME_CATALOG[gameId as GameId]?.playerCount ?? 2;
+    return {
+      screen: "play",
+      gameId: gameId as GameId,
+      seats: presetSeats("bot", playerCount, gameId),
+    };
+  }
+  return undefined;
+}
+
 function initialRoute(): Route {
   if (typeof window === "undefined") return { screen: "home" };
   // A share link is checked FIRST: it is the one entry point reached by people
@@ -127,7 +160,17 @@ function initialRoute(): Route {
     return { screen: "shared", token: shareToken };
   }
   const parsed = parseRoomPath(window.location.pathname);
-  if (!parsed) return { screen: "home" };
+  if (!parsed) {
+    // A bare `/:gameId` deep link — the fallback a shared score link uses when
+    // no durable `/s/:token` exists. Open the game directly (and count the
+    // cold arrival, same as a share link: a stranger can land here too).
+    const slugRoute = parseGameSlug(window.location.pathname);
+    if (slugRoute) {
+      markColdArrival();
+      return slugRoute;
+    }
+    return { screen: "home" };
+  }
   // MPG-025: a reload of this tab's own all-bot watch room — its creator
   // credential (persisted the moment the room was created, see `useRoom`'s
   // `createRoom`) is how we tell "this is the room I'm watching" apart from
@@ -359,11 +402,13 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     const onPopState = (): void => {
       const parsed = parseRoomPath(window.location.pathname);
-      setRoute(
-        parsed
-          ? { screen: "join", gameId: parsed.gameId, roomId: parsed.roomId }
-          : { screen: "home" },
-      );
+      if (parsed) {
+        setRoute({ screen: "join", gameId: parsed.gameId, roomId: parsed.roomId });
+        return;
+      }
+      // Keep bare `/:gameId` deep links working under back/forward too, not just
+      // on a cold load (mirrors `initialRoute`).
+      setRoute(parseGameSlug(window.location.pathname) ?? { screen: "home" });
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -544,10 +589,13 @@ export default function App(): React.JSX.Element {
         <>
           <GameSwitcher items={gameItems} currentId={route.gameId} onSwitch={quickStart} />
           <RealtimeGameRoute
-            key={route.gameId}
+            // Keyed on the challenge too so arriving on a target (or switching
+            // off one) remounts to a clean run rather than reusing loop state.
+            key={`${route.gameId}:${route.challenge?.score ?? ""}`}
             gameId={route.gameId}
             onExit={() => setRoute({ screen: "home" })}
             onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
+            {...(route.challenge ? { challenge: route.challenge } : {})}
           />
         </>
       ) : null}
@@ -556,12 +604,22 @@ export default function App(): React.JSX.Element {
         <SharedResultScreen
           token={route.token}
           onBackHome={goHome}
-          onPlayGame={(gameId) => {
+          onPlayGame={(gameId, challengeScore) => {
             // The shared game may be from either family, so resolve it through
             // the same ordered catalog Home uses rather than guessing.
             const item = gameItems.find((candidate) => candidate.id === gameId);
-            if (item) quickStart(item);
-            else goHome();
+            if (!item) {
+              goHome();
+              return;
+            }
+            // A "Beat this score" arrival (MPG-087): only real-time games are
+            // scored, so a challenge routes straight to the realtime surface
+            // with the target. Anything else just opens the game normally.
+            if (typeof challengeScore === "number" && item.kind === "realtime") {
+              setRoute({ screen: "realtime", gameId: item.id, challenge: { score: challengeScore } });
+              return;
+            }
+            quickStart(item);
           }}
           onViewLeaderboard={(gameId) =>
             setRoute({ screen: "leaderboard", gameId: gameId as GameId | RealtimeGameId })

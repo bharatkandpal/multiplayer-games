@@ -45,6 +45,9 @@
 .statusRow {
   display: flex;
   align-items: center;
+  /* Wrap so the Score + Target (challenge, MPG-087) badges and Pause never
+     overflow the row at 320px with a large score — they stack instead. */
+  flex-wrap: wrap;
   gap: var(--space-3);
   min-height: var(--space-8);
   margin-bottom: var(--space-4);
@@ -163,6 +166,64 @@
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-300);
+}
+
+/* Challenge (MPG-087): the mid-run "you passed the target" flash. Centered over
+   the scene, brief, and purely decorative — it is aria-hidden and not rendered
+   at all under reduced motion (the chip + announcement carry the fact). */
+.passFlash {
+  position: absolute;
+  inset-inline: 0;
+  top: 18%;
+  margin-inline: auto;
+  width: max-content;
+  max-width: 90%;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  /* The design system's contrast-verified success pairing (tokens.css:
+     4.65:1 light, 9.63:1 dark) — theme-aware, unlike a hardcoded green + white. */
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+  border: 1px solid color-mix(in srgb, var(--color-success) 40%, transparent);
+  font-family: var(--font-family-display);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-400);
+  letter-spacing: var(--letter-spacing-display);
+  pointer-events: none;
+  animation: passFlash 1600ms ease-out both;
+}
+
+@keyframes passFlash {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) translateY(0.5rem);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  75% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1) translateY(-0.75rem);
+  }
+}
+
+/* The game-over challenge verdict line. The winning case takes the success hue
+   and a touch more weight; the near-miss case stays in the muted result voice. */
+.verdict {
+  margin: 0;
+  font-size: var(--font-size-300);
+  color: var(--color-text-muted);
+}
+
+.verdictWon {
+  /* `-text`, not `--color-success` (a fill) — this is text on the overlay bg. */
+  color: var(--color-success-text);
+  font-weight: var(--font-weight-bold);
 }
 
 .playAgainIcon {

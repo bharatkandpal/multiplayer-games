@@ -241,4 +241,80 @@ describe("MPG-056: a durable share link is its own entry point", () => {
     fireEvent.click(screen.getByRole("button", { name: "Browse games" }));
     expect(screen.getByRole("list", { name: "Featured games" })).toBeInTheDocument();
   });
+
+  // MPG-087: a scored shared result is a challenge. "Beat this score" drops the
+  // visitor into that game with the sharer's score set as the live Target.
+  it("'Beat this score' opens the game with the shared score as the Target", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          kind: "result",
+          result: {
+            gameId: "floppy-birds",
+            gameFamily: "realtime",
+            status: "complete",
+            score: 42,
+            winnerSlot: null,
+            seatsSnapshot: null,
+            durationMs: null,
+            createdAt: "2026-09-09T00:00:00.000Z",
+          },
+        }),
+      }),
+    );
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Beat this score" }));
+
+    // Landed in the game (not Home), with the challenge target shown.
+    expect(screen.getByRole("application", { name: /Floppy Birds play area/ })).toBeInTheDocument();
+    expect(screen.getByText("Target")).toBeInTheDocument();
+    expect(screen.getByText("42")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Featured games" })).not.toBeInTheDocument();
+  });
+});
+
+// MPG-087: the share fallback (`buildShareUrl`) points at a bare `/:gameId`
+// whenever no durable `/s/:token` could be minted (offline / backend down).
+// That link must OPEN the game — landing on Home would be the 404-equivalent
+// bug this closes — and it must do so with no session and no network.
+describe("MPG-087: a bare /:gameId deep link opens the game (share fallback)", () => {
+  afterEach(() => {
+    window.history.pushState({}, "", "/");
+    vi.restoreAllMocks();
+  });
+
+  it("opens a real-time game straight onto its play surface, not Home", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    window.history.pushState({}, "", "/floppy-birds");
+
+    render(<App />);
+
+    expect(
+      screen.getByRole("application", { name: /Floppy Birds play area/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Featured games" })).not.toBeInTheDocument();
+  });
+
+  it("opens a turn-based game onto a live board, not Home", () => {
+    window.history.pushState({}, "", "/tictactoe");
+
+    render(<App />);
+
+    expect(screen.getByRole("grid", { name: /Tic-Tac-Toe board/i })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Featured games" })).not.toBeInTheDocument();
+  });
+
+  it("an unknown single-segment path still falls through to Home", () => {
+    window.history.pushState({}, "", "/not-a-game");
+
+    render(<App />);
+
+    expect(screen.getByRole("list", { name: "Featured games" })).toBeInTheDocument();
+  });
 });
