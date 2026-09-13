@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { BOT_NAMES } from "./botNames";
 import {
   DEFAULT_BOT_DIFFICULTY,
+  assignBotNames,
   botDifficultyFor,
   createDefaultSeats,
   describeSeat,
@@ -9,19 +11,27 @@ import {
 } from "./seatConfig";
 
 describe("seatConfig — N-seat-generic (MPG-024)", () => {
-  it("createDefaultSeats() defaults to 2 seats: human vs. bot", () => {
+  it("createDefaultSeats() defaults to 2 seats: human vs. a named bot", () => {
     const seats = createDefaultSeats();
     expect(seats).toHaveLength(2);
     expect(seats[0]).toEqual({ kind: "human" });
-    expect(seats[1]).toEqual({ kind: "bot", difficulty: DEFAULT_BOT_DIFFICULTY });
+    expect(seats[1]).toEqual(
+      expect.objectContaining({ kind: "bot", difficulty: DEFAULT_BOT_DIFFICULTY }),
+    );
+    // Every real-play bot carries a roster name (cosmetic; not difficulty).
+    expect(seats[1]).toHaveProperty("name");
+    expect(BOT_NAMES).toContain((seats[1] as { name: string }).name);
   });
 
-  it("createDefaultSeats(3) yields 3 seats: one human, two bots", () => {
+  it("createDefaultSeats(3) yields 3 seats: one human, two distinctly-named bots", () => {
     const seats = createDefaultSeats(3);
     expect(seats).toHaveLength(3);
     expect(seats[0]).toEqual({ kind: "human" });
-    expect(seats[1]).toEqual({ kind: "bot", difficulty: DEFAULT_BOT_DIFFICULTY });
-    expect(seats[2]).toEqual({ kind: "bot", difficulty: DEFAULT_BOT_DIFFICULTY });
+    const bot1 = seats[1] as { kind: "bot"; name: string };
+    const bot2 = seats[2] as { kind: "bot"; name: string };
+    expect(bot1.name).not.toBe(bot2.name); // two bots never share a name
+    expect(BOT_NAMES).toContain(bot1.name);
+    expect(BOT_NAMES).toContain(bot2.name);
   });
 
   it("createDefaultSeats(1) yields a single human seat", () => {
@@ -35,15 +45,33 @@ describe("seatConfig — N-seat-generic (MPG-024)", () => {
     expect(describeSeat(seats, 0)).toBe("You");
   });
 
-  it("describeSeat names a lone bot just 'Bot' — difficulty is not player-facing", () => {
-    const seats = createDefaultSeats(2);
+  it("describeSeat surfaces a named bot's roster name", () => {
+    const seats = assignBotNames([{ kind: "human" }, { kind: "bot", difficulty: "hard" }]);
+    expect(describeSeat(seats, 1)).toBe((seats[1] as { name: string }).name);
+  });
+
+  it("describeSeat falls back to 'Bot' for a nameless (hand-built) bot seat", () => {
+    const seats: SeatsConfig = [{ kind: "human" }, { kind: "bot", difficulty: "hard" }];
     expect(describeSeat(seats, 1)).toBe("Bot");
   });
 
-  it("describeSeat distinguishes multiple bots by 1-based player number, for any seat index", () => {
-    const seats = createDefaultSeats(3); // seat 0: human, seats 1 & 2: bots
+  it("describeSeat distinguishes multiple nameless bots by 1-based player number", () => {
+    const seats: SeatsConfig = [
+      { kind: "human" },
+      { kind: "bot", difficulty: "hard" },
+      { kind: "bot", difficulty: "hard" },
+    ];
     expect(describeSeat(seats, 1)).toBe("Bot (Player 2)");
     expect(describeSeat(seats, 2)).toBe("Bot (Player 3)");
+  });
+
+  it("assignBotNames leaves humans and already-named bots untouched", () => {
+    const seats: SeatsConfig = [
+      { kind: "human" },
+      { kind: "bot", difficulty: "hard", name: "Zoe" },
+    ];
+    // Deterministic rng: would pick index 0 if it named anything.
+    expect(assignBotNames(seats, () => 0)).toEqual(seats);
   });
 
   it("describeSeat labels every seat 'Player k' when more than one seat is human (3-human game)", () => {
@@ -75,10 +103,18 @@ describe("seatConfig — bot strength is per game, not player-selected", () => {
   });
 
   it("createDefaultSeats and presetSeats both honour the per-game strength", () => {
-    expect(createDefaultSeats(2, "nim")[1]).toEqual({ kind: "bot", difficulty: "medium" });
-    expect(createDefaultSeats(2, "connect4")[1]).toEqual({ kind: "bot", difficulty: "hard" });
-    expect(presetSeats("bot", 2, "nim")[1]).toEqual({ kind: "bot", difficulty: "medium" });
-    expect(presetSeats("bot", 2, "connect4")[1]).toEqual({ kind: "bot", difficulty: "hard" });
+    expect(createDefaultSeats(2, "nim")[1]).toEqual(
+      expect.objectContaining({ kind: "bot", difficulty: "medium" }),
+    );
+    expect(createDefaultSeats(2, "connect4")[1]).toEqual(
+      expect.objectContaining({ kind: "bot", difficulty: "hard" }),
+    );
+    expect(presetSeats("bot", 2, "nim")[1]).toEqual(
+      expect.objectContaining({ kind: "bot", difficulty: "medium" }),
+    );
+    expect(presetSeats("bot", 2, "connect4")[1]).toEqual(
+      expect.objectContaining({ kind: "bot", difficulty: "hard" }),
+    );
   });
 
   it("presetSeats('human') seats every player as human, whatever the game", () => {

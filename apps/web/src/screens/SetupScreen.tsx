@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import type { GameId } from "@mpg/engine";
 import { Button } from "../components/ui";
 import {
+  assignBotNames,
   botDifficultyFor,
   createDefaultSeats,
   presetSeats,
@@ -200,7 +201,11 @@ export function SetupScreen({
                 index={index}
                 seat={seat}
                 gameId={gameId}
-                onChange={(nextSeat) => setSeats((prev) => updateSeat(prev, index, nextSeat))}
+                onChange={(nextSeat) =>
+                  // Normalise after every toggle so a seat flipped to Bot picks
+                  // up a roster name (distinct from any other bot in the config).
+                  setSeats((prev) => assignBotNames(updateSeat(prev, index, nextSeat)))
+                }
               />
             ))}
           </div>

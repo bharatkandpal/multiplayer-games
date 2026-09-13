@@ -351,7 +351,7 @@ describe("GamePlayScreen — play again vs a different opponent (MPG-050)", () =
     await user.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
 
     expect(screen.getByRole("button", { name: "Rematch" })).toBeInTheDocument();
-    expect(screen.queryByRole("group", { name: "or play again vs…" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Play again or move on" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Play vs Bot/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Play a friend/ })).not.toBeInTheDocument();
   });
@@ -372,8 +372,7 @@ describe("GamePlayScreen — play again vs a different opponent (MPG-050)", () =
     const rematchButton = screen.getByRole("button", { name: "Rematch" });
     expect(rematchButton).toHaveFocus();
 
-    // The group's accessible name comes from the visible caption (aria-labelledby).
-    const group = screen.getByRole("group", { name: "or play again vs…" });
+    const group = screen.getByRole("group", { name: "Play again or move on" });
     expect(group).toBeInTheDocument();
 
     expect(screen.queryByRole("button", { name: /Play a friend/ })).not.toBeInTheDocument();
@@ -383,7 +382,8 @@ describe("GamePlayScreen — play again vs a different opponent (MPG-050)", () =
     expect(onPlayAgain).toHaveBeenCalledTimes(1);
     expect(onPlayAgain).toHaveBeenLastCalledWith([
       { kind: "human" },
-      { kind: "bot", difficulty: "medium" },
+      // Bot seats now carry a cosmetic roster name; assert the structural part.
+      expect.objectContaining({ kind: "bot", difficulty: "medium" }),
     ]);
   });
 
@@ -404,7 +404,7 @@ describe("GamePlayScreen — play again vs a different opponent (MPG-050)", () =
     const rematchButton = screen.getByRole("button", { name: "Rematch" });
     expect(rematchButton).toHaveFocus();
 
-    const group = screen.getByRole("group", { name: "or play again vs…" });
+    const group = screen.getByRole("group", { name: "Play again or move on" });
     expect(group).toBeInTheDocument();
 
     expect(screen.queryByRole("button", { name: /Play vs Bot/ })).not.toBeInTheDocument();

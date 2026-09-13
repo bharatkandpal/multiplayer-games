@@ -29,8 +29,8 @@ describe("SetupScreen — N-seat-generic (MPG-024/MPG-049)", () => {
 
     expect(onStart).toHaveBeenCalledExactlyOnceWith([
       { kind: "human" },
-      { kind: "bot", difficulty: "medium" },
-      { kind: "bot", difficulty: "medium" },
+      expect.objectContaining({ kind: "bot", difficulty: "medium" }),
+      expect.objectContaining({ kind: "bot", difficulty: "medium" }),
     ]);
   });
 
@@ -67,8 +67,8 @@ describe("SetupScreen — N-seat-generic (MPG-024/MPG-049)", () => {
     await user.click(screen.getByRole("button", { name: "Start game" }));
     expect(onStart).toHaveBeenCalledExactlyOnceWith([
       { kind: "human" },
-      { kind: "bot", difficulty: "medium" },
-      { kind: "bot", difficulty: "medium" },
+      expect.objectContaining({ kind: "bot", difficulty: "medium" }),
+      expect.objectContaining({ kind: "bot", difficulty: "medium" }),
     ]);
   });
 });
