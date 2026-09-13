@@ -221,9 +221,13 @@ export function RealtimePlayScreen<S, I>({
   const verdict = ((): { text: string; won: boolean } | null => {
     if (!hasTarget || phase !== "over") return null;
     if (score > challengeTarget) {
-      return { text: `You beat the challenge — topped ${challengeTarget} by ${score - challengeTarget}.`, won: true };
+      return {
+        text: `You beat the challenge — topped ${challengeTarget} by ${score - challengeTarget}.`,
+        won: true,
+      };
     }
-    if (score === challengeTarget) return { text: `Dead heat — you matched ${challengeTarget}.`, won: false };
+    if (score === challengeTarget)
+      return { text: `Dead heat — you matched ${challengeTarget}.`, won: false };
     return { text: `So close — ${challengeTarget} to beat.`, won: false };
   })();
 
@@ -333,12 +337,16 @@ export function RealtimePlayScreen<S, I>({
 
             {phase === "over" ? (
               <div className={styles.overlayInner}>
-                <p className={styles.overlayTitle}>{verdict?.won ? "You won the challenge!" : "Game over"}</p>
+                <p className={styles.overlayTitle}>
+                  {verdict?.won ? "You won the challenge!" : "Game over"}
+                </p>
                 <p className={styles.overlayText}>
                   Final score: <strong>{score}</strong>
                 </p>
                 {verdict ? (
-                  <p className={cx(styles.verdict, verdict.won && styles.verdictWon)}>{verdict.text}</p>
+                  <p className={cx(styles.verdict, verdict.won && styles.verdictWon)}>
+                    {verdict.text}
+                  </p>
                 ) : null}
                 <Button ref={playAgainBtnRef} variant="primary" onClick={handlePlayAgain}>
                   <span className={styles.playAgainIcon} aria-hidden="true">

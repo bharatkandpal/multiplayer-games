@@ -616,7 +616,11 @@ export default function App(): React.JSX.Element {
             // scored, so a challenge routes straight to the realtime surface
             // with the target. Anything else just opens the game normally.
             if (typeof challengeScore === "number" && item.kind === "realtime") {
-              setRoute({ screen: "realtime", gameId: item.id, challenge: { score: challengeScore } });
+              setRoute({
+                screen: "realtime",
+                gameId: item.id,
+                challenge: { score: challengeScore },
+              });
               return;
             }
             quickStart(item);

@@ -295,9 +295,7 @@ describe("MPG-087: a bare /:gameId deep link opens the game (share fallback)", (
 
     render(<App />);
 
-    expect(
-      screen.getByRole("application", { name: /Floppy Birds play area/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("application", { name: /Floppy Birds play area/ })).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Featured games" })).not.toBeInTheDocument();
   });
 
