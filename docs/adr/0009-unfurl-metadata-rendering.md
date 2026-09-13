@@ -1,6 +1,6 @@
 # ADR 0009 — Serving unfurl metadata for shareable routes
 
-**Status:** Proposed (2026-09-11)
+**Status:** Accepted (2026-09-11) — implemented in MPG-086 (2026-09-12): shim at `apps/web/api/unfurl.ts` + core `apps/web/src/unfurl/`.
 **Date:** 2026-09-11
 **Deciders:** Bharat (lead)
 **Decision lens:** Get real `og:*`/`twitter:*` tags in front of social scrapers without

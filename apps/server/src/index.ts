@@ -2,33 +2,27 @@
 // MPG-011: Express + Socket.IO transport, ephemeral Room Manager.
 // MPG-053: durable persistence foundation (Postgres / in-memory) — game
 // results/leaderboard/sessions only; rooms themselves are ephemeral (in-memory).
+// MPG-023: the stateless HTTP surface is factored into `createApiApp` and shared
+// with the serverless functions; this entry adds the room routes + Socket.IO,
+// which need a long-running process.
 
 import { createServer } from "node:http";
 
-import cors from "cors";
-import express, { type NextFunction, type Request, type Response } from "express";
 import { Server as SocketIOServer } from "socket.io";
+import type { Express, Request, Response } from "express";
 
 import { ENGINE_VERSION, registerBuiltInGames, registerBuiltInRealtimeGames } from "@mpg/engine";
 
-import { createEventRouter } from "./analytics/eventRoutes.js";
 import { createStoreSink } from "./analytics/sink.js";
-import { JSON_BODY_LIMIT } from "./config.js";
-import { createLeaderboardRouter } from "./leaderboard/leaderboardRoutes.js";
+import { createApiApp } from "./apiApp.js";
 import { parseCorsOrigin } from "./middleware/cors.js";
 import { createRateLimiter } from "./middleware/rateLimit.js";
 import { registerGameHandlers } from "./rooms/moveHandler.js";
 import { registerRematchHandlers } from "./rooms/rematchHandler.js";
 import { RoomManager, RoomManagerError } from "./rooms/RoomManager.js";
 import { registerRoomHandlers } from "./rooms/roomHandlers.js";
-import { createResultRouter } from "./results/resultRoutes.js";
-import { createShareRouter } from "./share/shareRoutes.js";
 import type { SeatConfig } from "./rooms/types.js";
-import {
-  createSessionMiddleware,
-  createSocketSessionMiddleware,
-} from "./sessions/sessionMiddleware.js";
-import { createSessionRouter } from "./sessions/sessionRoutes.js";
+import { createSocketSessionMiddleware } from "./sessions/sessionMiddleware.js";
 import { createStore } from "./store/index.js";
 
 registerBuiltInGames();
@@ -52,57 +46,20 @@ if (process.env["NODE_ENV"] === "production" && corsOrigin === "*") {
   );
 }
 
-const app = express();
-app.use(cors({ origin: corsOrigin, credentials: true }));
-// Bound the request body (see config.ts). Input logs are the largest legitimate
-// payload and sit under this; an unbounded body is a cheap memory-pressure vector.
-app.use(express.json({ limit: JSON_BODY_LIMIT }));
-
 // In-house rate limiter (MPG-021). Disabled (no-op) unless RATE_LIMITER_URL is
 // set, and fail-open when the service is unreachable — see middleware/rateLimit.ts.
 const rateLimiter = createRateLimiter();
 console.log(`@mpg/server — rate limiter: ${rateLimiter.enabled ? "enabled" : "disabled"}`);
+const limit = rateLimiter.limit.bind(rateLimiter);
 
 // Loop analytics (MPG-097). Behind the `EventSink` seam, so swapping in a
 // hosted vendor later is a change here and nowhere else. The sink never throws:
 // instrumentation is not allowed to break the thing it measures.
 const eventSink = createStoreSink(store.events);
 
-// Session identity — mints or resolves an opaque token on every request.
-app.use(createSessionMiddleware(store));
-
-// Session routes (GET/DELETE /api/session, GET /api/session/history).
-app.use("/api", createSessionRouter(store, rateLimiter.limit.bind(rateLimiter)));
-
-// Leaderboard routes (GET /api/leaderboard/:gameId, GET /api/leaderboard/:gameId/rank).
-// Both cross-cutting deps are threaded in: the analytics `eventSink` (MPG-097)
-// and the rate limiter (MPG-021). The routers apply the limiter to their write
-// paths and emit funnel events through the sink.
-const limit = rateLimiter.limit.bind(rateLimiter);
-app.use("/api", createLeaderboardRouter(store, eventSink, limit));
-
-// Client-reported turn-based results (POST /api/results) — MPG-131. Local play
-// never touches a room, so this is the only way a local game becomes shareable.
-app.use("/api", createResultRouter(store, eventSink, limit));
-
-// Durable share links (POST /api/share, GET/DELETE /api/share/:token) — MPG-056.
-app.use("/api", createShareRouter(store, eventSink, limit));
-
-// Client-reported funnel events (POST /api/events) — MPG-097. Only events the
-// server cannot observe itself are accepted here; see `analytics/events.ts`.
-app.use("/api", createEventRouter(eventSink));
-
-const startedAt = Date.now();
-
-app.get("/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok", uptime: Date.now() - startedAt, engineVersion: ENGINE_VERSION });
-});
-
-// docs/API_SPEC.md §2 liveness alias.
-app.get("/healthz", (_req: Request, res: Response) => {
-  res.json({ status: "ok" });
-});
-
+// Rooms are the one part of the HTTP surface that can't be stateless — the
+// RoomManager lives in this process, and Socket.IO drives it below. Everything
+// else is the shared stateless surface built by `createApiApp`.
 const roomManager = new RoomManager();
 
 function isSeatConfigArray(v: unknown): v is SeatConfig[] {
@@ -119,59 +76,59 @@ function isSeatConfigArray(v: unknown): v is SeatConfig[] {
   );
 }
 
-// docs/API_SPEC.md §2 — `POST /api/rooms`. Room creation is also available over
-// Socket.IO (`room:create`, see roomHandlers.ts) for clients that prefer a single
-// transport end-to-end; both paths share the same RoomManager.
-app.post("/api/rooms", rateLimiter.limit("room_create"), (req: Request, res: Response) => {
-  const body = req.body as Record<string, unknown>;
-  const gameId = body["gameId"];
-  const seats = body["seats"];
+/** Mount the room routes onto the shared app, before its error handler. */
+function attachRoomRoutes(api: Express): void {
+  // docs/API_SPEC.md §2 — `POST /api/rooms`. Room creation is also available over
+  // Socket.IO (`room:create`, see roomHandlers.ts) for clients that prefer a single
+  // transport end-to-end; both paths share the same RoomManager.
+  api.post("/api/rooms", rateLimiter.limit("room_create"), (req: Request, res: Response) => {
+    const body = req.body as Record<string, unknown>;
+    const gameId = body["gameId"];
+    const seats = body["seats"];
 
-  if (typeof gameId !== "string" || !isSeatConfigArray(seats)) {
-    res.status(400).json({ code: "INVALID_REQUEST", message: "gameId and seats are required" });
-    return;
-  }
-
-  try {
-    const { room, sessionTokens, creatorToken } = roomManager.createRoom(gameId, seats);
-    const selfSlot = seats.find((s) => s.kind === "human" && s.self)?.slot;
-    const sessionToken = selfSlot !== undefined ? sessionTokens.get(selfSlot) : undefined;
-    const hasOpenHumanSeat = room.seats.some((s) => s.kind === "human" && !s.sessionToken);
-
-    res.status(201).json({
-      roomId: room.id,
-      gameId: room.gameId,
-      inviteUrl: hasOpenHumanSeat ? `/${room.gameId}/room/${room.id}` : undefined,
-      yourSlot: selfSlot,
-      sessionToken,
-      // Lets the creator watch-join an all-bot room's live broadcasts over Socket.IO
-      // via `room:state` — there's no seat (and so no `sessionToken`) for that case.
-      creatorToken,
-      status: room.status,
-    });
-  } catch (err) {
-    if (err instanceof RoomManagerError) {
-      res.status(400).json({ code: err.code, message: err.message });
+    if (typeof gameId !== "string" || !isSeatConfigArray(seats)) {
+      res.status(400).json({ code: "INVALID_REQUEST", message: "gameId and seats are required" });
       return;
     }
-    res.status(500).json({ code: "INTERNAL_ERROR", message: "Unexpected error" });
-  }
-});
 
-// docs/API_SPEC.md §2 — `GET /api/rooms/:roomId`.
-app.get("/api/rooms/:roomId", (req: Request, res: Response) => {
-  const room = roomManager.getRoom(req.params["roomId"] as string);
-  if (!room) {
-    res.status(404).json({ code: "NOT_FOUND", message: "Room not found or expired" });
-    return;
-  }
-  res.json(roomManager.toPublicRoom(room));
-});
+    try {
+      const { room, sessionTokens, creatorToken } = roomManager.createRoom(gameId, seats);
+      const selfSlot = seats.find((s) => s.kind === "human" && s.self)?.slot;
+      const sessionToken = selfSlot !== undefined ? sessionTokens.get(selfSlot) : undefined;
+      const hasOpenHumanSeat = room.seats.some((s) => s.kind === "human" && !s.sessionToken);
 
-app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  console.error(err);
-  res.status(500).json({ code: "INTERNAL_ERROR", message: "Unexpected error" });
-});
+      res.status(201).json({
+        roomId: room.id,
+        gameId: room.gameId,
+        inviteUrl: hasOpenHumanSeat ? `/${room.gameId}/room/${room.id}` : undefined,
+        yourSlot: selfSlot,
+        sessionToken,
+        // Lets the creator watch-join an all-bot room's live broadcasts over Socket.IO
+        // via `room:state` — there's no seat (and so no `sessionToken`) for that case.
+        creatorToken,
+        status: room.status,
+      });
+    } catch (err) {
+      if (err instanceof RoomManagerError) {
+        res.status(400).json({ code: err.code, message: err.message });
+        return;
+      }
+      res.status(500).json({ code: "INTERNAL_ERROR", message: "Unexpected error" });
+    }
+  });
+
+  // docs/API_SPEC.md §2 — `GET /api/rooms/:roomId`.
+  api.get("/api/rooms/:roomId", (req: Request, res: Response) => {
+    const room = roomManager.getRoom(req.params["roomId"] as string);
+    if (!room) {
+      res.status(404).json({ code: "NOT_FOUND", message: "Room not found or expired" });
+      return;
+    }
+    res.json(roomManager.toPublicRoom(room));
+  });
+}
+
+const app = createApiApp({ store, eventSink, limit, corsOrigin, extend: attachRoomRoutes });
 
 const httpServer = createServer(app);
 
