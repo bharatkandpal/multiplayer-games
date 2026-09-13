@@ -15,6 +15,13 @@
       "when": 1789108212079,
       "tag": "0001_clear_bastion",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789276171369,
+      "tag": "0002_glossy_landau",
+      "breakpoints": true
     }
   ]
 }

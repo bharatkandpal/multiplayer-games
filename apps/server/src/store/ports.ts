@@ -58,6 +58,48 @@ export interface SessionRepo {
 }
 
 // ---------------------------------------------------------------------------
+// Identity (MPG-091)
+// ---------------------------------------------------------------------------
+
+export interface Identity {
+  readonly id: string;
+  readonly handle: string;
+  readonly createdAt: Date;
+}
+
+/** Result of a `claim` — links the caller's session to a new durable identity. */
+export type ClaimResult =
+  | { readonly ok: true; readonly identity: Identity }
+  | { readonly ok: false; readonly reason: "handle_taken" | "already_claimed" };
+
+/** Result of an `adopt` — relinks the caller's session to an existing identity. */
+export type AdoptResult =
+  | { readonly ok: true; readonly identity: Identity }
+  | { readonly ok: false; readonly reason: "invalid_code" };
+
+export interface IdentityRepo {
+  /**
+   * Mint a durable identity for `handle` and link `token` to it. The caller
+   * generates the recovery code and passes only its hash — the plaintext never
+   * reaches the store. `handle_taken` when another identity holds the handle
+   * (case-insensitive); `already_claimed` when this session is already linked.
+   */
+  claim(token: string, handle: string, recoveryCodeHash: string): Promise<ClaimResult>;
+
+  /**
+   * Link `token` to whichever identity a recovery-code hash resolves to
+   * (cross-device adoption). `invalid_code` when no identity matches.
+   */
+  adopt(token: string, recoveryCodeHash: string): Promise<AdoptResult>;
+
+  /** The identity `token` is linked to, if any. */
+  findByToken(token: string): Promise<Identity | undefined>;
+
+  /** All session tokens linked to an identity (owner-union source for MPG-091-b). */
+  tokensForIdentity(identityId: string): Promise<string[]>;
+}
+
+// ---------------------------------------------------------------------------
 // Game Result
 // ---------------------------------------------------------------------------
 
@@ -293,6 +335,7 @@ export interface EventRepo {
 
 export interface Store {
   readonly sessions: SessionRepo;
+  readonly identities: IdentityRepo;
   readonly results: ResultRepo;
   readonly leaderboard: LeaderboardRepo;
   readonly shareLinks: ShareLinkRepo;
