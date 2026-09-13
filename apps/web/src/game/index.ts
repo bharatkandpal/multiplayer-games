@@ -20,12 +20,14 @@ export type {
 } from "./seatConfig";
 export {
   DEFAULT_BOT_DIFFICULTY,
+  assignBotNames,
   botDifficultyFor,
   createDefaultSeats,
   describeSeat,
   presetSeats,
   sameSeatKinds,
 } from "./seatConfig";
+export { BOT_NAMES, FEMALE_BOT_NAMES, MALE_BOT_NAMES, pickBotName } from "./botNames";
 
 export { getBotThinkingDelayMs } from "./motion";
 

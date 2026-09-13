@@ -182,6 +182,28 @@ describe("session routes", () => {
       expect(body.error).toBe("INVALID_USERNAME");
     });
 
+    it("400s with INVALID_USERNAME + reason PROFANITY on a profane handle", async () => {
+      const res = await fetch(`${baseUrl}/api/session/username`, {
+        ...json({ username: "sh1thead" }),
+        headers: { ...json({}).headers, [SESSION_HEADER]: "user-profane" },
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: string; reason: string };
+      expect(body.error).toBe("INVALID_USERNAME");
+      expect(body.reason).toBe("PROFANITY");
+    });
+
+    it("400s with INVALID_USERNAME + reason RESERVED on an impersonating handle", async () => {
+      const res = await fetch(`${baseUrl}/api/session/username`, {
+        ...json({ username: "admin123" }),
+        headers: { ...json({}).headers, [SESSION_HEADER]: "user-reserved" },
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: string; reason: string };
+      expect(body.error).toBe("INVALID_USERNAME");
+      expect(body.reason).toBe("RESERVED");
+    });
+
     it("409s with USERNAME_TAKEN on a real collision (case-insensitive)", async () => {
       await fetch(`${baseUrl}/api/session/username`, {
         ...json({ username: "Unique" }),

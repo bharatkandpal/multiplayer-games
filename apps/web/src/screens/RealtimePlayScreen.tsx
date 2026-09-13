@@ -74,12 +74,12 @@ export interface RealtimePlayScreenProps<S, I> {
   /** Auto-pause when the tab is backgrounded (default true; ADR §5). */
   autoPauseOnBlur?: boolean;
   /**
-   * Optional extra control overlaid in the play surface's top-right corner —
-   * e.g. Drunk Walk's cog button opening its character-customization menu.
-   * Lives inside the game area (over the canvas) rather than the page's top
-   * bar, and stays available in every phase, stacked above the ready/paused/
-   * game-over scrim so it's never hidden. Omit for games with nothing to
-   * configure.
+   * Optional extra control (e.g. Drunk Walk's cog opening its character-
+   * customization menu) rendered on its own row just above the play box,
+   * right-aligned to the box edge — deliberately off the play surface so it
+   * never overlaps the scene or steals a tap meant for the game. Available in
+   * every phase (it's outside the ready/paused/game-over scrim entirely). Omit
+   * for games with nothing to configure.
    */
   surfaceExtra?: ReactNode;
   /**
@@ -277,6 +277,13 @@ export function RealtimePlayScreen<S, I>({
         ) : null}
       </div>
 
+      {/* Source-/game-owned controls (e.g. the customize gear) sit on their own
+          row above the play box, right-aligned to its edge — off the play
+          surface entirely so they never overlap the scene or steal a tap meant
+          for the game. Rendered only when supplied, matched to the box width so
+          the alignment holds on wide screens. */}
+      {surfaceExtra ? <div className={styles.surfaceControls}>{surfaceExtra}</div> : null}
+
       <div
         ref={surfaceRef}
         className={cx(styles.surface, isRunning && styles.surfaceRunning)}
@@ -363,8 +370,6 @@ export function RealtimePlayScreen<S, I>({
             ) : null}
           </div>
         ) : null}
-
-        {surfaceExtra ? <div className={styles.surfaceExtra}>{surfaceExtra}</div> : null}
       </div>
 
       {/* Source-owned on-screen touch controls (the action source's per-action
