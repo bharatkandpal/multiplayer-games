@@ -6,10 +6,10 @@ there is no forked handler logic here.
 
 ## What runs where
 
-| Surface | Deployment | Why |
-| --- | --- | --- |
-| `sessions`, `leaderboard`, `results`, `share`, `events`, `cards/:token.png` | **here** (Vercel functions + Neon) | stateless request/response; no persistent process needed |
-| rooms (`/api/rooms`) + Socket.IO realtime | `@mpg/server` container | need a long-running process holding the `RoomManager` and live sockets |
+| Surface                                                                     | Deployment                         | Why                                                                    |
+| --------------------------------------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------- |
+| `sessions`, `leaderboard`, `results`, `share`, `events`, `cards/:token.png` | **here** (Vercel functions + Neon) | stateless request/response; no persistent process needed               |
+| rooms (`/api/rooms`) + Socket.IO realtime                                   | `@mpg/server` container            | need a long-running process holding the `RoomManager` and live sockets |
 
 `GET /api/cards/:token.png` is the unfurl image (ADR 0009's `og:image` target). It
 rasterises the share card with `@resvg/resvg-js` and a **bundled** Nunito face

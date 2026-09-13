@@ -51,8 +51,7 @@ function apiOrigin(): string {
 /** The absolute origin this request arrived on, for fetching our own shell. */
 function selfOrigin(req: VercelRequest): string {
   const proto = (req.headers["x-forwarded-proto"] as string | undefined) ?? "https";
-  const host =
-    (req.headers["x-forwarded-host"] as string | undefined) ?? req.headers.host ?? "";
+  const host = (req.headers["x-forwarded-host"] as string | undefined) ?? req.headers.host ?? "";
   return `${proto}://${host}`;
 }
 
