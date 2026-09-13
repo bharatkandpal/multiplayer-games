@@ -91,14 +91,15 @@
    stacked above the canvas and above the ready/paused/game-over scrim (later
    in DOM order) so it's reachable in every phase. A translucent round
    backdrop keeps it legible over whatever's rendered underneath. */
-.surfaceExtra {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  z-index: 1;
-  border-radius: var(--radius-full, 999px);
-  background: color-mix(in srgb, var(--color-bg) 55%, transparent);
-  backdrop-filter: blur(2px);
+/* The gear/customize row above the play box — matched to the box's own width
+   (480px, centered) so it right-aligns to the box edge rather than the
+   viewport on wide screens. */
+.surfaceControls {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto var(--space-2);
 }
 
 /* Ready / paused / game-over overlays: a translucent scrim over the frozen

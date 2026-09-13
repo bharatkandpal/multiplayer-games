@@ -1,4 +1,4 @@
-import { createRef, type RefObject } from "react";
+import { createRef, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render } from "@testing-library/react";
 import {
@@ -148,5 +148,82 @@ describe("createActionInputSource — binding shape", () => {
     render(<Harness source={source} host={makeHost("ready")} onBinding={(b) => (binding = b)} />);
     expect(binding?.controls).not.toBeNull();
     expect(binding?.readyExplainer).toBe("Steer the paddle.");
+  });
+});
+
+describe("createActionInputSource — swipe gesture (MPG-074 bugfix)", () => {
+  type Dir = "up" | "down" | "left" | "right";
+  const swipeControls: RealtimeControls<{ swipe: Dir | null }, Dir> = {
+    primaryAction: "up",
+    keyMap: { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" },
+    toInput: (p) => ({
+      swipe: (["up", "down", "left", "right"] as const).find((d) => p.has(d)) ?? null,
+    }),
+    actionHint: "Swipe the board",
+    resolveSwipeAction: (dx, dy) =>
+      Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up",
+  };
+
+  it("does nothing on press-down alone — only the completed drag resolves a direction", () => {
+    const source = createActionInputSource(swipeControls);
+    let binding: InputBinding | undefined;
+    render(<Harness source={source} host={makeHost("running")} onBinding={(b) => (binding = b)} />);
+    binding?.onSurfacePointerDown?.({
+      clientX: 100,
+      clientY: 100,
+      target: document.createElement("div"),
+    } as unknown as ReactPointerEvent);
+    // No pointerup yet — the drag hasn't finished, so nothing is pressed.
+    expect(source.sample()).toEqual({ swipe: null });
+  });
+
+  it.each([
+    ["right", 100, 100, 160, 105],
+    ["left", 100, 100, 40, 95],
+    ["down", 100, 100, 105, 160],
+    ["up", 100, 100, 95, 40],
+  ] as const)("a %s drag past the threshold presses %s", (want, x0, y0, x1, y1) => {
+    const source = createActionInputSource(swipeControls);
+    let binding: InputBinding | undefined;
+    render(<Harness source={source} host={makeHost("running")} onBinding={(b) => (binding = b)} />);
+    const onDown = binding?.onSurfacePointerDown;
+    expect(onDown).toBeTruthy();
+    // Fire directly through the binding's own handler (jsdom has no real
+    // surface element here) then release via the window, exactly as the real
+    // gesture does — release routinely lands off the element that started it.
+    onDown?.({
+      clientX: x0,
+      clientY: y0,
+      target: document.createElement("div"),
+    } as unknown as ReactPointerEvent);
+    fireEvent.pointerUp(window, { clientX: x1, clientY: y1 });
+    expect(source.sample()).toEqual({ swipe: want });
+  });
+
+  it("a drag under the swipe threshold falls back to a tap (primaryAction)", () => {
+    const source = createActionInputSource(swipeControls);
+    let binding: InputBinding | undefined;
+    render(<Harness source={source} host={makeHost("running")} onBinding={(b) => (binding = b)} />);
+    binding?.onSurfacePointerDown?.({
+      clientX: 100,
+      clientY: 100,
+      target: document.createElement("div"),
+    } as unknown as ReactPointerEvent);
+    fireEvent.pointerUp(window, { clientX: 105, clientY: 102 }); // well under 24px
+    expect(source.sample()).toEqual({ swipe: "up" }); // primaryAction
+  });
+
+  it("a pointercancel (e.g. a scroll takeover) resolves nothing", () => {
+    const source = createActionInputSource(swipeControls);
+    let binding: InputBinding | undefined;
+    render(<Harness source={source} host={makeHost("running")} onBinding={(b) => (binding = b)} />);
+    binding?.onSurfacePointerDown?.({
+      clientX: 100,
+      clientY: 100,
+      target: document.createElement("div"),
+    } as unknown as ReactPointerEvent);
+    fireEvent.pointerCancel(window);
+    fireEvent.pointerUp(window, { clientX: 200, clientY: 100 }); // ignored — already settled
+    expect(source.sample()).toEqual({ swipe: null });
   });
 });

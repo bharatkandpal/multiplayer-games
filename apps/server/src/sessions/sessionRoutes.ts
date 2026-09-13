@@ -9,18 +9,13 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 
 import { noopLimit, type RateLimitFor } from "../middleware/rateLimit.js";
+import { moderateText } from "../moderation/index.js";
 import { forgetMe } from "../retention/retention.js";
 import type { Store } from "../store/ports.js";
 import { SESSION_COOKIE } from "./sessionMiddleware.js";
 
 const DEFAULT_HISTORY_LIMIT = 20;
 const MAX_HISTORY_LIMIT = 100;
-
-const USERNAME_PATTERN = /^[a-zA-Z0-9_-]{3,20}$/;
-
-function isValidUsername(value: unknown): value is string {
-  return typeof value === "string" && USERNAME_PATTERN.test(value);
-}
 
 function parseNonNegativeInt(raw: unknown, fallback: number, max?: number): number {
   const value = Array.isArray(raw) ? raw[0] : raw;
@@ -57,15 +52,17 @@ export function createSessionRouter(store: Store, limit: RateLimitFor = noopLimi
     }
 
     const body = req.body as { username?: unknown } | undefined;
-    const username = body?.username;
 
-    if (!isValidUsername(username)) {
-      res.status(400).json({ error: "INVALID_USERNAME" });
+    // Format caps + profanity + impersonation, server-side and authoritative
+    // (MPG-092). Pure/in-process, so it never blocks on a vendor or the network.
+    const moderated = moderateText("handle", body?.username);
+    if (!moderated.ok) {
+      res.status(400).json({ error: "INVALID_USERNAME", reason: moderated.reason });
       return;
     }
 
     await store.sessions.upsert(token);
-    const result = await store.sessions.setUsername(token, username);
+    const result = await store.sessions.setUsername(token, moderated.value);
     if (!result.ok) {
       res.status(409).json({ error: "USERNAME_TAKEN" });
       return;
