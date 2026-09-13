@@ -16,8 +16,12 @@ import styles from "./SharedResultScreen.module.css";
 
 export interface SharedResultScreenProps {
   token: string;
-  /** Start the game this result came from — the "way in" for a brand-new visitor. */
-  onPlayGame: (gameId: string) => void;
+  /**
+   * Start the game this result came from — the "way in" for a brand-new visitor.
+   * When `challengeScore` is given (a scored, real-time result opened via "Beat
+   * this score"), the game opens with that score as a target to beat (MPG-087).
+   */
+  onPlayGame: (gameId: string, challengeScore?: number) => void;
   onBackHome: () => void;
   /** Open the full leaderboard for a game (used by a `leaderboard` link). */
   onViewLeaderboard: (gameId: string) => void;
@@ -150,11 +154,24 @@ export function SharedResultScreen({
             </time>
           </p>
           {/* Primary action is to PLAY, not to admire someone else's score —
-              the shared link exists to pull a new player into the loop. */}
+              the shared link exists to pull a new player into the loop. For a
+              scored (real-time) result that becomes a direct challenge: "Beat
+              this score" drops the visitor into the game with this score as the
+              target (MPG-087). Turn-based results have no score, so they keep the
+              plain "Play" — there's nothing to beat, only to play. */}
           <div className={styles.actions}>
-            <Button variant="primary" onClick={() => onPlayGame(view.result.gameId)}>
-              Play {gameTitle(view.result.gameId)}
-            </Button>
+            {view.result.score !== null ? (
+              <Button
+                variant="primary"
+                onClick={() => onPlayGame(view.result.gameId, view.result.score ?? undefined)}
+              >
+                Beat this score
+              </Button>
+            ) : (
+              <Button variant="primary" onClick={() => onPlayGame(view.result.gameId)}>
+                Play {gameTitle(view.result.gameId)}
+              </Button>
+            )}
             <Button variant="ghost" onClick={() => onViewLeaderboard(view.result.gameId)}>
               View leaderboard
             </Button>

@@ -302,6 +302,12 @@ export interface RealtimeGameRouteProps {
    * post-game rank preview entirely — a rank with nowhere to go is a dead end.
    */
   onViewLeaderboard?: () => void;
+  /**
+   * A score to beat (MPG-087) — set when the player arrived from a friend's
+   * shared result via "Beat this score". Forwarded to `RealtimePlayScreen` as
+   * its `challengeTarget`. Omit for an ordinary solo run.
+   */
+  challenge?: { score: number };
 }
 
 /**
@@ -353,8 +359,12 @@ export function RealtimeGameRoute({
   gameId,
   onExit,
   onViewLeaderboard,
+  challenge,
 }: RealtimeGameRouteProps): React.JSX.Element | null {
   const [seed] = useState(makeSeed);
+  // `exactOptionalPropertyTypes` forbids passing `challengeTarget={undefined}`
+  // to an optional prop, so spread it in only when there is a target.
+  const challengeProps = challenge ? { challengeTarget: challenge.score } : {};
   const { runKey, settled, shareToken, onRunComplete } = useSettledRun();
   // Only meaningful for "drunk-walk" (the one game with a character to
   // customize), but declared unconditionally so this component's hook
@@ -406,6 +416,7 @@ export function RealtimeGameRoute({
           onRunComplete={onRunComplete}
           shareUrl={shareToken ?? buildShareUrl(gameId)}
           resultExtra={rankPreview}
+          {...challengeProps}
           surfaceExtra={
             <Button
               variant="ghost"
@@ -460,6 +471,7 @@ export function RealtimeGameRoute({
           onRunComplete={onRunComplete}
           shareUrl={shareToken ?? buildShareUrl(gameId)}
           resultExtra={rank2048}
+          {...challengeProps}
           surfaceExtra={
             <Button
               variant="ghost"
@@ -492,6 +504,7 @@ export function RealtimeGameRoute({
       onRunComplete={onRunComplete}
       shareUrl={shareToken ?? buildShareUrl(gameId)}
       resultExtra={rankPreview}
+      {...challengeProps}
     />
   );
 }

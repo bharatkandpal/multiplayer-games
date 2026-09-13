@@ -49,17 +49,18 @@ describe("SharedResultScreen (MPG-056)", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Loading shared result…");
   });
 
-  it("READY: shows the score and offers PLAYING the game as the primary action", async () => {
+  it("READY: a scored result offers BEATING it as the primary action (MPG-087)", async () => {
     vi.mocked(fetchSharedView).mockResolvedValue(RESULT_VIEW);
     const props = renderScreen();
 
     expect(await screen.findByText("Scored 42")).toBeInTheDocument();
     expect(screen.getByText("Floppy Birds")).toBeInTheDocument();
 
-    // The point of a shared link is to pull a NEW player into a game, so the
-    // primary action is to play, not to admire someone else's score.
-    await userEvent.click(screen.getByRole("button", { name: /Play Floppy Birds/ }));
-    expect(props.onPlayGame).toHaveBeenCalledWith("floppy-birds");
+    // A scored (real-time) result turns the shared link into a challenge: the
+    // primary action drops the visitor into the game with this score to beat,
+    // not merely to admire someone else's number.
+    await userEvent.click(screen.getByRole("button", { name: "Beat this score" }));
+    expect(props.onPlayGame).toHaveBeenCalledWith("floppy-birds", 42);
   });
 
   it("READY: a turn-based result with no score states the outcome instead", async () => {

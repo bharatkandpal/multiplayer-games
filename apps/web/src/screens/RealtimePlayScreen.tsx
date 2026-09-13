@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { RealtimeModule } from "@mpg/engine";
 import {
   BackArrowIcon,
@@ -100,6 +100,19 @@ export interface RealtimePlayScreenProps<S, I> {
    * it knows about run phases, not about leaderboards.
    */
   resultExtra?: ReactNode;
+  /**
+   * A score to beat — the challenge a player arrived on from someone else's
+   * shared result (the "Beat this score" entry on `SharedResultScreen`). When
+   * set, the screen shows a live `Target` readout, celebrates the moment the
+   * player's score passes it, and turns the game-over line into a verdict
+   * ("You beat the challenge" / "so close"). Omit for an ordinary solo run —
+   * the whole affordance simply isn't there, so a normal run is untouched.
+   *
+   * There is no challenger name because results carry no handles yet (MPG-091);
+   * the copy is deliberately about the *score*, and a name slots in later with
+   * no change to the mechanic.
+   */
+  challengeTarget?: number;
 }
 
 const HINT_ID_PREFIX = "rt-hint";
@@ -121,6 +134,7 @@ export function RealtimePlayScreen<S, I>({
   surfaceExtra,
   shareUrl,
   resultExtra,
+  challengeTarget,
 }: RealtimePlayScreenProps<S, I>): React.JSX.Element {
   const reducedMotion = usePrefersReducedMotion();
 
@@ -169,6 +183,54 @@ export function RealtimePlayScreen<S, I>({
   const isRunning = phase === "running";
   const hintId = `${HINT_ID_PREFIX}-${useId()}`;
 
+  // Challenge (MPG-087): a score to beat, carried in from a friend's shared
+  // result. `passed` is the live "you're now ahead" fact; it drives both the
+  // status chip and a one-time celebratory flash. All of it is inert when no
+  // target was supplied — an ordinary solo run renders exactly as before.
+  const hasTarget = typeof challengeTarget === "number";
+  const passed = hasTarget && score > challengeTarget;
+  // Latch the *first* crossing so the flash + its announcement fire once, not
+  // every frame the player stays ahead. Reset at the top of each run (score
+  // returns to 0 on start / "Play again"), so a rematch celebrates afresh.
+  const passAnnouncedRef = useRef(false);
+  const [showPassFlash, setShowPassFlash] = useState(false);
+  useEffect(() => {
+    if (score === 0) {
+      passAnnouncedRef.current = false;
+      setShowPassFlash(false);
+      return;
+    }
+    if (passed && !passAnnouncedRef.current) {
+      passAnnouncedRef.current = true;
+      setShowPassFlash(true);
+    }
+  }, [score, passed]);
+
+  // The flash is a moment, not a banner: it clears itself so it never sits over
+  // the running scene. The persistent "Passed" chip (below) carries the state
+  // afterwards, so nothing is lost when it goes — including for reduced-motion
+  // users, who get the chip and the announcement but no animation.
+  useEffect(() => {
+    if (!showPassFlash) return;
+    const timer = setTimeout(() => setShowPassFlash(false), 1600);
+    return () => clearTimeout(timer);
+  }, [showPassFlash]);
+
+  // The game-over verdict, once a target is in play. Spoiler-free of *how* the
+  // run went — just the comparison a challenge is about.
+  const verdict = ((): { text: string; won: boolean } | null => {
+    if (!hasTarget || phase !== "over") return null;
+    if (score > challengeTarget) {
+      return {
+        text: `You beat the challenge — topped ${challengeTarget} by ${score - challengeTarget}.`,
+        won: true,
+      };
+    }
+    if (score === challengeTarget)
+      return { text: `Dead heat — you matched ${challengeTarget}.`, won: false };
+    return { text: `So close — ${challengeTarget} to beat.`, won: false };
+  })();
+
   // A polite live region announces state transitions and the final score —
   // NOT every point (that would be noisy); the visible score readout carries
   // the running total as text (never motion-only), per ADR §5.
@@ -177,11 +239,13 @@ export function RealtimePlayScreen<S, I>({
       case "ready":
         return `${gameTitle} ready. ${binding.hint} to start.`;
       case "running":
-        return "Game started.";
+        // Once the target is passed, the single live region carries that news
+        // (constant text, so it announces once and doesn't repeat while ahead).
+        return passed ? `You passed the target score of ${challengeTarget}.` : "Game started.";
       case "paused":
         return `Paused. Score ${score}.`;
       case "over":
-        return `Game over. Final score ${score}.`;
+        return `Game over. Final score ${score}.${verdict ? ` ${verdict.text}` : ""}`;
     }
   })();
 
@@ -203,6 +267,13 @@ export function RealtimePlayScreen<S, I>({
         <StatusBadge status={isRunning ? "success" : "neutral"}>
           Score <span className={styles.scoreValue}>{score}</span>
         </StatusBadge>
+        {hasTarget ? (
+          <StatusBadge status={passed ? "success" : "neutral"}>
+            {passed ? "Passed" : "Target"}{" "}
+            <span className={styles.scoreValue}>{challengeTarget}</span>
+            {passed ? <span aria-hidden="true"> ✦</span> : null}
+          </StatusBadge>
+        ) : null}
         {isRunning ? (
           <Button variant="secondary" size="sm" onClick={pause}>
             Pause
@@ -227,6 +298,15 @@ export function RealtimePlayScreen<S, I>({
         onPointerDown={binding.onSurfacePointerDown ?? undefined}
       >
         {renderScene({ state, phase, score, reducedMotion })}
+
+        {/* The one-time "you're ahead now" moment. Decorative and transient —
+            the persistent chip and the announcement carry the fact — so it is
+            aria-hidden and dropped entirely for reduced-motion. */}
+        {showPassFlash && !reducedMotion ? (
+          <div className={styles.passFlash} aria-hidden="true">
+            Passed them! ✦
+          </div>
+        ) : null}
 
         {/* Source-owned in-surface UI (e.g. a camera preview / tracking dot for
             the vision source); `null` for the discrete-action source. */}
@@ -257,10 +337,17 @@ export function RealtimePlayScreen<S, I>({
 
             {phase === "over" ? (
               <div className={styles.overlayInner}>
-                <p className={styles.overlayTitle}>Game over</p>
+                <p className={styles.overlayTitle}>
+                  {verdict?.won ? "You won the challenge!" : "Game over"}
+                </p>
                 <p className={styles.overlayText}>
                   Final score: <strong>{score}</strong>
                 </p>
+                {verdict ? (
+                  <p className={cx(styles.verdict, verdict.won && styles.verdictWon)}>
+                    {verdict.text}
+                  </p>
+                ) : null}
                 <Button ref={playAgainBtnRef} variant="primary" onClick={handlePlayAgain}>
                   <span className={styles.playAgainIcon} aria-hidden="true">
                     ↻
@@ -278,8 +365,12 @@ export function RealtimePlayScreen<S, I>({
                   <ShareAction
                     url={shareUrl}
                     title={gameTitle}
-                    text={`I scored ${score} on ${gameTitle}`}
-                    shareLabel="Share score"
+                    text={
+                      verdict?.won
+                        ? `I beat the ${challengeTarget} challenge on ${gameTitle} — scored ${score}`
+                        : `I scored ${score} on ${gameTitle}`
+                    }
+                    shareLabel={verdict?.won ? "Share your win" : "Share score"}
                   />
                 ) : null}
                 {resultExtra}
