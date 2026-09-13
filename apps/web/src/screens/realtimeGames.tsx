@@ -148,12 +148,15 @@ const reflexControls: RealtimeControls<ReflexInput, "tap"> = {
     "The panel holds red for a random moment, then turns green — tap as fast as you can. Five rounds. Tap while it's still red and the run ends immediately.",
 };
 
-// 2048 has four discrete swipe actions. On-screen buttons (a D-pad) give touch
-// users an unambiguous control per direction; arrows and WASD give keyboard
-// parity. A plain surface tap falls back to `primaryAction` — harmless on a
-// puzzle where a stray swipe that changes nothing is simply a no-op. When more
-// than one direction is in the pressed set for a tick (rare), a fixed priority
-// order picks one so the input stays a single well-defined swipe.
+// 2048 has four discrete swipe actions. A real finger swipe on the board
+// resolves from the drag vector (`resolveSwipeAction`, dominant axis wins —
+// the classic 2048 gesture); on-screen buttons (a D-pad) are the unambiguous
+// fallback for a player who prefers taps; arrows and WASD give keyboard
+// parity. A drag too short to count as a swipe (or, on desktop, a plain
+// click) falls back to `primaryAction` — harmless on a puzzle where a stray
+// swipe that changes nothing is simply a no-op. When more than one direction
+// is in the pressed set for a tick (rare — two keys held at once), a fixed
+// priority order picks one so the input stays a single well-defined swipe.
 const SWIPE_PRIORITY: readonly SwipeDir[] = ["up", "down", "left", "right"];
 const game2048Controls: RealtimeControls<Game2048Input, SwipeDir> = {
   primaryAction: "up",
@@ -171,9 +174,14 @@ const game2048Controls: RealtimeControls<Game2048Input, SwipeDir> = {
     const swipe = SWIPE_PRIORITY.find((dir) => pressed.has(dir)) ?? null;
     return { swipe };
   },
-  actionHint: "Swipe with the arrows, WASD, or the buttons",
+  actionHint: "Swipe the board, or use the arrows, WASD, or the buttons",
   readyExplainer:
     "Slide the tiles in one direction — equal tiles merge and add up. A new tile appears after every move. You lose when the board fills up with no moves left.",
+  resolveSwipeAction: (dx, dy) => {
+    // Dominant axis wins — a mostly-horizontal drag is left/right even if it
+    // wobbles a little vertically, and vice versa (matches every other 2048).
+    return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
+  },
   touchActions: [
     { action: "up", label: "↑" },
     { action: "left", label: "←" },
