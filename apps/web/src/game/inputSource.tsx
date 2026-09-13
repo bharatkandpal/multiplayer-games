@@ -65,7 +65,21 @@ export interface RealtimeControls<I, A extends string = string> {
    * every tap on the surface means the same thing.
    */
   readonly resolveTapAction?: (fractionX: number) => A;
+  /**
+   * For a drag/swipe-controlled game (e.g. 2048): resolves a completed pointer
+   * drag on the play surface — `dx`/`dy` in pixels, end minus start — to the
+   * action it triggers, or `null` to ignore it (e.g. a diagonal the game has no
+   * action for). Only consulted once the drag clears {@link SWIPE_THRESHOLD_PX};
+   * shorter movements fall through to `resolveTapAction`/`primaryAction` as a
+   * plain tap. Takes priority over both for a surface press when present.
+   */
+  readonly resolveSwipeAction?: (dx: number, dy: number) => A | null;
 }
+
+/** Minimum drag distance (px) before a surface press counts as a swipe rather
+ * than a tap — small enough to feel responsive, large enough to absorb the
+ * finger drift a real touch swipe always has. */
+const SWIPE_THRESHOLD_PX = 24;
 
 /** Which control modality a source implements — part of the leaderboard key later (ADR §7). */
 export type InputSourceId = "actions" | "pointer-axis" | "vision-axis";
@@ -185,6 +199,21 @@ export function createActionInputSource<I, A extends string = string>(
       return () => window.removeEventListener("keydown", onKey);
     }, [press]);
 
+    // A tap that fell short of a swipe (or a swipe-less game): the pre-existing
+    // resolution order — tap-zone first, else the single primary action.
+    const pressAsTap = useCallback(
+      (clientX: number): void => {
+        if (controls.resolveTapAction) {
+          const rect = surfaceRef.current?.getBoundingClientRect();
+          const fractionX = rect && rect.width > 0 ? (clientX - rect.left) / rect.width : 0.5;
+          press(controls.resolveTapAction(fractionX));
+          return;
+        }
+        press(controls.primaryAction);
+      },
+      [press, surfaceRef],
+    );
+
     const onSurfacePointerDown = useCallback(
       (e: ReactPointerEvent): void => {
         // Only a plain tap on the surface itself triggers gameplay; taps on the
@@ -192,17 +221,48 @@ export function createActionInputSource<I, A extends string = string>(
         // by the button itself. `closest("button")` catches the button
         // regardless of which descendant (e.g. an icon span) was actually hit.
         if (e.target instanceof Element && e.target.closest("button")) return;
-        if (controls.resolveTapAction) {
-          // Tap-zone games (e.g. left/right halves): resolve from the tap's
-          // horizontal position within the surface, not a single fixed action.
-          const rect = surfaceRef.current?.getBoundingClientRect();
-          const fractionX = rect && rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0.5;
-          press(controls.resolveTapAction(fractionX));
+
+        if (controls.resolveSwipeAction) {
+          // Drag-controlled game (2048): don't act on press-down — wait for the
+          // gesture to finish (anywhere; a real thumb swipe routinely leaves the
+          // surface before lifting), then classify by the full drag vector. A
+          // window listener, not the surface's own pointerup, is what makes
+          // "finger slid off the board" still resolve correctly on release.
+          const startX = e.clientX;
+          const startY = e.clientY;
+          let settled = false;
+          const finish = (endX: number, endY: number): void => {
+            if (settled) return;
+            settled = true;
+            window.removeEventListener("pointerup", onPointerUp);
+            window.removeEventListener("pointercancel", onPointerCancel);
+            const dx = endX - startX;
+            const dy = endY - startY;
+            if (Math.max(Math.abs(dx), Math.abs(dy)) >= SWIPE_THRESHOLD_PX) {
+              const action = controls.resolveSwipeAction?.(dx, dy) ?? null;
+              if (action !== null) {
+                press(action);
+                return;
+              }
+            }
+            // Too short (or an ignored direction) to be a swipe — treat the
+            // release point as a plain tap.
+            pressAsTap(endX);
+          };
+          const onPointerUp = (ev: PointerEvent): void => finish(ev.clientX, ev.clientY);
+          const onPointerCancel = (): void => {
+            settled = true;
+            window.removeEventListener("pointerup", onPointerUp);
+            window.removeEventListener("pointercancel", onPointerCancel);
+          };
+          window.addEventListener("pointerup", onPointerUp);
+          window.addEventListener("pointercancel", onPointerCancel);
           return;
         }
-        press(controls.primaryAction);
+
+        pressAsTap(e.clientX);
       },
-      [press, surfaceRef],
+      [press, pressAsTap],
     );
 
     // On-screen touch controls for multi-action games; single-action games use
