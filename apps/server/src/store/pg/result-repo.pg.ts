@@ -1,4 +1,4 @@
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
 
 import type { Database } from "../../db/drizzle.js";
 import { gameResults } from "../../db/schema.js";
@@ -74,6 +74,18 @@ export function createPgResultRepo(db: Database): ResultRepo {
         .select()
         .from(gameResults)
         .where(eq(gameResults.ownerToken, ownerToken))
+        .orderBy(desc(gameResults.createdAt))
+        .limit(opts?.limit ?? 50)
+        .offset(opts?.offset ?? 0);
+      return rows.map(toGameResult);
+    },
+
+    async findByOwners(ownerTokens, opts?: PaginationOpts) {
+      if (ownerTokens.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(gameResults)
+        .where(inArray(gameResults.ownerToken, [...ownerTokens]))
         .orderBy(desc(gameResults.createdAt))
         .limit(opts?.limit ?? 50)
         .offset(opts?.offset ?? 0);

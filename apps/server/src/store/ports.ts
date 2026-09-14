@@ -150,6 +150,15 @@ export interface ResultRepo {
   /** All results owned by a session token, newest first. */
   findByOwner(ownerToken: string, opts?: PaginationOpts): Promise<GameResult[]>;
 
+  /**
+   * All results owned by ANY of `ownerTokens`, newest first — the cross-device
+   * read for MPG-091-b. The caller resolves the token set (all sessions linked
+   * to an identity, or the bare token when unclaimed) and this unions them at
+   * read time; no result row is ever re-owned on claim/adopt. An empty set
+   * returns `[]`.
+   */
+  findByOwners(ownerTokens: readonly string[], opts?: PaginationOpts): Promise<GameResult[]>;
+
   /** Results for a game + optional event scope, newest first. */
   findByGameAndEvent(
     gameId: string,
@@ -220,6 +229,20 @@ export interface LeaderboardRepo {
     gameId: string,
     metric: string,
     ownerToken: string,
+    filter?: LeaderboardFilter,
+  ): Promise<number | undefined>;
+
+  /**
+   * Best (numerically smallest) 1-based rank held by ANY of `ownerTokens` — the
+   * cross-device `yourRank` for MPG-091-b. Entries stay per-token aggregates
+   * (nothing is merged on claim/adopt); "your rank" is resolved at read time as
+   * the highest-placed of the caller's linked sessions. Undefined if none of
+   * them are on the board; an empty set is also undefined.
+   */
+  rankOfBest(
+    gameId: string,
+    metric: string,
+    ownerTokens: readonly string[],
     filter?: LeaderboardFilter,
   ): Promise<number | undefined>;
 

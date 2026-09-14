@@ -51,6 +51,15 @@ export function createMemoryResultRepo(): ResultRepo {
       return paginate(results, opts);
     },
 
+    async findByOwners(ownerTokens, opts) {
+      if (ownerTokens.length === 0) return [];
+      const owned = new Set(ownerTokens);
+      const results = [...store.values()]
+        .filter((r) => owned.has(r.ownerToken))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      return paginate(results, opts);
+    },
+
     async findByGameAndEvent(gameId, eventId, opts) {
       const results = [...store.values()]
         .filter((r) => {

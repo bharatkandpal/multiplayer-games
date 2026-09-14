@@ -84,6 +84,36 @@ describe("leaderboard routes", () => {
     expect(body.yourRank).toBe(2);
   });
 
+  it("GET /api/leaderboard/:gameId resolves yourRank across linked devices (MPG-091-b)", async () => {
+    const HASH = "a".repeat(64);
+    await store.sessions.upsert("dev-A");
+    await store.sessions.upsert("dev-B");
+    await store.identities.claim("dev-A", "Nova", HASH);
+    await store.identities.adopt("dev-B", HASH);
+
+    // Only device A ever posted a score; the rank must follow the player to B.
+    await store.leaderboard.upsert({
+      gameId: "floppy-birds",
+      metric: "score",
+      ownerToken: "top-player",
+      bestScore: 999,
+      totalGames: 1,
+    });
+    await store.leaderboard.upsert({
+      gameId: "floppy-birds",
+      metric: "score",
+      ownerToken: "dev-A",
+      bestScore: 500,
+      totalGames: 1,
+    });
+
+    const res = await fetch(`${baseUrl}/api/leaderboard/floppy-birds?metric=score`, {
+      headers: { [SESSION_HEADER]: "dev-B" },
+    });
+    const body = (await res.json()) as { yourRank?: number };
+    expect(body.yourRank).toBe(2);
+  });
+
   it("respects the metric and limit query params", async () => {
     for (let i = 0; i < 3; i++) {
       await store.leaderboard.upsert({

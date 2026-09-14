@@ -256,6 +256,37 @@ describe.each([["memory", () => createMemoryStore()]])("%s adapter", (_name, fac
       expect(page).toHaveLength(2);
     });
 
+    it("findByOwners unions results across tokens, newest first (MPG-091-b)", async () => {
+      await store.results.save(makeResult({ runId: "r1", ownerToken: "tok-1" }));
+      await new Promise((r) => setTimeout(r, 5));
+      await store.results.save(makeResult({ runId: "r2", ownerToken: "tok-2" }));
+      await new Promise((r) => setTimeout(r, 5));
+      await store.results.save(makeResult({ runId: "r3", ownerToken: "tok-1" }));
+
+      const union = await store.results.findByOwners(["tok-1", "tok-2"]);
+      expect(union.map((r) => r.runId)).toEqual(["r3", "r2", "r1"]);
+
+      // A single-token set is exactly the old single-owner behaviour.
+      const onlyOne = await store.results.findByOwners(["tok-2"]);
+      expect(onlyOne.map((r) => r.runId)).toEqual(["r2"]);
+    });
+
+    it("findByOwners returns [] for an empty token set", async () => {
+      await store.results.save(makeResult({ runId: "r1", ownerToken: "tok-1" }));
+      expect(await store.results.findByOwners([])).toEqual([]);
+    });
+
+    it("findByOwners paginates across the union", async () => {
+      await store.results.save(makeResult({ runId: "r1", ownerToken: "tok-1" }));
+      await new Promise((r) => setTimeout(r, 5));
+      await store.results.save(makeResult({ runId: "r2", ownerToken: "tok-2" }));
+      await new Promise((r) => setTimeout(r, 5));
+      await store.results.save(makeResult({ runId: "r3", ownerToken: "tok-1" }));
+
+      const page = await store.results.findByOwners(["tok-1", "tok-2"], { limit: 2, offset: 1 });
+      expect(page.map((r) => r.runId)).toEqual(["r2", "r1"]);
+    });
+
     it("findByGameAndEvent filters correctly", async () => {
       await store.results.save(makeResult({ runId: "r1", gameId: "tictactoe", eventId: "evt-A" }));
       await store.results.save(makeResult({ runId: "r2", gameId: "tictactoe", eventId: "evt-B" }));
@@ -417,6 +448,55 @@ describe.each([["memory", () => createMemoryStore()]])("%s adapter", (_name, fac
       expect(await store.leaderboard.rankOf("floppy-birds", "score", "tok-1")).toBe(1);
       expect(await store.leaderboard.rankOf("floppy-birds", "score", "tok-2")).toBe(2);
       expect(await store.leaderboard.rankOf("floppy-birds", "score", "tok-3")).toBeUndefined();
+    });
+
+    it("rankOfBest returns the best rank across a token set (MPG-091-b)", async () => {
+      await store.leaderboard.upsert({
+        gameId: "floppy-birds",
+        metric: "score",
+        ownerToken: "tok-1",
+        bestScore: 100,
+        totalGames: 1,
+      });
+      await store.leaderboard.upsert({
+        gameId: "floppy-birds",
+        metric: "score",
+        ownerToken: "tok-2",
+        bestScore: 70,
+        totalGames: 1,
+      });
+      await store.leaderboard.upsert({
+        gameId: "floppy-birds",
+        metric: "score",
+        ownerToken: "tok-3",
+        bestScore: 40,
+        totalGames: 1,
+      });
+
+      // tok-2 and tok-3 belong to the same player: their best rank is tok-2's (2nd).
+      expect(await store.leaderboard.rankOfBest("floppy-birds", "score", ["tok-2", "tok-3"])).toBe(
+        2,
+      );
+      // Union with the top entry surfaces rank 1.
+      expect(await store.leaderboard.rankOfBest("floppy-birds", "score", ["tok-1", "tok-3"])).toBe(
+        1,
+      );
+      // A single-token set matches the old rankOf.
+      expect(await store.leaderboard.rankOfBest("floppy-birds", "score", ["tok-3"])).toBe(3);
+    });
+
+    it("rankOfBest is undefined when no token is on the board (and for an empty set)", async () => {
+      await store.leaderboard.upsert({
+        gameId: "floppy-birds",
+        metric: "score",
+        ownerToken: "tok-1",
+        bestScore: 100,
+        totalGames: 1,
+      });
+      expect(
+        await store.leaderboard.rankOfBest("floppy-birds", "score", ["tok-2", "tok-3"]),
+      ).toBeUndefined();
+      expect(await store.leaderboard.rankOfBest("floppy-birds", "score", [])).toBeUndefined();
     });
 
     it("filters by eventId", async () => {

@@ -117,6 +117,64 @@ describe("session routes", () => {
     expect(body.results).toEqual([]);
   });
 
+  it("GET /api/session/history unions results across identity-linked devices (MPG-091-b)", async () => {
+    const HASH = "a".repeat(64);
+    // Device A claims an identity; device B adopts it via the recovery code.
+    await store.sessions.upsert("dev-A");
+    await store.sessions.upsert("dev-B");
+    await store.identities.claim("dev-A", "Nova", HASH);
+    await store.identities.adopt("dev-B", HASH);
+
+    await store.results.save({
+      runId: "on-A",
+      gameId: "tictactoe",
+      ownerToken: "dev-A",
+      status: "win",
+      seatsSnapshot: [],
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    await store.results.save({
+      runId: "on-B",
+      gameId: "tictactoe",
+      ownerToken: "dev-B",
+      status: "win",
+      seatsSnapshot: [],
+    });
+
+    // Reading from device B sees device A's game too, newest first.
+    const res = await fetch(`${baseUrl}/api/session/history`, {
+      headers: { [SESSION_HEADER]: "dev-B" },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: { runId: string }[] };
+    expect(body.results.map((r) => r.runId)).toEqual(["on-B", "on-A"]);
+  });
+
+  it("GET /api/session/history stays single-owner for an unclaimed session (MPG-091-b)", async () => {
+    await store.sessions.upsert("solo");
+    await store.sessions.upsert("stranger");
+    await store.results.save({
+      runId: "mine",
+      gameId: "tictactoe",
+      ownerToken: "solo",
+      status: "win",
+      seatsSnapshot: [],
+    });
+    await store.results.save({
+      runId: "theirs",
+      gameId: "tictactoe",
+      ownerToken: "stranger",
+      status: "win",
+      seatsSnapshot: [],
+    });
+
+    const res = await fetch(`${baseUrl}/api/session/history`, {
+      headers: { [SESSION_HEADER]: "solo" },
+    });
+    const body = (await res.json()) as { results: { runId: string }[] };
+    expect(body.results.map((r) => r.runId)).toEqual(["mine"]);
+  });
+
   it("GET /api/session reports username: null before one is set", async () => {
     const res = await fetch(`${baseUrl}/api/session`, {
       headers: { [SESSION_HEADER]: "no-username-yet" },

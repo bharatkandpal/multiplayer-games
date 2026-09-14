@@ -77,6 +77,19 @@ export function createMemoryLeaderboardRepo(): LeaderboardRepo {
       return idx === -1 ? undefined : idx + 1; // 1-based
     },
 
+    async rankOfBest(gameId, metric, ownerTokens, filter) {
+      if (ownerTokens.length === 0) return undefined;
+      const owned = new Set(ownerTokens);
+      const sorted = [...store.values()]
+        .filter((e) => e.gameId === gameId && e.metric === metric && matchesFilter(e, filter))
+        .sort(rankSort);
+
+      // The list is already in rank order, so the first entry owned by any of
+      // the caller's tokens is their best-placed one.
+      const idx = sorted.findIndex((e) => owned.has(e.ownerToken));
+      return idx === -1 ? undefined : idx + 1; // 1-based
+    },
+
     async deleteByOwner(ownerToken) {
       let count = 0;
       for (const [key, e] of store) {
