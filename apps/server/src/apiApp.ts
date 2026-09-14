@@ -26,6 +26,7 @@ import { createEventRouter } from "./analytics/eventRoutes.js";
 import { type EventSink } from "./analytics/sink.js";
 import { createCardRouter } from "./cards/cardRoutes.js";
 import { JSON_BODY_LIMIT } from "./config.js";
+import { createIdentityRouter } from "./identity/identityRoutes.js";
 import { createLeaderboardRouter } from "./leaderboard/leaderboardRoutes.js";
 import { parseCorsOrigin } from "./middleware/cors.js";
 import { noopLimit, type RateLimitFor } from "./middleware/rateLimit.js";
@@ -72,6 +73,7 @@ export function createApiApp({
   app.use(createSessionMiddleware(store));
 
   app.use("/api", createSessionRouter(store, limit));
+  app.use("/api", createIdentityRouter(store, limit));
   app.use("/api", createLeaderboardRouter(store, eventSink, limit));
   app.use("/api", createResultRouter(store, eventSink, limit));
   app.use("/api", createShareRouter(store, eventSink, limit));

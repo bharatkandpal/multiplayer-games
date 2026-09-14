@@ -1,8 +1,9 @@
 /**
  * Drizzle table definitions — the durable persistence schema.
  *
- * Five aggregates:
+ * Six aggregates:
  *   sessions          – lightweight, no-PII identity tokens
+ *   identities        – claimed, durable handles a session can upgrade into (MPG-091)
  *   game_results      – durable record of every completed/abandoned game
  *   leaderboard_entries – per-game, per-scope standings (score or W/L/D)
  *   share_links       – unguessable tokens resolving to a result, replay, or leaderboard
@@ -14,6 +15,7 @@
 
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   index,
   integer,
@@ -38,11 +40,52 @@ export const sessions = pgTable(
     // Nullable — most sessions have never picked a username (MPG-077).
     // Uniqueness is case-insensitive, enforced via the functional index below.
     username: text("username"),
+    // Nullable — set when a session is upgraded into a claimed, durable identity
+    // (MPG-091). Many sessions (devices) may point at one identity. `set null` on
+    // identity delete: losing the claim reverts the session to anonymous, it is
+    // never orphaned to a dangling FK.
+    identityId: uuid("identity_id").references((): AnyPgColumn => identities.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
     metadata: jsonb("metadata"),
   },
-  (t) => [uniqueIndex("sessions_username_lower_idx").on(sql`lower(${t.username})`)],
+  (t) => [
+    uniqueIndex("sessions_username_lower_idx").on(sql`lower(${t.username})`),
+    index("sessions_identity_idx").on(t.identityId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// identities (MPG-091)
+// ---------------------------------------------------------------------------
+
+/**
+ * A claimed, durable handle. A player plays anonymously on a session token;
+ * claiming a handle mints an identity and links the current session to it. A
+ * returning player on a new device re-links their session by presenting the
+ * recovery code (device-key model — no passwords, no email, no OAuth).
+ *
+ *  - `handle` is case-insensitively unique (functional index below), moderated
+ *    at the route via the same `moderateText("handle", …)` as usernames.
+ *  - `recovery_code_hash` is the SHA-256 of the normalised recovery code. The
+ *    plaintext code is shown to the player exactly once at claim time and never
+ *    stored — the column authorises re-linking a session, nothing more, and a
+ *    leak of this table cannot reveal a code.
+ */
+export const identities = pgTable(
+  "identities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    handle: text("handle").notNull(),
+    recoveryCodeHash: text("recovery_code_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("identities_handle_lower_idx").on(sql`lower(${t.handle})`),
+    index("identities_recovery_idx").on(t.recoveryCodeHash),
+  ],
 );
 
 // ---------------------------------------------------------------------------

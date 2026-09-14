@@ -11,6 +11,10 @@ export type { Store } from "./ports.js";
 export type {
   Session,
   SessionRepo,
+  Identity,
+  ClaimResult,
+  AdoptResult,
+  IdentityRepo,
   GameResult,
   NewGameResult,
   ResultRepo,

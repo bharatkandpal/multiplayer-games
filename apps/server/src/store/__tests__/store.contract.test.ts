@@ -118,6 +118,76 @@ describe.each([["memory", () => createMemoryStore()]])("%s adapter", (_name, fac
   });
 
   // -----------------------------------------------------------------------
+  // IdentityRepo (MPG-091)
+  // -----------------------------------------------------------------------
+
+  describe("IdentityRepo", () => {
+    const HASH_A = "a".repeat(64);
+    const HASH_B = "b".repeat(64);
+
+    it("claims a handle and links the calling session", async () => {
+      await store.sessions.upsert("tok-1");
+      const result = await store.identities.claim("tok-1", "Nova", HASH_A);
+      expect(result.ok).toBe(true);
+
+      const identity = await store.identities.findByToken("tok-1");
+      expect(identity?.handle).toBe("Nova");
+      expect(identity?.id).toBeTruthy();
+    });
+
+    it("findByToken returns undefined for an unclaimed session", async () => {
+      await store.sessions.upsert("tok-1");
+      expect(await store.identities.findByToken("tok-1")).toBeUndefined();
+    });
+
+    it("rejects a second claim from the same session (already_claimed)", async () => {
+      await store.sessions.upsert("tok-1");
+      await store.identities.claim("tok-1", "Nova", HASH_A);
+      const again = await store.identities.claim("tok-1", "Other", HASH_B);
+      expect(again).toEqual({ ok: false, reason: "already_claimed" });
+    });
+
+    it("rejects a handle already taken (case-insensitive)", async () => {
+      await store.sessions.upsert("tok-1");
+      await store.sessions.upsert("tok-2");
+      await store.identities.claim("tok-1", "Nova", HASH_A);
+      const taken = await store.identities.claim("tok-2", "nova", HASH_B);
+      expect(taken).toEqual({ ok: false, reason: "handle_taken" });
+    });
+
+    it("adopts an existing identity onto a new session by recovery hash", async () => {
+      await store.sessions.upsert("tok-1");
+      await store.sessions.upsert("tok-2");
+      const claim = await store.identities.claim("tok-1", "Nova", HASH_A);
+      const claimedId = claim.ok ? claim.identity.id : "";
+
+      const adopt = await store.identities.adopt("tok-2", HASH_A);
+      expect(adopt.ok).toBe(true);
+      if (adopt.ok) expect(adopt.identity.id).toBe(claimedId);
+
+      const fromNewDevice = await store.identities.findByToken("tok-2");
+      expect(fromNewDevice?.id).toBe(claimedId);
+    });
+
+    it("rejects adoption with an unknown recovery hash", async () => {
+      await store.sessions.upsert("tok-2");
+      const adopt = await store.identities.adopt("tok-2", HASH_B);
+      expect(adopt).toEqual({ ok: false, reason: "invalid_code" });
+    });
+
+    it("tokensForIdentity returns every linked session (claim + adopt)", async () => {
+      await store.sessions.upsert("tok-1");
+      await store.sessions.upsert("tok-2");
+      const claim = await store.identities.claim("tok-1", "Nova", HASH_A);
+      const id = claim.ok ? claim.identity.id : "";
+      await store.identities.adopt("tok-2", HASH_A);
+
+      const tokens = await store.identities.tokensForIdentity(id);
+      expect(tokens.sort()).toEqual(["tok-1", "tok-2"]);
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // ResultRepo
   // -----------------------------------------------------------------------
 
