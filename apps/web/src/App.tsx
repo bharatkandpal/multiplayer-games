@@ -10,7 +10,7 @@ import {
 import type { GameId, RealtimeGameId } from "@mpg/engine";
 import { useTheme } from "./lib/useTheme";
 import { UiGallery } from "./components/UiGallery";
-import { Button, UsernamePrompt } from "./components/ui";
+import { Button, ClaimHandlePrompt, UsernamePrompt } from "./components/ui";
 import {
   ConnectFourOnlineRoute,
   ConnectFourRoute,
@@ -46,6 +46,7 @@ import { markColdArrival } from "./analytics/firstInput";
 import { getStoredCreatorToken } from "./api/watchSession";
 import { useRoom } from "./hooks/useRoom";
 import { useUsernameGate } from "./hooks/useUsernameGate";
+import { useClaimGate } from "./hooks/useClaimGate";
 import { presetSeats, type SeatsConfig } from "./game";
 import { hasCosmetics } from "./cosmetics";
 import { registerDrunkWalkCosmetics } from "./components/realtime/drunkWalkCharacter";
@@ -351,6 +352,13 @@ export default function App(): React.JSX.Element {
   // an invite link sends the user home rather than leaving them stuck.
   const usernameGate = useUsernameGate(goHome);
 
+  // MPG-091-c: after a value moment (a win or a leaderboard-worthy score, fired
+  // via `noteValueMoment`), offer a non-blocking prompt to claim a durable
+  // handle. Entirely an enhancement — the gate only opens when a boot probe
+  // confirmed the backend is reachable and this session hasn't claimed, so a
+  // backend that's down simply never offers it (offline pillar).
+  const claimGate = useClaimGate();
+
   // MPG-025: `seats` is the Setup screen's real per-seat editor state (human/
   // bot + difficulty, any combination) — no longer hardcoded to "every seat
   // an open human". An all-bot config has no seat for the creator to hold,
@@ -645,6 +653,22 @@ export default function App(): React.JSX.Element {
         onSubmit={usernameGate.handleSubmit}
         onCancel={usernameGate.handleCancel}
         collisionMessage={usernameGate.collisionMessage}
+      />
+
+      <ClaimHandlePrompt
+        isOpen={claimGate.isOpen}
+        view={claimGate.view}
+        recoveryCode={claimGate.recoveryCode}
+        claimedHandle={claimGate.claimedHandle}
+        claimError={claimGate.claimError}
+        adoptError={claimGate.adoptError}
+        submitting={claimGate.submitting}
+        onSubmitClaim={claimGate.submitClaim}
+        onSubmitAdopt={claimGate.submitAdopt}
+        onConfirmSaved={claimGate.confirmSaved}
+        onSwitchToAdopt={claimGate.switchToAdopt}
+        onSwitchToClaim={claimGate.switchToClaim}
+        onCancel={claimGate.cancel}
       />
 
       <footer className={styles.footer}>Created by Bharat Kandpal</footer>

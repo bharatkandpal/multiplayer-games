@@ -25,6 +25,7 @@ import {
 } from "../game";
 import { useLocalResultShare } from "../hooks/useResultShare";
 import { RankPreview } from "./RankPreview";
+import { noteValueMoment } from "../api/identity";
 import styles from "./GamePlayScreen.module.css";
 
 /**
@@ -448,6 +449,14 @@ export function GamePlayScreenView<S, M, L = unknown>({
   useEffect(() => {
     if (isGameOver && showRematch) rematchButtonRef.current?.focus();
   }, [isGameOver, showRematch]);
+
+  // MPG-091-c: a win the local player actually achieved (the same "celebrate"
+  // tone the result banner uses) is a "worth keeping" moment — nudge the claim
+  // prompt. Fires once on the game-over edge; `tone` is stable while the game
+  // stays over, and the gate itself decides whether to offer anything.
+  useEffect(() => {
+    if (isGameOver && tone === "celebrate") noteValueMoment();
+  }, [isGameOver, tone]);
 
   // MPG-042/046: one SeatCard per seat, all in a single row above the board —
   // the primary "whose turn" signal (folds in the bot "thinking" affordance,

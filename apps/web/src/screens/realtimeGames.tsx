@@ -51,6 +51,7 @@ import {
 import { REALTIME_CATALOG } from "./HomeScreen";
 import { RankPreview } from "./RankPreview";
 import { submitRealtimeScore } from "../api/leaderboard";
+import { noteValueMoment } from "../api/identity";
 import { mintResultShareUrl } from "../api/share";
 import { createActionInputSource, createPointerAxisInputSource, type InputSource } from "../game";
 import type { RunComplete } from "../game/useRealtimeLoop";
@@ -342,7 +343,13 @@ function useSettledRun(): {
       // The rank is readable the moment the score write lands; don't make it
       // wait on the share link, which is a separate, optional round-trip.
       setRun((prev) => ({ runKey: prev.runKey + 1, settled: true }));
-      if (resultId) setShareToken(await mintResultShareUrl(resultId));
+      if (resultId) {
+        // A score the server actually persisted is a "worth keeping" moment
+        // (MPG-091-c): nudge the claim prompt. Fire-and-forget; the gate itself
+        // decides whether to offer anything (unclaimed + backend reachable).
+        noteValueMoment();
+        setShareToken(await mintResultShareUrl(resultId));
+      }
     });
   };
 
