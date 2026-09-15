@@ -251,3 +251,48 @@ export const reports = pgTable(
     index("reports_created_idx").on(t.createdAt),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// variants (MPG-089 — save & share a customized game)
+// ---------------------------------------------------------------------------
+
+/**
+ * A player-authored, saveable customization of a base game. At L1 this is
+ * purely cosmetic (ADR 0007) — a named bundle of renderer-only option choices.
+ *
+ *  - `owner_token` is the authoring session, owner-scoped and FK-cascaded like
+ *    every other aggregate so "forget me" erases a player's variants.
+ *  - `cosmetics` is an **opaque, bounded, flat `string→string` JSON map**. The
+ *    server does NOT interpret the option ids — the `CosmeticSchema` lives in
+ *    `apps/web` per the FE/BE import boundary (a variant made on a newer client
+ *    must round-trip through an older server untouched). A shape + size guard
+ *    (`variants/cosmetics.ts`) keeps the column from being abused as arbitrary
+ *    storage; it validates structure and bounds, never the *meaning* of an id.
+ *  - `forked_from` is a nullable self-FK provisioned for lineage (MPG-099). No
+ *    fork path ships at L1 — the column exists so forking is an additive route,
+ *    not a migration. `set null` on parent delete: a fork outlives its origin.
+ *  - `base_game_id` is a plain string (a registered game id), validated at the
+ *    save route (MPG-089-b), not here — the store stays engine-agnostic.
+ */
+export const variants = pgTable(
+  "variants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    ownerToken: text("owner_token")
+      .notNull()
+      .references(() => sessions.token, { onDelete: "cascade" }),
+    baseGameId: text("base_game_id").notNull(),
+    cosmetics: jsonb("cosmetics").notNull(),
+    forkedFrom: uuid("forked_from").references((): AnyPgColumn => variants.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // "My variants" and per-session erasure both scan by owner, newest-first.
+    index("variants_owner_idx").on(t.ownerToken, t.createdAt),
+    // Lineage lookups (MPG-099) walk children of a parent.
+    index("variants_forked_from_idx").on(t.forkedFrom),
+  ],
+);

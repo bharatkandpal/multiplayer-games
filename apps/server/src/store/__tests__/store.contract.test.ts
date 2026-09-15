@@ -748,6 +748,153 @@ describe.each([["memory", () => createMemoryStore()]])("%s adapter", (_name, fac
   });
 
   // -----------------------------------------------------------------------
+  // VariantRepo (MPG-089)
+  // -----------------------------------------------------------------------
+
+  describe("VariantRepo", () => {
+    beforeEach(async () => {
+      await store.sessions.upsert("tok-1");
+      await store.sessions.upsert("tok-2");
+    });
+
+    it("creates a variant and finds it by id", async () => {
+      const created = await store.variants.create({
+        name: "Neon Nim",
+        ownerToken: "tok-1",
+        baseGameId: "nim",
+        cosmetics: { theme: "neon", piece: "orb" },
+      });
+
+      expect(created.id).toBeTruthy();
+      expect(created.name).toBe("Neon Nim");
+      expect(created.ownerToken).toBe("tok-1");
+      expect(created.baseGameId).toBe("nim");
+      expect(created.cosmetics).toEqual({ theme: "neon", piece: "orb" });
+      expect(created.forkedFrom).toBeNull();
+
+      const found = await store.variants.findById(created.id);
+      expect(found).toEqual(created);
+    });
+
+    it("findById returns undefined for an unknown id", async () => {
+      expect(await store.variants.findById(crypto.randomUUID())).toBeUndefined();
+    });
+
+    it("defaults forkedFrom to null and preserves it when set", async () => {
+      const parent = await store.variants.create({
+        name: "Base",
+        ownerToken: "tok-1",
+        baseGameId: "nim",
+        cosmetics: {},
+      });
+      expect(parent.forkedFrom).toBeNull();
+
+      const child = await store.variants.create({
+        name: "Fork",
+        ownerToken: "tok-1",
+        baseGameId: "nim",
+        cosmetics: { theme: "dark" },
+        forkedFrom: parent.id,
+      });
+      expect(child.forkedFrom).toBe(parent.id);
+    });
+
+    it("stores an empty cosmetics map (defaults, saved and named)", async () => {
+      const created = await store.variants.create({
+        name: "Just The Name",
+        ownerToken: "tok-1",
+        baseGameId: "nim",
+        cosmetics: {},
+      });
+      expect(created.cosmetics).toEqual({});
+    });
+
+    it("does not alias stored cosmetics to the input object", async () => {
+      const cosmetics: Record<string, string> = { theme: "neon" };
+      const created = await store.variants.create({
+        name: "Isolated",
+        ownerToken: "tok-1",
+        baseGameId: "nim",
+        cosmetics,
+      });
+      // Mutating the caller's object must not change what was stored.
+      cosmetics["theme"] = "tampered";
+      const found = await store.variants.findById(created.id);
+      expect(found!.cosmetics).toEqual({ theme: "neon" });
+    });
+
+    it("findByOwner returns newest first", async () => {
+      await store.variants.create({
+        name: "v1",
+        ownerToken: "tok-1",
+        baseGameId: "nim",
+        cosmetics: {},
+      });
+      await new Promise((r) => setTimeout(r, 5));
+      await store.variants.create({
+        name: "v2",
+        ownerToken: "tok-1",
+        baseGameId: "nim",
+        cosmetics: {},
+      });
+
+      const owned = await store.variants.findByOwner("tok-1");
+      expect(owned.map((v) => v.name)).toEqual(["v2", "v1"]);
+    });
+
+    it("findByOwner scopes to the owner and returns [] for none", async () => {
+      await store.variants.create({
+        name: "v1",
+        ownerToken: "tok-1",
+        baseGameId: "nim",
+        cosmetics: {},
+      });
+      expect(await store.variants.findByOwner("tok-2")).toEqual([]);
+    });
+
+    it("findByOwner paginates with limit + offset", async () => {
+      for (const name of ["a", "b", "c"]) {
+        await store.variants.create({
+          name,
+          ownerToken: "tok-1",
+          baseGameId: "nim",
+          cosmetics: {},
+        });
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      // Newest-first is [c, b, a]; offset 1 + limit 1 → [b].
+      const page = await store.variants.findByOwner("tok-1", { limit: 1, offset: 1 });
+      expect(page.map((v) => v.name)).toEqual(["b"]);
+    });
+
+    it("deleteByOwner removes all of an owner's variants", async () => {
+      await store.variants.create({
+        name: "a",
+        ownerToken: "tok-1",
+        baseGameId: "nim",
+        cosmetics: {},
+      });
+      await store.variants.create({
+        name: "b",
+        ownerToken: "tok-1",
+        baseGameId: "nim",
+        cosmetics: {},
+      });
+      await store.variants.create({
+        name: "c",
+        ownerToken: "tok-2",
+        baseGameId: "nim",
+        cosmetics: {},
+      });
+
+      const count = await store.variants.deleteByOwner("tok-1");
+      expect(count).toBe(2);
+      expect(await store.variants.findByOwner("tok-1")).toEqual([]);
+      expect(await store.variants.findByOwner("tok-2")).toHaveLength(1);
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // Retention / "Forget me"
   // -----------------------------------------------------------------------
 
