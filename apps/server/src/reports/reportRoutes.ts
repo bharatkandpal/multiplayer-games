@@ -24,10 +24,11 @@ import { noopLimit, type RateLimitFor } from "../middleware/rateLimit.js";
 import type { NewReport, Store } from "../store/ports.js";
 
 /**
- * The reportable surfaces that exist at L1/L2 — the only user-authored content
- * today. `variant_name` joins this set when MPG-089 lands the variant-save path.
+ * The reportable surfaces that exist at L1/L2 — the only user-authored content.
+ * `variant_name` joined when MPG-089-b landed the variant-save path; its
+ * `targetId` is a variant id (a reviewer resolves it to the offending name).
  */
-const REPORT_KINDS = new Set(["username", "handle"]);
+const REPORT_KINDS = new Set(["username", "handle", "variant_name"]);
 
 /** Targets are ids of existing rows; the real ones are UUIDs, well under this. */
 const MAX_TARGET_ID_LEN = 64;

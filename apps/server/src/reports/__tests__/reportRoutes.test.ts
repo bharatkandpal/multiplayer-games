@@ -70,6 +70,14 @@ describe("report routes", () => {
     });
   });
 
+  it("accepts a variant_name report (the surface MPG-089-b added)", async () => {
+    await listen();
+    const res = await report("sess-a", { kind: "variant_name", targetId: "variant-9" });
+    expect(res.status).toBe(201);
+    const [filed] = await store.reports.findByReporter("sess-a");
+    expect(filed).toMatchObject({ kind: "variant_name", targetId: "variant-9" });
+  });
+
   it("accepts a report with no reason and stores null", async () => {
     await listen();
     const res = await report("sess-a", { kind: "username", targetId: "session-7" });

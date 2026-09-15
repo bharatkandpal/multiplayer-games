@@ -217,4 +217,45 @@ describe("share link routes (MPG-056)", () => {
   it("404s an unknown token", async () => {
     expect((await call("/api/share/definitely-not-a-token")).status).toBe(404);
   });
+
+  it("resolves a variant link to a spoiler-free public variant (MPG-089-b)", async () => {
+    await store.sessions.upsert(OWNER);
+    const variant = await store.variants.create({
+      name: "Neon Nim",
+      ownerToken: OWNER,
+      baseGameId: "nim",
+      cosmetics: { theme: "neon" },
+    });
+    // Variant links are minted by POST /api/variants, but the resolve path lives
+    // here — create one directly to exercise the GET branch in isolation.
+    const link = await store.shareLinks.create({
+      token: "variant-link-token",
+      kind: "variant",
+      targetId: variant.id,
+      ownerToken: OWNER,
+    });
+
+    const body = (await (await call(`/api/share/${link.token}`)).json()) as {
+      kind: string;
+      variant: { name: string; baseGameId: string; cosmetics: unknown; ownerToken?: string };
+    };
+    expect(body.kind).toBe("variant");
+    expect(body.variant).toMatchObject({
+      name: "Neon Nim",
+      baseGameId: "nim",
+      cosmetics: { theme: "neon" },
+    });
+    expect(body.variant.ownerToken).toBeUndefined();
+  });
+
+  it("404s a variant link whose target was removed (dead link)", async () => {
+    await store.sessions.upsert(OWNER);
+    const link = await store.shareLinks.create({
+      token: "orphan-variant-link",
+      kind: "variant",
+      targetId: crypto.randomUUID(), // no such variant
+      ownerToken: OWNER,
+    });
+    expect((await call(`/api/share/${link.token}`)).status).toBe(404);
+  });
 });
