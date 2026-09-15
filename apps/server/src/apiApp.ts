@@ -30,6 +30,7 @@ import { createIdentityRouter } from "./identity/identityRoutes.js";
 import { createLeaderboardRouter } from "./leaderboard/leaderboardRoutes.js";
 import { parseCorsOrigin } from "./middleware/cors.js";
 import { noopLimit, type RateLimitFor } from "./middleware/rateLimit.js";
+import { createReportRouter } from "./reports/reportRoutes.js";
 import { createResultRouter } from "./results/resultRoutes.js";
 import { createSessionMiddleware } from "./sessions/sessionMiddleware.js";
 import { createSessionRouter } from "./sessions/sessionRoutes.js";
@@ -77,6 +78,7 @@ export function createApiApp({
   app.use("/api", createLeaderboardRouter(store, eventSink, limit));
   app.use("/api", createResultRouter(store, eventSink, limit));
   app.use("/api", createShareRouter(store, eventSink, limit));
+  app.use("/api", createReportRouter(store, limit));
   // Public, session-free card image for unfurls (MPG-085-b) — the `og:image`
   // target ADR 0009's shim points at.
   app.use("/api", createCardRouter(store));

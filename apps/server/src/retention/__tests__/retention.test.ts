@@ -102,6 +102,12 @@ describe("retention", () => {
         targetId: crypto.randomUUID(),
         ownerToken: "tok-doom",
       });
+      await store.reports.create({
+        kind: "username",
+        targetId: crypto.randomUUID(),
+        reason: "impersonation",
+        reporterToken: "tok-doom",
+      });
 
       // Keep data
       await store.results.save({
@@ -117,6 +123,7 @@ describe("retention", () => {
         results: 1,
         leaderboard: 1,
         shareLinks: 1,
+        reports: 1,
         sessions: 1,
       });
 

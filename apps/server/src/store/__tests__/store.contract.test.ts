@@ -664,6 +664,90 @@ describe.each([["memory", () => createMemoryStore()]])("%s adapter", (_name, fac
   });
 
   // -----------------------------------------------------------------------
+  // ReportRepo (MPG-092 slice 2)
+  // -----------------------------------------------------------------------
+
+  describe("ReportRepo", () => {
+    beforeEach(async () => {
+      await store.sessions.upsert("tok-1");
+      await store.sessions.upsert("tok-2");
+    });
+
+    it("creates a report and finds it by reporter", async () => {
+      const created = await store.reports.create({
+        kind: "handle",
+        targetId: "identity-42",
+        reason: "impersonation",
+        reporterToken: "tok-1",
+      });
+
+      expect(created.id).toBeTruthy();
+      expect(created.kind).toBe("handle");
+      expect(created.targetId).toBe("identity-42");
+      expect(created.reason).toBe("impersonation");
+      expect(created.reporterToken).toBe("tok-1");
+
+      const found = await store.reports.findByReporter("tok-1");
+      expect(found).toEqual([created]);
+    });
+
+    it("defaults an omitted reason to null", async () => {
+      const created = await store.reports.create({
+        kind: "username",
+        targetId: "session-7",
+        reporterToken: "tok-1",
+      });
+      expect(created.reason).toBeNull();
+    });
+
+    it("findByReporter returns newest first", async () => {
+      await store.reports.create({ kind: "username", targetId: "a", reporterToken: "tok-1" });
+      await new Promise((r) => setTimeout(r, 5));
+      await store.reports.create({ kind: "username", targetId: "b", reporterToken: "tok-1" });
+
+      const found = await store.reports.findByReporter("tok-1");
+      expect(found.map((r) => r.targetId)).toEqual(["b", "a"]);
+    });
+
+    it("findByReporter scopes to the reporter and returns [] for none", async () => {
+      await store.reports.create({ kind: "username", targetId: "a", reporterToken: "tok-1" });
+      expect(await store.reports.findByReporter("tok-2")).toEqual([]);
+    });
+
+    it("findByReporter paginates with limit + offset", async () => {
+      for (const targetId of ["a", "b", "c"]) {
+        await store.reports.create({ kind: "username", targetId, reporterToken: "tok-1" });
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      // Newest-first is [c, b, a]; offset 1 + limit 1 → [b].
+      const page = await store.reports.findByReporter("tok-1", { limit: 1, offset: 1 });
+      expect(page.map((r) => r.targetId)).toEqual(["b"]);
+    });
+
+    it("deleteByOwner removes all of a reporter's reports", async () => {
+      await store.reports.create({ kind: "username", targetId: "a", reporterToken: "tok-1" });
+      await store.reports.create({ kind: "handle", targetId: "b", reporterToken: "tok-1" });
+      await store.reports.create({ kind: "username", targetId: "c", reporterToken: "tok-2" });
+
+      const count = await store.reports.deleteByOwner("tok-1");
+      expect(count).toBe(2);
+      expect(await store.reports.findByReporter("tok-1")).toEqual([]);
+      expect(await store.reports.findByReporter("tok-2")).toHaveLength(1);
+    });
+
+    it("deleteOlderThan removes only reports before the cutoff", async () => {
+      await store.reports.create({ kind: "username", targetId: "a", reporterToken: "tok-1" });
+      // Everything just created is newer than a past cutoff, so nothing is swept.
+      const past = new Date(Date.now() - 60_000);
+      expect(await store.reports.deleteOlderThan(past)).toBe(0);
+      // A future cutoff is after every row, so all are swept.
+      const future = new Date(Date.now() + 60_000);
+      expect(await store.reports.deleteOlderThan(future)).toBe(1);
+      expect(await store.reports.findByReporter("tok-1")).toEqual([]);
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // Retention / "Forget me"
   // -----------------------------------------------------------------------
 

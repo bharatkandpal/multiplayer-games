@@ -215,3 +215,39 @@ export const analyticsEvents = pgTable(
     index("analytics_events_owner_idx").on(t.ownerToken, t.createdAt),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// reports (MPG-092 slice 2 — report-a-name)
+// ---------------------------------------------------------------------------
+
+/**
+ * A review queue for player-filed reports about authored content (usernames,
+ * handles at L1/L2). A report hides nothing and blocks no one — it records a
+ * concern for a human reviewer (MPG-103/104) to act on.
+ *
+ *  - `reporter_token` is the filing session, owner-scoped like every other
+ *    table, and FK-cascaded so "forget me" erases a reporter's filings.
+ *  - `target_id` is plain text, not an FK: targets are heterogeneous (a session
+ *    for a username, an identity for a handle, later a variant), so it stores
+ *    the reported surface's id uninterpreted — the reviewer resolves it.
+ *  - `reason` is a bounded, optional, non-displayed note; validated at the route.
+ */
+export const reports = pgTable(
+  "reports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: text("kind").notNull(), // username | handle
+    targetId: text("target_id").notNull(),
+    reason: text("reason"),
+    reporterToken: text("reporter_token")
+      .notNull()
+      .references(() => sessions.token, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Per-session erasure ("forget me") and retention sweeps scan by reporter.
+    index("reports_reporter_idx").on(t.reporterToken, t.createdAt),
+    // A reviewer queue reads newest-first across the whole table.
+    index("reports_created_idx").on(t.createdAt),
+  ],
+);
