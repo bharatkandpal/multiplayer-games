@@ -160,6 +160,12 @@ catalogue shelf), the _region_ scrolls inside the bezel; the page never does.
 - Chrome is spent sparingly: two compact bars, and the board takes the rest. Anything else
   that wants vertical space (status badge, seat rail, watch controls) folds into an existing
   bar or is demoted — the layout is never extended downward.
+- **The site chrome stops at the bezel.** The credit footer and the theme toggle are page
+  furniture: they belong on Home, Setup, a leaderboard or a shared result, and they are not
+  rendered in-game at all. On a 568px frame that toggle is board height.
+- **The board sizes to the shorter axis.** A board clamps its width against the height it
+  was given (`min(<max-width>, calc(100cqh * <aspect>))`), so a short frame yields a smaller
+  board, never a taller page. The bezel wins; the contents fit.
 
 ## 6. Rollout slices
 

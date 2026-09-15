@@ -1,6 +1,12 @@
 .board {
   width: 100%;
-  max-width: 30rem;
+  /* MPG-137: 7 columns of 6 square cells, so the board is ~7:6 — clamping the
+     width by `height * 7/6` is what keeps the tallest board in the catalogue
+     inside the frame instead of pushing the pinned action bar off it. `100cqh`
+     is the play screen's `.boardArea` height (`container-type: size`); outside
+     a size container the unit falls back to the small viewport, which this
+     `min()` never picks. */
+  max-width: min(30rem, calc(100cqh * 7 / 6));
   margin: 0 auto;
 }
 

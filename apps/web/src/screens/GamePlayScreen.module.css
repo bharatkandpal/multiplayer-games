@@ -11,14 +11,21 @@
   width: 100%;
   max-width: var(--container-md);
   margin: 0 auto;
-  padding: var(--space-6) var(--space-4) 0;
+  padding: var(--space-4) var(--space-4) 0;
 
   /* MPG-136: a flex column that fills the shell, so the pinned action bar
      (`margin-top: auto` on `.bar`) lands on the bottom edge even when the board
      is short, instead of floating under it mid-screen. The bar itself is the
-     last child; nothing else here is stretched by this. MPG-137 turns the same
-     column into a hard no-scroll frame. */
-  flex: 1;
+     last child; nothing else here is stretched by this.
+
+     MPG-137 turns the same column into a hard no-scroll frame: `min-height: 0`
+     lets it actually be constrained by the shell instead of flooring at its
+     content height, and `overflow: hidden` is the assertion that nothing here
+     is reachable by scrolling. Everything above the board is deliberately
+     compact — the board is the hero and gets the remainder (§9). */
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -109,12 +116,26 @@
   width: var(--space-8);
 }
 
+/* MPG-137: every row above the board is fixed-size chrome competing with the
+   board for the same budget — none of it may grow, and none of it may be
+   squeezed into illegibility either. */
+.topBar,
+.statusRow,
+.watchControls,
+.toastSlot,
+.seatRow {
+  flex: 0 0 auto;
+}
+
 .statusRow {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   min-height: var(--space-8);
-  margin-bottom: var(--space-6);
+  /* Was `--space-6`. On a 568px-tall frame the gaps above the board were
+     costing more than the difference between a playable board and a cramped
+     one (MPG-137). */
+  margin-bottom: var(--space-3);
 }
 
 .toastSlot {
@@ -128,7 +149,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
-  margin: 0 0 var(--space-6);
+  margin: 0 0 var(--space-3);
   padding: 0;
   border: none;
 }
@@ -144,11 +165,44 @@
   color: var(--color-text-muted);
 }
 
+/*
+ * MPG-137 — the board's height budget, and the reason this screen can't grow
+ * past the frame. It takes the remainder of the column and nothing more:
+ * `flex: 1 1 0` (not `1 1 auto`) because `container-type: size` applies size
+ * containment, so this element's contents deliberately no longer contribute to
+ * its own size — the space it gets is what the chrome leaves over.
+ *
+ * `container-type: size` is what lets the board measure that remainder: board
+ * modules clamp their width with `calc(100cqh * <aspect>)` so a tall board
+ * shrinks to fit the frame instead of pushing the action bar off it. Where
+ * there is no size container (a board rendered outside a play screen), `cqh`
+ * falls back to the small viewport, which the `min()` simply never wins.
+ */
+.boardArea {
+  flex: 1 1 0;
+  /* Floor, not a budget: the board is the hero and never collapses to nothing,
+     whatever the result actions below it are asking for. 11.5rem is the
+     smallest board the catalogue can actually draw — Tic-Tac-Toe's cells hold
+     a 44px touch target (3 x 44 + 2 gaps = 148px) and the move-mode variant
+     adds its phase prompt on top. Below this the board would spill over the
+     actions instead of shrinking, so this is where shrinking stops and the
+     block below starts scrolling instead. */
+  min-height: 11.5rem;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-3);
+}
+
 /* Positioned so the win/lose overlays (MPG-046) can sit above the board
-   itself without affecting layout. */
+   itself without affecting layout. Shrink-wrapped to the board inside
+   `.boardArea`, so `inset: 0` on an overlay means "the board", not "the empty
+   space around it". */
 .boardWrap {
   position: relative;
-  margin-bottom: var(--space-4);
+  width: 100%;
+  max-height: 100%;
 }
 
 /* Seat presence cards (MPG-042/046): a single row above the board. */
@@ -156,8 +210,8 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 /* Inline terminal state (MPG-044/046): the result reads from the board
@@ -169,7 +223,29 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-3);
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-3);
+
+  /* MPG-137: at game over this block (Rematch + the two end actions + a share
+     row + a rank preview) arrives all at once under an already-full column.
+     It is the one thing here allowed to scroll, and only after the board has
+     given up what it can — `.boardArea` shrinks first (it has no floor beyond
+     what the board's own `min()` leaves), and the primary action stays at the
+     top of this block either way, so Rematch is never the part that goes
+     out of view.
+
+     `flex-grow: 1` with `max-height: max-content` is what makes the two
+     settle exactly on the frame: growing stops at this block's own content
+     height (so a tall screen hands the slack to the board, not to whitespace
+     under the buttons), and when there isn't enough room, `.boardArea` freezes
+     at its floor and the shortfall comes out of here — which is why this is
+     the thing that scrolls and the board is not. */
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Percentage first, as the fallback for engines without `max-content` here. */
+  max-height: 60%;
+  max-height: max-content;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* MPG-136: the "you're about to give up this game" confirmation (opened only

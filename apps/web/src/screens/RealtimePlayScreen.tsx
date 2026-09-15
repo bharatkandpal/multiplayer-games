@@ -332,96 +332,102 @@ export function RealtimePlayScreen<S, I>({
           the alignment holds on wide screens. */}
       {surfaceExtra ? <div className={styles.surfaceControls}>{surfaceExtra}</div> : null}
 
-      <div
-        ref={surfaceRef}
-        className={cx(styles.surface, isRunning && styles.surfaceRunning)}
-        role="application"
-        aria-label={`${gameTitle} play area`}
-        aria-describedby={hintId}
-        tabIndex={0}
-        onPointerDown={binding.onSurfacePointerDown ?? undefined}
-      >
-        {renderScene({ state, phase, score, reducedMotion })}
+      {/* MPG-137: the play surface's height budget. This element takes what the
+          chrome above and below leaves over, and is a size container the square
+          surface inside clamps its width against (`100cqh`) — so a short frame
+          gets a smaller play area rather than an action bar pushed off screen. */}
+      <div className={styles.surfaceArea}>
+        <div
+          ref={surfaceRef}
+          className={cx(styles.surface, isRunning && styles.surfaceRunning)}
+          role="application"
+          aria-label={`${gameTitle} play area`}
+          aria-describedby={hintId}
+          tabIndex={0}
+          onPointerDown={binding.onSurfacePointerDown ?? undefined}
+        >
+          {renderScene({ state, phase, score, reducedMotion })}
 
-        {/* The one-time "you're ahead now" moment. Decorative and transient —
+          {/* The one-time "you're ahead now" moment. Decorative and transient —
             the persistent chip and the announcement carry the fact — so it is
             aria-hidden and dropped entirely for reduced-motion. */}
-        {showPassFlash && !reducedMotion ? (
-          <div className={styles.passFlash} aria-hidden="true">
-            Passed them! ✦
-          </div>
-        ) : null}
+          {showPassFlash && !reducedMotion ? (
+            <div className={styles.passFlash} aria-hidden="true">
+              Passed them! ✦
+            </div>
+          ) : null}
 
-        {/* Source-owned in-surface UI (e.g. a camera preview / tracking dot for
+          {/* Source-owned in-surface UI (e.g. a camera preview / tracking dot for
             the vision source); `null` for the discrete-action source. */}
-        {binding.overlay}
+          {binding.overlay}
 
-        {phase !== "running" ? (
-          <div className={cx(styles.overlay, phase === "over" && styles.overlayOver)}>
-            {phase === "ready" ? (
-              <div className={styles.overlayInner}>
-                <p className={styles.overlayText}>{binding.hint}</p>
-                {binding.readyExplainer ? (
-                  <p className={styles.overlayText}>{binding.readyExplainer}</p>
-                ) : null}
-                <Button ref={startBtnRef} variant="primary" onClick={start}>
-                  Start
-                </Button>
-              </div>
-            ) : null}
+          {phase !== "running" ? (
+            <div className={cx(styles.overlay, phase === "over" && styles.overlayOver)}>
+              {phase === "ready" ? (
+                <div className={styles.overlayInner}>
+                  <p className={styles.overlayText}>{binding.hint}</p>
+                  {binding.readyExplainer ? (
+                    <p className={styles.overlayText}>{binding.readyExplainer}</p>
+                  ) : null}
+                  <Button ref={startBtnRef} variant="primary" onClick={start}>
+                    Start
+                  </Button>
+                </div>
+              ) : null}
 
-            {phase === "paused" ? (
-              <div className={styles.overlayInner}>
-                <p className={styles.overlayTitle}>Paused</p>
-                <Button ref={resumeBtnRef} variant="primary" onClick={resume}>
-                  Resume
-                </Button>
-              </div>
-            ) : null}
+              {phase === "paused" ? (
+                <div className={styles.overlayInner}>
+                  <p className={styles.overlayTitle}>Paused</p>
+                  <Button ref={resumeBtnRef} variant="primary" onClick={resume}>
+                    Resume
+                  </Button>
+                </div>
+              ) : null}
 
-            {phase === "over" ? (
-              <div className={styles.overlayInner}>
-                <p className={styles.overlayTitle}>
-                  {verdict?.won ? "You won the challenge!" : "Game over"}
-                </p>
-                <p className={styles.overlayText}>
-                  Final score: <strong>{score}</strong>
-                </p>
-                {verdict ? (
-                  <p className={cx(styles.verdict, verdict.won && styles.verdictWon)}>
-                    {verdict.text}
+              {phase === "over" ? (
+                <div className={styles.overlayInner}>
+                  <p className={styles.overlayTitle}>
+                    {verdict?.won ? "You won the challenge!" : "Game over"}
                   </p>
-                ) : null}
-                <Button ref={playAgainBtnRef} variant="primary" onClick={handlePlayAgain}>
-                  <span className={styles.playAgainIcon} aria-hidden="true">
-                    ↻
-                  </span>
-                  Play again
-                </Button>
-                {shareUrl ? (
-                  /* Secondary to "Play again" — one primary action per state
+                  <p className={styles.overlayText}>
+                    Final score: <strong>{score}</strong>
+                  </p>
+                  {verdict ? (
+                    <p className={cx(styles.verdict, verdict.won && styles.verdictWon)}>
+                      {verdict.text}
+                    </p>
+                  ) : null}
+                  <Button ref={playAgainBtnRef} variant="primary" onClick={handlePlayAgain}>
+                    <span className={styles.playAgainIcon} aria-hidden="true">
+                      ↻
+                    </span>
+                    Play again
+                  </Button>
+                  {shareUrl ? (
+                    /* Secondary to "Play again" — one primary action per state
                      stays the rule; sharing is the optional brag on top. The
                      whole ladder (sheet → clipboard → visible URL) plus its
                      politely-announced feedback lives in `ShareAction`, shared
                      with the turn-based result actions so the two can't drift.
                      Brag-first text (PRD FR-23): the score leads, the link
                      follows, and there's no "Play now!" CTA. */
-                  <ShareAction
-                    url={shareUrl}
-                    title={gameTitle}
-                    text={
-                      verdict?.won
-                        ? `I beat the ${challengeTarget} challenge on ${gameTitle} — scored ${score}`
-                        : `I scored ${score} on ${gameTitle}`
-                    }
-                    shareLabel={verdict?.won ? "Share your win" : "Share score"}
-                  />
-                ) : null}
-                {resultExtra}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+                    <ShareAction
+                      url={shareUrl}
+                      title={gameTitle}
+                      text={
+                        verdict?.won
+                          ? `I beat the ${challengeTarget} challenge on ${gameTitle} — scored ${score}`
+                          : `I scored ${score} on ${gameTitle}`
+                      }
+                      shareLabel={verdict?.won ? "Share your win" : "Share score"}
+                    />
+                  ) : null}
+                  {resultExtra}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {/* Source-owned on-screen touch controls (the action source's per-action

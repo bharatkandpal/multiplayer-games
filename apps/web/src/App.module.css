@@ -4,14 +4,54 @@
  * only owns the persistent chrome.
  */
 
+/*
+ * MPG-137, the layout law (UX_PRINCIPLES §9 / DESIGN_LANGUAGE §5): the viewport
+ * is a hard budget, not a suggestion. The shell is exactly one viewport tall
+ * and never scrolls — `dvh`, not `vh`, so a mobile browser collapsing its
+ * chrome can't leave a strip of the app permanently below the fold. Content
+ * longer than the frame scrolls inside `.screen`, one region, in place.
+ */
 .main {
   font-family: var(--font-family-base);
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  /* `vh` first as the fallback for engines without `dvh`. */
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/*
+ * The active screen. The one scrolling region on a page screen (Home, Setup,
+ * Leaderboard, a shared result): the chrome above it stays put and the page
+ * itself never moves, so no control can scroll out of reach.
+ */
+.screen {
+  flex: 1 1 auto;
+  /* Without this a flex item floors at its content height and pushes the
+     column past the frame — it is what actually makes the budget bite. */
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  /* Don't hand an over-scroll at the end of a shelf to the browser as a
+     page-level pull-to-refresh. */
+  overscroll-behavior: contain;
+}
+
+/*
+ * In-game there is no scrolling region at all: top bar, board, pinned action
+ * bar, and the board takes whatever is left over (GamePlayScreen.module.css
+ * `.boardArea`). Nothing here may be reached by scrolling.
+ */
+.screenInGame {
+  overflow: hidden;
 }
 
 .themeToggle {
+  /* Fixed chrome above the scrolling screen: it must not absorb slack or be
+     squeezed by a tall screen below it. */
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -48,9 +88,13 @@
   padding: 0 var(--space-4) var(--space-6);
 }
 
-/* Site-wide credit, pinned below the content on every screen. */
+/* Site-wide credit, below the content on every page screen. It scrolls WITH
+   the screen (it lives inside `.screen`) rather than being pinned: a credit
+   that permanently occupies the bottom of a 568px-tall frame is spending the
+   budget the content needs (MPG-137). */
 .footer {
   margin-top: auto;
+  flex: 0 0 auto;
   padding: var(--space-6) var(--space-4);
   text-align: center;
   font-size: var(--font-size-200);
