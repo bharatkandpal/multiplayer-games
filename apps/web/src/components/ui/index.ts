@@ -16,6 +16,9 @@ export type { ModalProps } from "./Modal";
 export { UsernamePrompt } from "./UsernamePrompt";
 export type { UsernamePromptProps } from "./UsernamePrompt";
 
+export { ClaimHandlePrompt } from "./ClaimHandlePrompt";
+export type { ClaimHandlePromptProps } from "./ClaimHandlePrompt";
+
 export { ShareAction } from "./ShareAction";
 export type { ShareActionProps } from "./ShareAction";
 
