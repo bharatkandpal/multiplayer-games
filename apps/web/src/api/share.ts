@@ -8,8 +8,9 @@
  */
 
 import { apiFetch } from "./session";
+import type { CosmeticConfig } from "../cosmetics/types";
 
-export type ShareKind = "result" | "replay" | "leaderboard";
+export type ShareKind = "result" | "replay" | "leaderboard" | "variant";
 
 export interface ShareLinkRef {
   readonly token: string;
@@ -32,9 +33,25 @@ export interface SharedResult {
   readonly moveLog?: unknown;
 }
 
+/**
+ * The public projection of a saved variant (MPG-089-c) — enough to play it,
+ * never the owner token. `cosmetics` is the same flat, opaque `slotId →
+ * optionId` map `apps/web/src/cosmetics` already works with; the server
+ * stores it verbatim and never interprets it (ADR 0007: variants are data,
+ * never code).
+ */
+export interface SharedVariant {
+  readonly id: string;
+  readonly name: string;
+  readonly baseGameId: string;
+  readonly cosmetics: CosmeticConfig;
+  readonly createdAt: string;
+}
+
 export type SharedView =
   | { readonly kind: "result" | "replay"; readonly result: SharedResult }
-  | { readonly kind: "leaderboard"; readonly gameId: string; readonly eventId: string | null };
+  | { readonly kind: "leaderboard"; readonly gameId: string; readonly eventId: string | null }
+  | { readonly kind: "variant"; readonly variant: SharedVariant };
 
 /**
  * Thrown when a token resolves to nothing. The server answers "never existed",
