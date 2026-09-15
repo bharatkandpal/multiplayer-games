@@ -12,23 +12,16 @@
 
 /* Raised board panel: a soft outer shadow plus a subtle top highlight/bottom
    shade on the frame itself so the board reads as a physical object sitting
-   above the page, not a flat color fill. */
+   above the page, not a flat color fill. The material is the shared tier-2
+   panel treatment (UI-9, `tokens.css`) — only the color underneath is ours. */
 .grid {
   display: grid;
   gap: var(--space-1);
   padding: var(--space-2);
   border-radius: var(--radius-lg);
   background-color: var(--color-accent);
-  background-image: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.14) 0%,
-    rgba(255, 255, 255, 0) 12%,
-    rgba(0, 0, 0, 0) 88%,
-    rgba(0, 0, 0, 0.12) 100%
-  );
-  box-shadow:
-    var(--shadow-lg),
-    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+  background-image: var(--game-panel-sheen);
+  box-shadow: var(--shadow-lg), var(--game-panel-edge-light);
 }
 
 /* Below ~390px the full gap+padding budget doesn't leave room for 7 shrinkable
@@ -67,7 +60,7 @@
 }
 
 .column:hover:not([aria-disabled="true"]) {
-  background-color: rgba(255, 255, 255, 0.12);
+  background-color: var(--game-surface-hover);
 }
 
 .column:focus-visible {
@@ -88,19 +81,17 @@
 }
 
 /* The empty slot itself: an inset "hole" so unfilled cells read as punched
-   into the board rather than flat rectangles of the frame color. Sits behind
-   the disc (z-index default stacking, disc painted after in DOM order) so a
-   dropped disc still reads as sitting inside the hole, with a thin rim
-   visible around it. */
+   into the board rather than flat rectangles of the frame color — the shared
+   tier-2 "well" material. Sits behind the disc (z-index default stacking,
+   disc painted after in DOM order) so a dropped disc still reads as sitting
+   inside the hole, with a thin rim visible around it. */
 .cell::before {
   content: "";
   position: absolute;
   inset: 6%;
   border-radius: var(--radius-full);
   background-color: var(--color-bg);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.35),
-    inset 0 -1px 1px rgba(255, 255, 255, 0.08);
+  box-shadow: var(--game-well-shadow);
 }
 
 .disc {
@@ -108,13 +99,12 @@
   width: 82%;
   height: 82%;
   border-radius: var(--radius-full);
-  border: var(--border-width-thin) solid rgba(0, 0, 0, 0.25);
+  border: var(--border-width-thin) solid var(--game-piece-rim);
   /* Soft gloss (top-left highlight) + drop shadow so discs read as physical,
-     slightly-domed pieces rather than flat color fills. */
+     slightly-domed pieces rather than flat color fills — the shared tier-2
+     "piece" material. */
   background-blend-mode: normal;
-  box-shadow:
-    0 2px 3px rgba(0, 0, 0, 0.35),
-    0 1px 0 rgba(255, 255, 255, 0.15) inset;
+  box-shadow: var(--game-piece-shadow);
   animation: drop var(--duration-slow) var(--ease-emphasized);
 }
 
@@ -125,12 +115,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background-image: radial-gradient(
-    circle at 32% 28%,
-    rgba(255, 255, 255, 0.55) 0%,
-    rgba(255, 255, 255, 0.12) 30%,
-    rgba(255, 255, 255, 0) 55%
-  );
+  background-image: var(--game-piece-gloss);
   pointer-events: none;
 }
 
@@ -172,9 +157,11 @@
 }
 
 .lastMove {
+  /* Ring + the cast half of the piece material — the inset catchlight is
+     dropped here because the ring already sits where it would read. */
   box-shadow:
     0 0 0 3px var(--color-accent-text),
-    0 2px 3px rgba(0, 0, 0, 0.35);
+    var(--game-piece-cast);
   /* The most recently-dropped disc gets an extra little "impact" squash right
      as it lands, on top of the base fall (MPG-043) — makes the drop feel
      weighted rather than just a straight-line slide. */

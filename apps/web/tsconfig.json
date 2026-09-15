@@ -4,5 +4,9 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx"
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Node-side tests (they read project files off disk) are typechecked by
+  // tsconfig.api.json, which carries node types. Keeping them out of this project
+  // is what stops `node:fs` from typechecking inside the browser bundle.
+  "exclude": ["src/**/*.node.test.ts"]
 }
