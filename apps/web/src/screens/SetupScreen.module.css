@@ -7,11 +7,14 @@
   width: 100%;
   max-width: var(--container-md);
   margin: 0 auto;
-  padding: var(--space-6) var(--space-4);
+  /* MPG-137: trimmed from `--space-6`. The three quick-start options are the
+     whole point of this screen and have to be reachable without scrolling on a
+     568px frame; the budget comes out of the chrome around them. */
+  padding: var(--space-4);
 }
 
 .backRow {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .heading {
@@ -25,14 +28,14 @@
 .description {
   color: var(--color-text-muted);
   max-width: 34rem;
-  margin: 0 0 var(--space-6);
+  margin: 0 0 var(--space-4);
 }
 
 .quickStart {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 /*
@@ -46,8 +49,11 @@
  * specificity, regardless of CSS import order.
  */
 .quickOption.quickOption {
-  min-height: 8rem;
-  padding: var(--space-5) var(--space-4);
+  /* Was 8rem: two of these stacked at 320px wide plus the heading and the
+     online option have to clear a 568px frame (MPG-137). Still comfortably
+     past the 44px touch target. */
+  min-height: 6.5rem;
+  padding: var(--space-4);
   border-radius: var(--radius-lg);
 }
 
@@ -76,7 +82,7 @@
 }
 
 .onlineSection {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-4);
 }
 
 .onlineOption.onlineOption {

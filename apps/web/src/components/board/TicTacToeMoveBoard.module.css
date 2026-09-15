@@ -22,7 +22,11 @@
   grid-template-rows: repeat(3, 1fr);
   gap: var(--space-2);
   width: 100%;
-  max-width: 22rem;
+  /* MPG-137: square, like `TicTacToeBoard` — but this board sits under a phase
+     prompt inside `.wrapper`, so the height budget it can actually claim is
+     the container's minus that line. See `ConnectFourBoard.module.css` for
+     what `cqh` resolves against. */
+  max-width: min(22rem, calc(100cqh - 3rem));
   margin: 0 auto;
 }
 

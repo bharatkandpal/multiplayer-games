@@ -7,12 +7,15 @@
   width: 100%;
   max-width: var(--container-md);
   margin: 0 auto;
-  padding: var(--space-6) var(--space-4) 0;
+  padding: var(--space-4) var(--space-4) 0;
 
   /* MPG-136: a flex column filling the shell, so the pinned action bar
      (`margin-top: auto`) sits on the bottom edge rather than floating under a
-     short play surface. */
-  flex: 1;
+     short play surface. MPG-137 makes the same column a hard no-scroll frame
+     — see the matching note in `GamePlayScreen.module.css`. */
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -116,12 +119,30 @@
 /* The play surface hosts the per-game renderer plus the state overlays. Square
    by default, capped to the container width so it stays responsive down to
    320px. Focusable so keyboard users can flap once the run is under way. */
+/*
+ * MPG-137 — the play surface's height budget. Takes the remainder of the column
+ * and declares itself a size container so `.surface` can clamp against it; see
+ * the twin `.boardArea` in `GamePlayScreen.module.css` for the full reasoning
+ * behind `flex: 1 1 0` (size containment means contents no longer size this) and
+ * the `min-height` floor.
+ */
+.surfaceArea {
+  flex: 1 1 0;
+  min-height: 6rem;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-3);
+}
+
 .surface {
   position: relative;
   width: 100%;
-  max-width: 480px;
+  /* Square, so the height budget clamps the width directly. */
+  max-width: min(480px, 100cqh);
   aspect-ratio: 1 / 1;
-  margin: 0 auto var(--space-4);
+  margin: 0 auto;
   border-radius: var(--radius-lg);
   overflow: hidden;
   background: var(--color-surface-sunken, var(--color-surface));
@@ -298,4 +319,14 @@
   text-align: center;
   color: var(--color-text-muted);
   font-size: var(--font-size-200);
+}
+
+/* MPG-137: everything outside the play surface is fixed-size chrome competing
+   with it for the same budget — it holds its height and never grows. */
+.topBar,
+.statusRow,
+.surfaceControls,
+.touchControls,
+.hint {
+  flex: 0 0 auto;
 }

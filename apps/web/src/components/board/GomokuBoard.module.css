@@ -6,7 +6,10 @@
   grid-template-rows: repeat(9, 1fr);
   gap: var(--space-1);
   width: 100%;
-  max-width: 32rem;
+  /* MPG-137: square (9 rows of 1:1 cells), so the height budget clamps the
+     width directly. See the note in `ConnectFourBoard.module.css` for what
+     `cqh` resolves against here and outside a play screen. */
+  max-width: min(32rem, 100cqh);
   margin: 0 auto;
 }
 

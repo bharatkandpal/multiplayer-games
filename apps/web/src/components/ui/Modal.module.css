@@ -22,7 +22,11 @@
 .dialog {
   width: 100%;
   max-width: var(--container-sm);
+  /* MPG-137: `dvh`, not `vh` — on mobile `vh` is the *large* viewport, so with
+     browser chrome showing, a full-height dialog ran off the bottom of the
+     actual frame. `vh` first as the fallback for engines without `dvh`. */
   max-height: calc(100vh - var(--space-8));
+  max-height: calc(100dvh - var(--space-8));
   overflow-y: auto;
   border-radius: var(--radius-lg);
   background-color: var(--color-surface-raised);

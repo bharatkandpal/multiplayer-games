@@ -8,6 +8,9 @@
  * lets `bottom: 0` pin it on a tall one.
  */
 .bar {
+  /* MPG-137: the bar is the frame's bottom edge and the last thing that may
+     give up space — never shrink it to make room for what's above. */
+  flex: 0 0 auto;
   position: sticky;
   bottom: 0;
   z-index: var(--z-sticky);

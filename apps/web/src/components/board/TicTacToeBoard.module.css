@@ -3,7 +3,12 @@
   grid-template-rows: repeat(3, 1fr);
   gap: var(--space-2);
   width: 100%;
-  max-width: 22rem;
+  /* MPG-137: the board is square (3 rows of 1:1 cells), so its height equals
+     its width — clamping the width by the height budget is what makes it fit
+     the frame. `100cqh` is the play screen's `.boardArea` height (it declares
+     `container-type: size`); with no size container the unit falls back to the
+     small viewport, which this `min()` never picks. */
+  max-width: min(22rem, 100cqh);
   margin: 0 auto;
 }
 

@@ -11,6 +11,7 @@ import type { GameId, RealtimeGameId } from "@mpg/engine";
 import { useTheme } from "./lib/useTheme";
 import { UiGallery } from "./components/UiGallery";
 import { Button, ClaimHandlePrompt, UsernamePrompt } from "./components/ui";
+import { cx } from "./components/ui/cx";
 import {
   ConnectFourOnlineRoute,
   ConnectFourRoute,
@@ -466,215 +467,237 @@ export default function App(): React.JSX.Element {
     // re-run when a distinct invite link is opened.
   }, [joinRoomId, usernameGate.requireUsername]);
 
+  // MPG-136/137: an in-game screen is a frame, not a page — it carries only its
+  // own top bar, the board and the pinned action bar.
+  const inGame = IN_GAME_SCREENS.has(route.screen);
+
   return (
     <main className={styles.main}>
-      <button
-        type="button"
-        className={styles.themeToggle}
-        onClick={cycleTheme}
-        aria-label={`Theme: ${THEME_LABEL[theme]}. Activate to switch theme.`}
-      >
-        Theme: {THEME_LABEL[theme]} ({resolvedTheme})
-      </button>
+      {/* MPG-137: the theme toggle is site chrome, and costs ~76px of a 568px
+          budget. In-game that is board height, and the top bar is spoken for
+          (Home + title + Rules, UX_PRINCIPLES §9) — so it's offered on every
+          page screen and withheld from the frame, exactly like the footer
+          credit below. */}
+      {inGame ? null : (
+        <button
+          type="button"
+          className={styles.themeToggle}
+          onClick={cycleTheme}
+          aria-label={`Theme: ${THEME_LABEL[theme]}. Activate to switch theme.`}
+        >
+          Theme: {THEME_LABEL[theme]} ({resolvedTheme})
+        </button>
+      )}
 
-      {route.screen === "home" ? (
-        <HomeScreen
-          games={games}
-          realtimeGames={realtimeGames}
-          {...(gameOfTheDayId ? { gameOfTheDay: gameOfTheDayId } : {})}
-          onSelectGame={(gameId) => quickStart({ kind: "turn-based", id: gameId, title: gameId })}
-          onSelectRealtimeGame={(gameId) => setRoute({ screen: "realtime", gameId })}
-          onConfigureGame={(gameId) => setRoute({ screen: "setup", gameId })}
-          onShowGallery={() => setRoute({ screen: "gallery" })}
-          devMode={isDevMode()}
-        />
-      ) : null}
+      {/* MPG-137: the one scrolling region. A page screen scrolls in here; an
+          in-game screen doesn't scroll at all. Either way the page itself is
+          pinned to the viewport, so no control can scroll out of reach. */}
+      <div className={cx(styles.screen, inGame && styles.screenInGame)}>
+        {route.screen === "home" ? (
+          <HomeScreen
+            games={games}
+            realtimeGames={realtimeGames}
+            {...(gameOfTheDayId ? { gameOfTheDay: gameOfTheDayId } : {})}
+            onSelectGame={(gameId) => quickStart({ kind: "turn-based", id: gameId, title: gameId })}
+            onSelectRealtimeGame={(gameId) => setRoute({ screen: "realtime", gameId })}
+            onConfigureGame={(gameId) => setRoute({ screen: "setup", gameId })}
+            onShowGallery={() => setRoute({ screen: "gallery" })}
+            devMode={isDevMode()}
+          />
+        ) : null}
 
-      {route.screen === "setup" ? (
-        <SetupScreen
-          gameId={route.gameId}
-          onBack={goHome}
-          onStart={(seats) => setRoute({ screen: "play", gameId: route.gameId, seats })}
-          onPlayOnline={(seats) => handlePlayOnline(route.gameId, seats)}
-        />
-      ) : null}
-
-      {route.screen === "invite" ? (
-        <InviteScreen
-          gameId={route.gameId}
-          room={room}
-          inviteUrl={route.inviteUrl}
-          onCancel={() => {
-            void leaveRoom();
-            goHome();
-          }}
-          onReady={(readyRoom) => {
-            setRoute({
-              screen: "online-play",
-              gameId: route.gameId,
-              roomId: readyRoom.roomId,
-              seats: publicRoomToSeats(readyRoom),
-            });
-          }}
-        />
-      ) : null}
-
-      {route.screen === "join" ? (
-        getStoredUsername() ? (
-          <JoinScreen
+        {route.screen === "setup" ? (
+          <SetupScreen
             gameId={route.gameId}
-            roomId={route.roomId}
-            joinRoom={joinRoom}
-            error={roomError}
-            onBackHome={() => {
-              clearRoomError();
+            onBack={goHome}
+            onStart={(seats) => setRoute({ screen: "play", gameId: route.gameId, seats })}
+            onPlayOnline={(seats) => handlePlayOnline(route.gameId, seats)}
+          />
+        ) : null}
+
+        {route.screen === "invite" ? (
+          <InviteScreen
+            gameId={route.gameId}
+            room={room}
+            inviteUrl={route.inviteUrl}
+            onCancel={() => {
+              void leaveRoom();
               goHome();
             }}
-            onJoined={(joinedRoom) => {
+            onReady={(readyRoom) => {
               setRoute({
                 screen: "online-play",
                 gameId: route.gameId,
-                roomId: joinedRoom.roomId,
-                seats: publicRoomToSeats(joinedRoom),
+                roomId: readyRoom.roomId,
+                seats: publicRoomToSeats(readyRoom),
               });
             }}
           />
-        ) : (
-          // The username picker (rendered below, unconditionally) is open on
-          // top of this — this is just the non-blank state behind it.
-          <div className={styles.galleryWrap}>
-            <p>Pick a username to join this game.</p>
-          </div>
-        )
-      ) : null}
+        ) : null}
 
-      {route.screen === "online-play" ? (
-        <OnlineGameRoute
-          key={route.roomId}
-          gameId={route.gameId}
-          seats={route.seats}
-          roomId={route.roomId}
-          yourSlot={yourSlot}
-          sessionToken={sessionToken}
-          initialRoom={room?.roomId === route.roomId ? room : undefined}
-          onExit={() => {
-            void leaveRoom();
-            goHome();
-          }}
-          onRematchStart={(newRoomId) => {
-            setRoute({
-              screen: "online-play",
-              gameId: route.gameId,
-              roomId: newRoomId,
-              seats: route.seats,
-            });
-          }}
-          onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
-        />
-      ) : null}
+        {route.screen === "join" ? (
+          getStoredUsername() ? (
+            <JoinScreen
+              gameId={route.gameId}
+              roomId={route.roomId}
+              joinRoom={joinRoom}
+              error={roomError}
+              onBackHome={() => {
+                clearRoomError();
+                goHome();
+              }}
+              onJoined={(joinedRoom) => {
+                setRoute({
+                  screen: "online-play",
+                  gameId: route.gameId,
+                  roomId: joinedRoom.roomId,
+                  seats: publicRoomToSeats(joinedRoom),
+                });
+              }}
+            />
+          ) : (
+            // The username picker (rendered below, unconditionally) is open on
+            // top of this — this is just the non-blank state behind it.
+            <div className={styles.galleryWrap}>
+              <p>Pick a username to join this game.</p>
+            </div>
+          )
+        ) : null}
 
-      {route.screen === "watch" ? (
-        <WatchGameRoute
-          key={route.roomId}
-          gameId={route.gameId}
-          roomId={route.roomId}
-          creatorToken={creatorToken ?? getStoredCreatorToken(route.roomId)}
-          initialRoom={room?.roomId === route.roomId ? room : undefined}
-          onExit={goHome}
-        />
-      ) : null}
-
-      {route.screen === "play" ? (
-        <GameRoute
-          key={playNonce}
-          gameId={route.gameId}
-          seats={route.seats}
-          navigation={navigationFor(route.gameId)}
-          onExit={() => {
-            void leaveRoom();
-            goHome();
-          }}
-          onPlayAgain={(seats) => {
-            setPlayNonce((n) => n + 1);
-            setRoute({ screen: "play", gameId: route.gameId, seats });
-          }}
-          onNextGame={() => {
-            const next = nextGame(gameItems, route.gameId);
-            if (next) quickStart(next);
-          }}
-          onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
-        />
-      ) : null}
-
-      {route.screen === "leaderboard" ? (
-        <LeaderboardScreen
-          gameId={route.gameId}
-          gameTitle={
-            GAME_CATALOG[route.gameId as GameId]?.title ??
-            REALTIME_CATALOG[route.gameId as RealtimeGameId]?.title ??
-            route.gameId
-          }
-          metric={
-            REALTIME_CATALOG[route.gameId as RealtimeGameId]
-              ? "score"
-              : (LEADERBOARD_METRIC[route.gameId as GameId] ?? "wld")
-          }
-          onBack={goHome}
-        />
-      ) : null}
-
-      {route.screen === "realtime" ? (
-        <RealtimeGameRoute
-          // Keyed on the challenge too so arriving on a target (or switching
-          // off one) remounts to a clean run rather than reusing loop state.
-          key={`${route.gameId}:${route.challenge?.score ?? ""}`}
-          gameId={route.gameId}
-          navigation={navigationFor(route.gameId)}
-          onExit={() => setRoute({ screen: "home" })}
-          onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
-          {...(route.challenge ? { challenge: route.challenge } : {})}
-        />
-      ) : null}
-
-      {route.screen === "shared" ? (
-        <SharedResultScreen
-          token={route.token}
-          onBackHome={goHome}
-          onPlayGame={(gameId, challengeScore) => {
-            // The shared game may be from either family, so resolve it through
-            // the same ordered catalog Home uses rather than guessing.
-            const item = gameItems.find((candidate) => candidate.id === gameId);
-            if (!item) {
+        {route.screen === "online-play" ? (
+          <OnlineGameRoute
+            key={route.roomId}
+            gameId={route.gameId}
+            seats={route.seats}
+            roomId={route.roomId}
+            yourSlot={yourSlot}
+            sessionToken={sessionToken}
+            initialRoom={room?.roomId === route.roomId ? room : undefined}
+            onExit={() => {
+              void leaveRoom();
               goHome();
-              return;
-            }
-            // A "Beat this score" arrival (MPG-087): only real-time games are
-            // scored, so a challenge routes straight to the realtime surface
-            // with the target. Anything else just opens the game normally.
-            if (typeof challengeScore === "number" && item.kind === "realtime") {
+            }}
+            onRematchStart={(newRoomId) => {
               setRoute({
-                screen: "realtime",
-                gameId: item.id,
-                challenge: { score: challengeScore },
+                screen: "online-play",
+                gameId: route.gameId,
+                roomId: newRoomId,
+                seats: route.seats,
               });
-              return;
-            }
-            quickStart(item);
-          }}
-          onViewLeaderboard={(gameId) =>
-            setRoute({ screen: "leaderboard", gameId: gameId as GameId | RealtimeGameId })
-          }
-        />
-      ) : null}
+            }}
+            onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
+          />
+        ) : null}
 
-      {route.screen === "gallery" ? (
-        <div className={styles.galleryWrap}>
-          <Button variant="ghost" size="sm" onClick={() => setRoute({ screen: "home" })}>
-            ← Back to home
-          </Button>
-          <UiGallery />
-        </div>
-      ) : null}
+        {route.screen === "watch" ? (
+          <WatchGameRoute
+            key={route.roomId}
+            gameId={route.gameId}
+            roomId={route.roomId}
+            creatorToken={creatorToken ?? getStoredCreatorToken(route.roomId)}
+            initialRoom={room?.roomId === route.roomId ? room : undefined}
+            onExit={goHome}
+          />
+        ) : null}
+
+        {route.screen === "play" ? (
+          <GameRoute
+            key={playNonce}
+            gameId={route.gameId}
+            seats={route.seats}
+            navigation={navigationFor(route.gameId)}
+            onExit={() => {
+              void leaveRoom();
+              goHome();
+            }}
+            onPlayAgain={(seats) => {
+              setPlayNonce((n) => n + 1);
+              setRoute({ screen: "play", gameId: route.gameId, seats });
+            }}
+            onNextGame={() => {
+              const next = nextGame(gameItems, route.gameId);
+              if (next) quickStart(next);
+            }}
+            onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
+          />
+        ) : null}
+
+        {route.screen === "leaderboard" ? (
+          <LeaderboardScreen
+            gameId={route.gameId}
+            gameTitle={
+              GAME_CATALOG[route.gameId as GameId]?.title ??
+              REALTIME_CATALOG[route.gameId as RealtimeGameId]?.title ??
+              route.gameId
+            }
+            metric={
+              REALTIME_CATALOG[route.gameId as RealtimeGameId]
+                ? "score"
+                : (LEADERBOARD_METRIC[route.gameId as GameId] ?? "wld")
+            }
+            onBack={goHome}
+          />
+        ) : null}
+
+        {route.screen === "realtime" ? (
+          <RealtimeGameRoute
+            // Keyed on the challenge too so arriving on a target (or switching
+            // off one) remounts to a clean run rather than reusing loop state.
+            key={`${route.gameId}:${route.challenge?.score ?? ""}`}
+            gameId={route.gameId}
+            navigation={navigationFor(route.gameId)}
+            onExit={() => setRoute({ screen: "home" })}
+            onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
+            {...(route.challenge ? { challenge: route.challenge } : {})}
+          />
+        ) : null}
+
+        {route.screen === "shared" ? (
+          <SharedResultScreen
+            token={route.token}
+            onBackHome={goHome}
+            onPlayGame={(gameId, challengeScore) => {
+              // The shared game may be from either family, so resolve it through
+              // the same ordered catalog Home uses rather than guessing.
+              const item = gameItems.find((candidate) => candidate.id === gameId);
+              if (!item) {
+                goHome();
+                return;
+              }
+              // A "Beat this score" arrival (MPG-087): only real-time games are
+              // scored, so a challenge routes straight to the realtime surface
+              // with the target. Anything else just opens the game normally.
+              if (typeof challengeScore === "number" && item.kind === "realtime") {
+                setRoute({
+                  screen: "realtime",
+                  gameId: item.id,
+                  challenge: { score: challengeScore },
+                });
+                return;
+              }
+              quickStart(item);
+            }}
+            onViewLeaderboard={(gameId) =>
+              setRoute({ screen: "leaderboard", gameId: gameId as GameId | RealtimeGameId })
+            }
+          />
+        ) : null}
+
+        {route.screen === "gallery" ? (
+          <div className={styles.galleryWrap}>
+            <Button variant="ghost" size="sm" onClick={() => setRoute({ screen: "home" })}>
+              ← Back to home
+            </Button>
+            <UiGallery />
+          </div>
+        ) : null}
+
+        {/* MPG-136/137: the credit is site chrome, and an in-game screen has
+            none — it ends at the pinned action bar (UX_PRINCIPLES §9: the
+            screen is the frame, and the bar is its bottom edge). On a page
+            screen it sits below the content, inside the scrolling region. */}
+        {inGame ? null : <footer className={styles.footer}>Created by Bharat Kandpal</footer>}
+      </div>
 
       <UsernamePrompt
         isOpen={usernameGate.isOpen}
@@ -698,13 +721,6 @@ export default function App(): React.JSX.Element {
         onSwitchToClaim={claimGate.switchToClaim}
         onCancel={claimGate.cancel}
       />
-
-      {/* MPG-136: the credit is site chrome, and an in-game screen has none —
-          it ends at the pinned action bar (UX_PRINCIPLES §9: the screen is the
-          frame, and the bar is its bottom edge). Shown everywhere else. */}
-      {IN_GAME_SCREENS.has(route.screen) ? null : (
-        <footer className={styles.footer}>Created by Bharat Kandpal</footer>
-      )}
     </main>
   );
 }

@@ -111,41 +111,46 @@ export function LeaderboardScreen({
         </div>
       ) : null}
 
+      {/* MPG-137: the rows are the one thing here that genuinely exceeds the
+          frame, so they are the one thing that scrolls — inside it, with the
+          top bar and Home pinned above (UX_PRINCIPLES §9). */}
       {status === "ready" && entries.length > 0 ? (
-        <table className={styles.table}>
-          <caption className={styles.caption}>
-            {gameTitle} — top {entries.length} {isScore ? "scores" : "players"}
-            {yourRank !== undefined ? ` · your rank: #${yourRank}` : ""}
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Rank</th>
-              <th scope="col">Player</th>
-              <th scope="col">{isScore ? "Best score" : "Wins"}</th>
-              <th scope="col">Games</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry, index) => {
-              const rank = index + 1;
-              const isYou = sessionToken !== null && entry.ownerToken === sessionToken;
-              return (
-                <tr
-                  key={entry.id}
-                  className={isYou ? styles.selfRow : undefined}
-                  aria-current={isYou ? "true" : undefined}
-                >
-                  <td className={styles.numeric}>{rank}</td>
-                  <td>{playerLabel(entry.ownerToken, isYou)}</td>
-                  <td className={styles.numeric}>
-                    {isScore ? (entry.bestScore ?? 0) : entry.wins}
-                  </td>
-                  <td className={styles.numeric}>{entry.totalGames}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <caption className={styles.caption}>
+              {gameTitle} — top {entries.length} {isScore ? "scores" : "players"}
+              {yourRank !== undefined ? ` · your rank: #${yourRank}` : ""}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Rank</th>
+                <th scope="col">Player</th>
+                <th scope="col">{isScore ? "Best score" : "Wins"}</th>
+                <th scope="col">Games</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry, index) => {
+                const rank = index + 1;
+                const isYou = sessionToken !== null && entry.ownerToken === sessionToken;
+                return (
+                  <tr
+                    key={entry.id}
+                    className={isYou ? styles.selfRow : undefined}
+                    aria-current={isYou ? "true" : undefined}
+                  >
+                    <td className={styles.numeric}>{rank}</td>
+                    <td>{playerLabel(entry.ownerToken, isYou)}</td>
+                    <td className={styles.numeric}>
+                      {isScore ? (entry.bestScore ?? 0) : entry.wins}
+                    </td>
+                    <td className={styles.numeric}>{entry.totalGames}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : null}
     </div>
   );

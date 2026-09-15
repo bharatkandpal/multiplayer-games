@@ -7,7 +7,10 @@
   width: 100%;
   max-width: var(--container-sm);
   margin: 0 auto;
-  padding: var(--space-6) var(--space-4);
+  /* MPG-137: this is the one screen a total stranger can land on, so the
+     headline, the score and the play action all have to be in the frame at
+     320×568 without a scroll. */
+  padding: var(--space-5) var(--space-4);
 }
 
 .skeletons {

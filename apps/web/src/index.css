@@ -35,6 +35,18 @@ body,
   height: 100%;
 }
 
+/* MPG-137, the layout law (UX_PRINCIPLES §9): the page itself never scrolls.
+   Every screen is one viewport tall (App.module.css `.main`) and anything
+   longer scrolls in a region inside that frame, so a document-level scrollbar
+   here would only ever be a layout bug leaking out. `overscroll-behavior`
+   stops a fling inside a region turning into a page-level rubber-band /
+   pull-to-refresh on iOS and Android. */
+html,
+body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 body {
   margin: 0;
   background-color: var(--color-bg);

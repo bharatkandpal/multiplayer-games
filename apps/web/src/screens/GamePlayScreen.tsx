@@ -605,24 +605,33 @@ export function GamePlayScreenView<S, M, L = unknown>({
       {/* MPG-046: all seats in a single row above the board. */}
       <div className={styles.seatRow}>{seats.map((seat, i) => renderSeatCard(seat, i))}</div>
 
-      <div className={cx(styles.boardWrap, isGameOver && tone === "subdued" && styles.boardSink)}>
-        {renderBoard({
-          state: session.state,
-          onMove: play,
-          disabled: boardDisabled,
-          lastMove: session.lastMove,
-          winningLine,
-          winningLineTone: tone === "subdued" ? "loss" : "win",
-        })}
+      {/* MPG-137: the board's height budget. This element takes whatever the
+          chrome above and below leaves over and never more (`flex: 1 1 0` +
+          `min-height: 0`), and is a size container — the board reads its
+          height as `cqh` and shrinks to fit rather than pushing the column
+          past the frame. `.boardWrap` stays shrink-wrapped around the board
+          inside it so the win/lose/draw overlays keep hugging the board and
+          not the empty space around it. */}
+      <div className={styles.boardArea}>
+        <div className={cx(styles.boardWrap, isGameOver && tone === "subdued" && styles.boardSink)}>
+          {renderBoard({
+            state: session.state,
+            onMove: play,
+            disabled: boardDisabled,
+            lastMove: session.lastMove,
+            winningLine,
+            winningLineTone: tone === "subdued" ? "loss" : "win",
+          })}
 
-        {/* MPG-046/047: tone-specific decoration over the board, entirely
-            aria-hidden — the outcome itself is carried by the live region
-            below, not by these effects. */}
-        {isGameOver && tone === "celebrate" ? (
-          <div className={styles.winFlash} aria-hidden="true" />
-        ) : null}
-        {isGameOver && tone === "subdued" ? <DefeatGloom /> : null}
-        {isGameOver && tone === "neutral" ? <DrawStalemate /> : null}
+          {/* MPG-046/047: tone-specific decoration over the board, entirely
+              aria-hidden — the outcome itself is carried by the live region
+              below, not by these effects. */}
+          {isGameOver && tone === "celebrate" ? (
+            <div className={styles.winFlash} aria-hidden="true" />
+          ) : null}
+          {isGameOver && tone === "subdued" ? <DefeatGloom /> : null}
+          {isGameOver && tone === "neutral" ? <DrawStalemate /> : null}
+        </div>
       </div>
 
       <div aria-live="polite" role="status">

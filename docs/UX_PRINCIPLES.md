@@ -187,12 +187,30 @@ game, rather than as a _frame_ the game has to fit inside.
 - **No affordance is discovered by gesture.** No swipe-only game switching, no long-press,
   no off-screen drawer as the only path to a feature.
 
+### How it is built (MPG-137)
+
+The law is a layout contract, not a per-screen habit, so it is implemented once in the
+shell and inherited:
+
+- **`App.module.css` `.main` is exactly one viewport tall** (`100dvh`, with a `100vh`
+  fallback) and `overflow: hidden`; `html, body` are locked too, so a document-level
+  scrollbar can only ever be a bug leaking out.
+- **`.screen` is the single scrolling region** on a page screen (Home, Setup, Leaderboard,
+  a shared result). The chrome outside it never moves.
+- **In-game there is no scrolling region at all.** The play column is a flex column whose
+  board sits in a `container-type: size` area taking the remainder; each board clamps its
+  width against that height (`min(<max>, calc(100cqh * <aspect>))`), so a short frame gets
+  a smaller board rather than an action bar pushed off screen.
+- **On game-over the result actions are the one thing that gives**: the board holds a floor
+  and the actions block shrinks and scrolls, so Rematch is never what disappears.
+
 ### How to verify
 
-Load the screen at 320×568 and 390×844 with the browser's page scrollbar disabled, and
-confirm nothing is clipped and every control is reachable. Then hand it to someone who has
-never used the app and say nothing: if they ask "how do I get back?" or "how do I play a
-bot?", the screen has not met this bar.
+`e2e/layout-frame.spec.ts` asserts all of this in a real browser at both sizes — jsdom has
+no layout, so unit tests cannot see this class of regression at all. By hand: load the
+screen at 320×568 and 390×844 and confirm nothing is clipped and every control is
+reachable. Then hand it to someone who has never used the app and say nothing: if they ask
+"how do I get back?" or "how do I play a bot?", the screen has not met this bar.
 
-Backlog: **MPG-136** (in-game bottom action bar + larger Home), **MPG-137** (no-scroll
-viewport layout across the remaining screens).
+Backlog: **MPG-136** (in-game bottom action bar + larger Home) and **MPG-137** (no-scroll
+viewport layout across the remaining screens) — both landed.

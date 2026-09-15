@@ -7,7 +7,10 @@
   width: 100%;
   max-width: var(--container-md);
   margin: 0 auto;
-  padding: var(--space-6) var(--space-4);
+  /* MPG-137: trimmed from `--space-6`. Home is allowed to scroll (it is a
+     catalogue, and the shelves genuinely exceed the frame), but the first card
+     has to be on screen before anyone scrolls — this budget buys that. */
+  padding: var(--space-4);
   font-family: var(--font-family-base);
 }
 
@@ -22,7 +25,7 @@
 
 .tagline {
   color: var(--color-text-muted);
-  margin: 0 0 var(--space-8);
+  margin: 0 0 var(--space-5);
   max-width: 34rem;
 }
 
