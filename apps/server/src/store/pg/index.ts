@@ -3,6 +3,7 @@ import type { Store } from "../ports.js";
 import { createPgEventRepo } from "./event-repo.pg.js";
 import { createPgIdentityRepo } from "./identity-repo.pg.js";
 import { createPgLeaderboardRepo } from "./leaderboard-repo.pg.js";
+import { createPgReportRepo } from "./report-repo.pg.js";
 import { createPgResultRepo } from "./result-repo.pg.js";
 import { createPgSessionRepo } from "./session-repo.pg.js";
 import { createPgShareLinkRepo } from "./share-link-repo.pg.js";
@@ -16,5 +17,6 @@ export function createPgStore(db: Database): Store {
     leaderboard: createPgLeaderboardRepo(db),
     shareLinks: createPgShareLinkRepo(db),
     events: createPgEventRepo(db),
+    reports: createPgReportRepo(db),
   };
 }

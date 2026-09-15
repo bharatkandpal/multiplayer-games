@@ -29,6 +29,9 @@ export type {
   NewAnalyticsEvent,
   EventCount,
   EventRepo,
+  Report,
+  NewReport,
+  ReportRepo,
   PaginationOpts,
 } from "./ports.js";
 

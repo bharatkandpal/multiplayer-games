@@ -17,6 +17,7 @@ export interface RetentionStats {
   readonly results: number;
   readonly leaderboard: number;
   readonly shareLinks: number;
+  readonly reports: number;
   readonly sessions: number;
 }
 
@@ -30,7 +31,10 @@ export async function rollingRetention(store: Store): Promise<RetentionStats> {
   const results = await store.results.deleteOlderThan(cutoff);
   const shareLinks = await store.shareLinks.deleteExpired();
 
-  return { results, leaderboard: 0, shareLinks, sessions: 0 };
+  // Reports are a review queue, not time-series data: pruning them on the same
+  // clock could silently drop an unreviewed report, so they are left to the
+  // reviewer workflow (MPG-103/104), like leaderboard standings.
+  return { results, leaderboard: 0, shareLinks, reports: 0, sessions: 0 };
 }
 
 /** Delete all data scoped to a specific event. */
@@ -39,7 +43,7 @@ export async function purgeEvent(store: Store, eventId: string): Promise<Retenti
   // Game results and share links don't have a dedicated deleteByEvent,
   // but they cascade from session deletion. For event-specific cleanup
   // we rely on the leaderboard; results are cleaned by rolling retention.
-  return { results: 0, leaderboard, shareLinks: 0, sessions: 0 };
+  return { results: 0, leaderboard, shareLinks: 0, reports: 0, sessions: 0 };
 }
 
 /** Delete all traces of a session token across every repo. */
@@ -49,12 +53,14 @@ export async function forgetMe(store: Store, ownerToken: string): Promise<Retent
   const results = await store.results.deleteByOwner(ownerToken);
   const leaderboard = await store.leaderboard.deleteByOwner(ownerToken);
   const shareLinks = await store.shareLinks.deleteByOwner(ownerToken);
+  const reports = await store.reports.deleteByOwner(ownerToken);
   const deleted = await store.sessions.delete(ownerToken);
 
   return {
     results,
     leaderboard,
     shareLinks,
+    reports,
     sessions: deleted ? 1 : 0,
   };
 }

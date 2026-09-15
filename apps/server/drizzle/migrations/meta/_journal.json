@@ -22,6 +22,13 @@
       "when": 1789276171369,
       "tag": "0002_glossy_landau",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789441395893,
+      "tag": "0003_slow_polaris",
+      "breakpoints": true
     }
   ]
 }

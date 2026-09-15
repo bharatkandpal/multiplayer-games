@@ -353,6 +353,53 @@ export interface EventRepo {
 }
 
 // ---------------------------------------------------------------------------
+// Report (MPG-092 slice 2 — report-a-name)
+// ---------------------------------------------------------------------------
+
+/**
+ * A player-filed report about authored content (a username or handle at L1/L2).
+ *
+ * This is a **review queue, not an enforcement action**: writing a report
+ * hides nothing and blocks no one. A human reviewer (MPG-103/104) decides what
+ * happens. The row is owner-scoped by the *reporter's* session token — the same
+ * opaque no-PII token as everywhere else, FK-cascaded so "forget me" erases a
+ * reporter's filings along with the rest of their trail.
+ *
+ * `targetId` is a plain string, not an FK: targets are heterogeneous (a
+ * username belongs to a session, a handle to an identity, later a name to a
+ * variant), so it stores whatever id the reported surface uses, uninterpreted.
+ */
+export interface Report {
+  readonly id: string;
+  readonly kind: string;
+  readonly targetId: string;
+  readonly reason: string | null;
+  readonly reporterToken: string;
+  readonly createdAt: Date;
+}
+
+export interface NewReport {
+  readonly kind: string;
+  readonly targetId: string;
+  readonly reason?: string | null;
+  readonly reporterToken: string;
+}
+
+export interface ReportRepo {
+  /** File a report. Append-only — a report is never updated, only reviewed elsewhere. */
+  create(report: NewReport): Promise<Report>;
+
+  /** All reports filed by a session token, newest first. */
+  findByReporter(reporterToken: string, opts?: PaginationOpts): Promise<Report[]>;
+
+  /** Delete all reports filed by a token ("forget me"). Returns count deleted. */
+  deleteByOwner(reporterToken: string): Promise<number>;
+
+  /** Delete reports older than `cutoff`. Returns count deleted. */
+  deleteOlderThan(cutoff: Date): Promise<number>;
+}
+
+// ---------------------------------------------------------------------------
 // Store (bundle of all repos)
 // ---------------------------------------------------------------------------
 
@@ -363,4 +410,5 @@ export interface Store {
   readonly leaderboard: LeaderboardRepo;
   readonly shareLinks: ShareLinkRepo;
   readonly events: EventRepo;
+  readonly reports: ReportRepo;
 }
