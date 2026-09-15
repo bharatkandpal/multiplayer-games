@@ -102,6 +102,10 @@ export function WatchGamePlayScreen<S, M, L = unknown>({
         describeMove={describeMove}
         onExit={onExit}
         controller={controller}
+        // MPG-138: enables the Rules sheet. Safe alongside `showRematch={false}`
+        // — the other things `gameId` gates (the rank preview, the share link)
+        // need props this screen deliberately doesn't pass, so they stay off.
+        gameId={game.id}
         showRematch={false}
       />
     </div>

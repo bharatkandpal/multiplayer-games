@@ -38,5 +38,8 @@ export type {
   OpponentAction,
 } from "./GameActionBar";
 
-export { BackArrowIcon, GearIcon, HomeIcon } from "./icons";
+export { RulesSheet } from "./RulesSheet";
+export type { RulesSheetProps } from "./RulesSheet";
+
+export { BackArrowIcon, GearIcon, HelpIcon, HomeIcon } from "./icons";
 export type { IconProps } from "./icons";

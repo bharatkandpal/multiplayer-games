@@ -47,6 +47,22 @@
   letter-spacing: var(--letter-spacing-display);
   font-weight: var(--font-weight-bold);
   margin: 0;
+  /* MPG-138: with Home on one side and Rules on the other, the title is now the
+     flexible middle. `min-width: 0` is what actually lets it wrap instead of
+     forcing the bar wider than a 320px viewport and pushing Rules off the
+     screen — the exact failure the layout law exists to prevent. */
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+  overflow-wrap: break-word;
+}
+
+/* Narrow phones: the title steps down a size rather than either control
+   shrinking — the controls are what a lost player is looking for. */
+@media (max-width: 420px) {
+  .heading {
+    font-size: var(--font-size-400);
+  }
 }
 
 /* MPG-136: Home is a labelled exit, not a glyph. The house sits at display
@@ -67,6 +83,30 @@
   /* Icons size to 1em; this is the one place the glyph is deliberately bigger
      than the label beside it — it's the control a lost player looks for. */
   font-size: var(--font-size-400);
+}
+
+/* MPG-138: Rules sits opposite Home, the other end of the same bar — labelled
+   for the same reason Home is, and `ghost` so it reads as the quieter of the
+   two (leaving is the action a lost player needs first). */
+.rulesButton {
+  flex: 0 0 auto;
+}
+
+.rulesContent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rulesIcon {
+  font-size: var(--font-size-300);
+}
+
+/* Occupies the Rules slot for a game with no rules written, so the title
+   doesn't shift across the bar from one game to the next. */
+.topBarSpacer {
+  flex: 0 0 auto;
+  width: var(--space-8);
 }
 
 .statusRow {
