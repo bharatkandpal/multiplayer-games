@@ -400,6 +400,54 @@ export interface ReportRepo {
 }
 
 // ---------------------------------------------------------------------------
+// Variant (MPG-089 — save & share a customized game)
+// ---------------------------------------------------------------------------
+
+/**
+ * A named, player-authored customization of a base game. At L1 (ADR 0007) the
+ * customization is `cosmetics` — a flat, opaque `string→string` map the server
+ * stores but never interprets (the `CosmeticSchema` lives in `apps/web`).
+ *
+ * `forkedFrom` is the id of the variant this one was derived from, if any —
+ * provisioned for lineage (MPG-099); no fork path ships at L1.
+ */
+export interface Variant {
+  readonly id: string;
+  readonly name: string;
+  readonly ownerToken: string;
+  readonly baseGameId: string;
+  readonly cosmetics: Readonly<Record<string, string>>;
+  readonly forkedFrom: string | null;
+  readonly createdAt: Date;
+}
+
+export interface NewVariant {
+  readonly name: string;
+  readonly ownerToken: string;
+  readonly baseGameId: string;
+  readonly cosmetics: Readonly<Record<string, string>>;
+  readonly forkedFrom?: string | null;
+}
+
+export interface VariantRepo {
+  /** Persist a new variant. */
+  create(variant: NewVariant): Promise<Variant>;
+
+  /**
+   * Find a variant by its primary key. A `kind: "variant"` share link stores
+   * this id as its `targetId` (MPG-089-b), so resolving a shared variant is a
+   * lookup by id.
+   */
+  findById(id: string): Promise<Variant | undefined>;
+
+  /** All variants authored by a session token, newest first. */
+  findByOwner(ownerToken: string, opts?: PaginationOpts): Promise<Variant[]>;
+
+  /** Delete all variants authored by a token ("forget me"). Returns count deleted. */
+  deleteByOwner(ownerToken: string): Promise<number>;
+}
+
+// ---------------------------------------------------------------------------
 // Store (bundle of all repos)
 // ---------------------------------------------------------------------------
 
@@ -411,4 +459,5 @@ export interface Store {
   readonly shareLinks: ShareLinkRepo;
   readonly events: EventRepo;
   readonly reports: ReportRepo;
+  readonly variants: VariantRepo;
 }

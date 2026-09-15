@@ -7,6 +7,7 @@ import { createPgReportRepo } from "./report-repo.pg.js";
 import { createPgResultRepo } from "./result-repo.pg.js";
 import { createPgSessionRepo } from "./session-repo.pg.js";
 import { createPgShareLinkRepo } from "./share-link-repo.pg.js";
+import { createPgVariantRepo } from "./variant-repo.pg.js";
 
 /** Create a Postgres-backed Store from a Drizzle instance. */
 export function createPgStore(db: Database): Store {
@@ -18,5 +19,6 @@ export function createPgStore(db: Database): Store {
     shareLinks: createPgShareLinkRepo(db),
     events: createPgEventRepo(db),
     reports: createPgReportRepo(db),
+    variants: createPgVariantRepo(db),
   };
 }

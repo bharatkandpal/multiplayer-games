@@ -32,6 +32,9 @@ export type {
   Report,
   NewReport,
   ReportRepo,
+  Variant,
+  NewVariant,
+  VariantRepo,
   PaginationOpts,
 } from "./ports.js";
 

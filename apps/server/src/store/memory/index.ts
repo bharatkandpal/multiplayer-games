@@ -6,6 +6,7 @@ import { createMemoryReportRepo } from "./report-repo.memory.js";
 import { createMemoryResultRepo } from "./result-repo.memory.js";
 import { createMemorySessionRepo } from "./session-repo.memory.js";
 import { createMemoryShareLinkRepo } from "./share-link-repo.memory.js";
+import { createMemoryVariantRepo } from "./variant-repo.memory.js";
 
 /** Create a fully in-memory Store — no DB required. Used for dev + Vitest. */
 export function createMemoryStore(): Store {
@@ -17,5 +18,6 @@ export function createMemoryStore(): Store {
     shareLinks: createMemoryShareLinkRepo(),
     events: createMemoryEventRepo(),
     reports: createMemoryReportRepo(),
+    variants: createMemoryVariantRepo(),
   };
 }

@@ -108,6 +108,12 @@ describe("retention", () => {
         reason: "impersonation",
         reporterToken: "tok-doom",
       });
+      await store.variants.create({
+        name: "Neon Nim",
+        ownerToken: "tok-doom",
+        baseGameId: "nim",
+        cosmetics: { theme: "neon" },
+      });
 
       // Keep data
       await store.results.save({
@@ -124,6 +130,7 @@ describe("retention", () => {
         leaderboard: 1,
         shareLinks: 1,
         reports: 1,
+        variants: 1,
         sessions: 1,
       });
 
