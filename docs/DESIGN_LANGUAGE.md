@@ -5,7 +5,9 @@ that document sets the quality bar every screen must clear, this one sets what t
 screens should look like while clearing it.
 
 - **Status:** adopted. Foundations (UI-1…UI-3) shipped in `32bc7f2`; UI-4 shipped
-  with MPG-090; UI-5…UI-12 are on the backlog as MPG-112…MPG-119.
+  with MPG-090; UI-5…UI-12 are on the backlog as MPG-112…MPG-119. **§5 (the layout
+  law) was added 2026-09-15 from pilot-user feedback** — slices UI-13/UI-14,
+  backlog MPG-136/MPG-137.
 - **Baseline it was written against:** `main @ 10ec79b` (MPG-056).
 - **Source:** originally drafted as a rendered proposal —
   <https://claude.ai/code/artifact/f4c79e7a-8878-425d-9615-f32b653c5002> — which
@@ -120,7 +122,46 @@ itself — turn-based cards are matte table stock, real-time cards are lit cabin
 panels — so a mixed shelf still reads as two temperatures at a glance, and a
 "Solo arcade" chip keeps that signal in text rather than colour alone.
 
-## 5. Rollout slices
+## 5. Layout law — the cabinet has a bezel
+
+**Added 2026-09-15 from pilot-user feedback.** The direction so far has been about
+_material_ (table vs cabinet). This is the one law about _frame_, and it outranks any
+material decision that conflicts with it. Full rationale and the verification steps live in
+[UX_PRINCIPLES.md](UX_PRINCIPLES.md) §9; this section is what it means visually.
+
+A cabinet is a fixed panel in a bezel. You do not scroll an arcade machine, and the table
+family inherits the same discipline: **a play screen is a frame, not a document.** The
+board and every control needed to act on it live inside the viewport — at 320×568 and
+390×844, with no page scroll. Where content genuinely exceeds the frame (a leaderboard, a
+catalogue shelf), the _region_ scrolls inside the bezel; the page never does.
+
+**The in-game chrome is two bars, and only two.**
+
+```
+┌──────────────────────────────────────────┐
+│ 🏠 Home     Connect Four                 │   ← top bar: exit + title, nothing else
+│                                          │
+│                board                     │   ← the hero, gets all remaining height
+│                                          │
+├──────────────────────────────────────────┤
+│  ‹ Prev      🤖 vs Bot      Next ›       │   ← bottom bar: pinned, thumb-reachable
+└──────────────────────────────────────────┘
+```
+
+- The bottom bar is **persistent and pinned**, not revealed by scrolling. It is where
+  game-switching and the opponent switch live during play — the two things pilot users had
+  to be taught.
+- **Every control in either bar carries a visible text label.** An icon alone with an
+  `aria-label` passes a screen reader and fails a sighted first-timer; this is the same
+  "never colour alone" instinct applied to meaning rather than hue.
+- **The Home control is a labelled exit, sized up.** House glyph at display scale plus the
+  word "Home" — comfortably past the 44px target rather than exactly at it. It replaces the
+  current back-arrow + house pair, which reads as decoration at `--font-size-300`.
+- Chrome is spent sparingly: two compact bars, and the board takes the rest. Anything else
+  that wants vertical space (status badge, seat rail, watch controls) folds into an existing
+  bar or is demoted — the layout is never extended downward.
+
+## 6. Rollout slices
 
 Ordered so each ships on its own; nothing is a big-bang rewrite. UI-9…UI-12 are
 in-game work and can run in parallel with the shell slices — they touch no shared
@@ -140,6 +181,8 @@ screens.
 | UI-10 | MPG-117 | Shared `BoardGrid` primitive; all five boards onto one cell grammar. Kills radius/gap drift                                              | `components/board/BoardGrid` · all five `*Board.module.css`                          | M    | Backlog                 |
 | UI-11 | MPG-118 | Tier-3 scene ramp + memoised `readSceneTokens()`; semantic tokens reserved for state                                                     | `tokens.css` · `lib/sceneTokens.ts` · `FloppyBirdsScene`                             | M    | Backlog                 |
 | UI-12 | MPG-119 | Drunk Walk detox: ~75 baked-in literals → scene ramp; tree sprites re-authored to take `currentColor`                                    | `DrunkWalkScene` · character · glyph · cosmetics                                     | L    | Backlog                 |
+| UI-13 | MPG-136 | §5 bezel, in-game: pinned bottom action bar (prev / vs Bot / next), labelled + enlarged Home, top bar reduced to exit + title            | `GamePlayScreen` · `GameSwitcher` · `OnlineGamePlay`/`WatchGamePlay` · `icons.tsx`   | M    | Backlog                 |
+| UI-14 | MPG-137 | §5 bezel, everywhere else: no page scroll at 320×568 / 390×844; overflow scoped to one region per screen                                 | `App.module.css` · Home · Setup · Leaderboard · Shared result                        | M    | Backlog                 |
 
 **Gate for every slice:** the UX Definition of Done in
 [UX_PRINCIPLES.md](UX_PRINCIPLES.md) §6 — all required states, AA contrast

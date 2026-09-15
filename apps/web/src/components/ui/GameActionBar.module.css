@@ -1,0 +1,82 @@
+/*
+ * MPG-136: the pinned in-game action bar (prev game · opponent · next game).
+ *
+ * `sticky`, not `fixed`: the bar keeps its place in the flow, so it can never
+ * cover the board above it and needs no spacer element underneath. Screens that
+ * render it make their root a full-height flex column and give the bar
+ * `margin-top: auto`, which puts it on the bottom edge of a short screen and
+ * lets `bottom: 0` pin it on a tall one.
+ */
+.bar {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  margin-top: auto;
+  background-color: var(--color-surface);
+  border-top: var(--border-width-hairline) solid var(--color-border);
+  /* Home-indicator / gesture-bar clearance on iOS, zero everywhere else. */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.inner {
+  /* Three fixed slots so the opponent switch stays optically centred as the
+     neighbouring game names change length — and so an empty slot (no opponent
+     to switch to on a watch/online screen) holds its space instead of letting
+     the other two drift inward. */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--size-action-bar);
+  padding: var(--space-2) var(--space-3);
+}
+
+.slot {
+  display: flex;
+  min-width: 0;
+}
+
+.slotEnd {
+  justify-content: flex-end;
+}
+
+/* The glyph is decoration in front of the label, not a substitute for it —
+   they need real space between them, which adjacent JSX children don't give. */
+.opponentContent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+/* Let the button shrink to its slot rather than forcing the row wider to fit a
+   long neighbour title ("Move-Mode Tic-Tac-Toe"). */
+.navButton {
+  min-width: 0;
+}
+
+.navContent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.navLabel {
+  /* A flex item's content-based default min-width defeats ellipsis truncation
+     entirely — `min-width: 0` is what actually lets it shrink. */
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Narrow phones: the three labelled controls still have to fit one row, so the
+   bar trades padding before it trades any label away. */
+@media (max-width: 420px) {
+  .inner {
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-2);
+  }
+}

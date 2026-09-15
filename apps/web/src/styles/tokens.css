@@ -221,6 +221,11 @@
   /* Minimum interactive target (UX_PRINCIPLES §4, §7: touch targets ≥ 44px) */
   --size-touch-target: 2.75rem; /* 44px */
 
+  /* Height of the pinned in-game action bar (MPG-136, UX_PRINCIPLES §9) — a
+     44px target plus its padding. Shared so a screen can reserve exactly the
+     space the bar takes instead of guessing at it. */
+  --size-action-bar: 3.75rem; /* 60px */
+
   /* ---------------------------------------------------------------- */
   /* Radius / border / elevation                                      */
   /* ---------------------------------------------------------------- */

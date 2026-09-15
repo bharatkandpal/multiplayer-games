@@ -35,9 +35,8 @@ import {
 } from "./screens";
 import { GAME_CATALOG, REALTIME_CATALOG } from "./screens/HomeScreen";
 import { SharedResultScreen } from "./screens/SharedResultScreen";
-import { buildGameItems, nextGame, type GameItem } from "./screens/catalog";
+import { buildGameItems, nextGame, prevGame, type GameItem } from "./screens/catalog";
 import { pickGameOfTheDay } from "./screens/gameOfTheDay";
-import { GameSwitcher } from "./screens/GameSwitcher";
 import { isAllBotRoom, publicRoomToSeats, toSeatConfigInput } from "./api/roomSeats";
 import { getStoredUsername } from "./api/username";
 import { initSession } from "./api/session";
@@ -99,6 +98,13 @@ type Route =
   // invite above, this outlives every room — the token resolves to a finished
   // result, a replay, or a leaderboard view, and needs no session to read.
   | { screen: "shared"; token: string };
+
+/**
+ * The screens that are a *game*, not a page: a top bar, the board or play
+ * surface, and the pinned action bar, with no site chrome below them
+ * (MPG-136).
+ */
+const IN_GAME_SCREENS = new Set<Route["screen"]>(["play", "realtime", "online-play", "watch"]);
 
 const ROOM_PATH_RE = /^\/([^/]+)\/room\/([^/]+)\/?$/;
 const SHARE_PATH_RE = /^\/s\/([^/]+)\/?$/;
@@ -221,6 +227,7 @@ function GameRoute({
   onPlayAgain,
   onNextGame,
   onViewLeaderboard,
+  navigation,
 }: { gameId: GameId } & GameRouteProps): React.JSX.Element {
   const Route = GAME_ROUTES[gameId] ?? ConnectFourRoute;
   return (
@@ -230,6 +237,7 @@ function GameRoute({
       {...(onPlayAgain ? { onPlayAgain } : {})}
       {...(onNextGame ? { onNextGame } : {})}
       {...(onViewLeaderboard ? { onViewLeaderboard } : {})}
+      {...(navigation ? { navigation } : {})}
     />
   );
 }
@@ -346,6 +354,30 @@ export default function App(): React.JSX.Element {
       seats: presetSeats("bot", playerCount, item.id),
     });
   }, []);
+
+  /**
+   * MPG-136: the prev/next entries for the play screens' pinned action bar.
+   * Walks the same ordered catalog Home uses and wraps at both ends
+   * (`prevGame`/`nextGame`), so with 2+ games neither side is ever a dead
+   * control — and with a single-game catalog both are absent and the bar
+   * renders nothing rather than two disabled arrows.
+   *
+   * Switching quick-starts the neighbour exactly as tapping it on Home would,
+   * so moving between games never routes through setup.
+   */
+  const navigationFor = useCallback(
+    (gameId: GameId | RealtimeGameId) => {
+      const previous = prevGame(gameItems, gameId);
+      const next = nextGame(gameItems, gameId);
+      return {
+        ...(previous
+          ? { previous: { title: previous.title, onSelect: () => quickStart(previous) } }
+          : {}),
+        ...(next ? { next: { title: next.title, onSelect: () => quickStart(next) } } : {}),
+      };
+    },
+    [gameItems, quickStart],
+  );
 
   // MPG-077: online play (create or join a room) needs a username; local-only
   // play never touches this. Backing out of the picker while trying to join
@@ -553,27 +585,25 @@ export default function App(): React.JSX.Element {
       ) : null}
 
       {route.screen === "play" ? (
-        <>
-          <GameSwitcher items={gameItems} currentId={route.gameId} onSwitch={quickStart} />
-          <GameRoute
-            key={playNonce}
-            gameId={route.gameId}
-            seats={route.seats}
-            onExit={() => {
-              void leaveRoom();
-              goHome();
-            }}
-            onPlayAgain={(seats) => {
-              setPlayNonce((n) => n + 1);
-              setRoute({ screen: "play", gameId: route.gameId, seats });
-            }}
-            onNextGame={() => {
-              const next = nextGame(gameItems, route.gameId);
-              if (next) quickStart(next);
-            }}
-            onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
-          />
-        </>
+        <GameRoute
+          key={playNonce}
+          gameId={route.gameId}
+          seats={route.seats}
+          navigation={navigationFor(route.gameId)}
+          onExit={() => {
+            void leaveRoom();
+            goHome();
+          }}
+          onPlayAgain={(seats) => {
+            setPlayNonce((n) => n + 1);
+            setRoute({ screen: "play", gameId: route.gameId, seats });
+          }}
+          onNextGame={() => {
+            const next = nextGame(gameItems, route.gameId);
+            if (next) quickStart(next);
+          }}
+          onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
+        />
       ) : null}
 
       {route.screen === "leaderboard" ? (
@@ -594,18 +624,16 @@ export default function App(): React.JSX.Element {
       ) : null}
 
       {route.screen === "realtime" ? (
-        <>
-          <GameSwitcher items={gameItems} currentId={route.gameId} onSwitch={quickStart} />
-          <RealtimeGameRoute
-            // Keyed on the challenge too so arriving on a target (or switching
-            // off one) remounts to a clean run rather than reusing loop state.
-            key={`${route.gameId}:${route.challenge?.score ?? ""}`}
-            gameId={route.gameId}
-            onExit={() => setRoute({ screen: "home" })}
-            onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
-            {...(route.challenge ? { challenge: route.challenge } : {})}
-          />
-        </>
+        <RealtimeGameRoute
+          // Keyed on the challenge too so arriving on a target (or switching
+          // off one) remounts to a clean run rather than reusing loop state.
+          key={`${route.gameId}:${route.challenge?.score ?? ""}`}
+          gameId={route.gameId}
+          navigation={navigationFor(route.gameId)}
+          onExit={() => setRoute({ screen: "home" })}
+          onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
+          {...(route.challenge ? { challenge: route.challenge } : {})}
+        />
       ) : null}
 
       {route.screen === "shared" ? (
@@ -671,7 +699,12 @@ export default function App(): React.JSX.Element {
         onCancel={claimGate.cancel}
       />
 
-      <footer className={styles.footer}>Created by Bharat Kandpal</footer>
+      {/* MPG-136: the credit is site chrome, and an in-game screen has none —
+          it ends at the pinned action bar (UX_PRINCIPLES §9: the screen is the
+          frame, and the bar is its bottom edge). Shown everywhere else. */}
+      {IN_GAME_SCREENS.has(route.screen) ? null : (
+        <footer className={styles.footer}>Created by Bharat Kandpal</footer>
+      )}
     </main>
   );
 }

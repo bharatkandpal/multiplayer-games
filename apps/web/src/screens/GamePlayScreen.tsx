@@ -1,16 +1,17 @@
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { DrawReason, GameModule, Player, Result } from "@mpg/engine";
 import {
-  BackArrowIcon,
   Button,
+  GameActionBar,
   HomeIcon,
+  Modal,
   SeatCard,
   ShareAction,
   StatusBadge,
   Toast,
   VisuallyHidden,
 } from "../components/ui";
-import type { StatusBadgeStatus } from "../components/ui";
+import type { GameNavigation, StatusBadgeStatus } from "../components/ui";
 import { cx } from "../components/ui/cx";
 import {
   type AppliedMove,
@@ -96,6 +97,12 @@ export interface GamePlayScreenProps<S, M, L = unknown> {
    */
   onNextGame?: () => void;
   /**
+   * MPG-136: the neighbouring games in the catalog, for the pinned action bar
+   * at the bottom of the screen. Omit and the bar's prev/next slots are simply
+   * empty — which is what the watch and online screens want.
+   */
+  navigation?: GameNavigation;
+  /**
    * MPG-015: when set, this is an online (room-backed) game — the Rematch
    * button proposes a server-authoritative rematch instead of restarting the
    * local session, and the negotiation state (waiting / opponent wants a
@@ -131,6 +138,7 @@ export interface GamePlayScreenViewProps<S, M, L = unknown> {
   onExit: () => void;
   onPlayAgain?: (seats: SeatsConfig) => void;
   onNextGame?: () => void;
+  navigation?: GameNavigation;
   online?: OnlineRematchProps;
   gameId?: string;
   onViewLeaderboard?: () => void;
@@ -370,6 +378,7 @@ export function GamePlayScreenView<S, M, L = unknown>({
   onExit,
   onPlayAgain,
   onNextGame,
+  navigation,
   online,
   gameId,
   onViewLeaderboard,
@@ -441,6 +450,25 @@ export function GamePlayScreenView<S, M, L = unknown>({
     (preset) => !sameSeatKinds(presetSeats(preset, seats.length), seats),
   );
 
+  // MPG-136: the same preset drives the opponent switch in the pinned action
+  // bar, so it's available *during* a game and not only once one is over —
+  // "how do I play a bot?" was a question pilot users had to ask. Exactly one
+  // preset survives the filter above in a two-seat game (a human-vs-bot game
+  // can only offer "play a friend", and vice versa), so the bar shows one
+  // labelled control rather than a menu.
+  const opponentPreset = playAgainPresets[0];
+
+  // Switching opponent starts a genuinely new game, so a game already under way
+  // has to be given up. That's only worth a confirmation when there's something
+  // to lose: a game with no moves yet (or one already over) switches straight
+  // away, and only a game in progress opens the dialog.
+  const [pendingOpponent, setPendingOpponent] = useState<OpponentPreset | null>(null);
+  const gameInProgress = !isGameOver && session.lastMove !== null;
+
+  const switchOpponent = (preset: OpponentPreset): void => {
+    onPlayAgain?.(presetSeats(preset, seats.length, gameId));
+  };
+
   // MPG-044: the result banner is inline (no modal to dismiss before the
   // board is visible), so on game-over move focus straight to Rematch — the
   // one obvious next action — rather than leaving focus stranded on the
@@ -484,11 +512,15 @@ export function GamePlayScreenView<S, M, L = unknown>({
 
   return (
     <div className={styles.main}>
+      {/* MPG-136: the top bar is the exit and the title, nothing else. Home is
+          a glyph *plus the word* — the old back-arrow + house pair had no
+          visible label and read as decoration, so players had to be told what
+          it was (UX_PRINCIPLES §9). */}
       <div className={styles.topBar}>
-        <Button variant="ghost" size="sm" onClick={onExit} aria-label="Home">
-          <span className={styles.homeIcons}>
-            <BackArrowIcon />
-            <HomeIcon />
+        <Button variant="secondary" className={styles.homeButton} onClick={onExit}>
+          <span className={styles.homeContent}>
+            <HomeIcon className={styles.homeIcon} />
+            Home
           </span>
         </Button>
         <h1 className={styles.heading}>{gameTitle}</h1>
@@ -663,6 +695,65 @@ export function GamePlayScreenView<S, M, L = unknown>({
           ) : null}
         </div>
       ) : null}
+
+      {/* MPG-136: the pinned bottom bar. Last child of the flex column, so it
+          sits on the bottom edge and every path out of this screen — another
+          game, another opponent — is visible without scrolling or being told.
+
+          The opponent switch is the *mid-game* affordance and drops off once
+          the game is over: the result actions offer the identical choice
+          ("Play vs Bot" / "Play a friend") right where the player is already
+          looking, and two buttons with the same label on one screen is worse
+          than one. Prev/next stay put — the bar's whole point is that it
+          doesn't move. */}
+      <GameActionBar
+        {...(navigation ? { navigation } : {})}
+        {...(onPlayAgain && opponentPreset && !isGameOver
+          ? {
+              opponent: {
+                icon: PLAY_AGAIN_PRESET_COPY[opponentPreset].icon,
+                label: PLAY_AGAIN_PRESET_COPY[opponentPreset].label,
+                onSelect: () => {
+                  if (gameInProgress) {
+                    setPendingOpponent(opponentPreset);
+                    return;
+                  }
+                  switchOpponent(opponentPreset);
+                },
+              },
+            }
+          : {})}
+      />
+
+      {/* Only ever opened for a game with moves on the board (see
+          `gameInProgress`) — the cost of switching is real there, and nowhere
+          else. Plain language about what is actually lost, and Escape/backdrop
+          both mean "keep playing". */}
+      <Modal
+        isOpen={pendingOpponent !== null}
+        title="Start a new game?"
+        onClose={() => setPendingOpponent(null)}
+        closeLabel="Close, keep playing"
+      >
+        <p className={styles.confirmBody}>
+          This game is still going. Switching opponent starts a fresh one, and this board is lost.
+        </p>
+        <div className={styles.confirmActions}>
+          <Button variant="ghost" onClick={() => setPendingOpponent(null)}>
+            Keep playing
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              const preset = pendingOpponent;
+              setPendingOpponent(null);
+              if (preset) switchOpponent(preset);
+            }}
+          >
+            {pendingOpponent ? PLAY_AGAIN_PRESET_COPY[pendingOpponent].label : "Start new game"}
+          </Button>
+        </div>
+      </Modal>
 
       {/* Full-viewport particle layers on a terminal state — rendered at the
           top level so their fixed positioning isn't trapped by a transformed
