@@ -3,8 +3,10 @@ import type { DrawReason, GameModule, Player, Result } from "@mpg/engine";
 import {
   Button,
   GameActionBar,
+  HelpIcon,
   HomeIcon,
   Modal,
+  RulesSheet,
   SeatCard,
   ShareAction,
   StatusBadge,
@@ -24,6 +26,7 @@ import {
   sameSeatKinds,
   useLocalPlayController,
 } from "../game";
+import { useGameRules } from "../hooks/useGameRules";
 import { useLocalResultShare } from "../hooks/useResultShare";
 import { RankPreview } from "./RankPreview";
 import { noteValueMoment } from "../api/identity";
@@ -465,6 +468,12 @@ export function GamePlayScreenView<S, M, L = unknown>({
   const [pendingOpponent, setPendingOpponent] = useState<OpponentPreset | null>(null);
   const gameInProgress = !isGameOver && session.lastMove !== null;
 
+  // MPG-138: how to play, both on demand (the top-bar Rules control) and
+  // unasked the first time this player opens this game. `rules === null` — no
+  // game id, or no prose written for it — means no control and no sheet, rather
+  // than a button that opens nothing.
+  const rules = useGameRules(gameId);
+
   const switchOpponent = (preset: OpponentPreset): void => {
     onPlayAgain?.(presetSeats(preset, seats.length, gameId));
   };
@@ -524,6 +533,27 @@ export function GamePlayScreenView<S, M, L = unknown>({
           </span>
         </Button>
         <h1 className={styles.heading}>{gameTitle}</h1>
+
+        {/* MPG-138: the help affordance lives opposite Home — the two "I need
+            something that isn't a move" controls, both labelled, both in the
+            same place on every play screen. */}
+        {rules.rules ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className={styles.rulesButton}
+            onClick={rules.open}
+            aria-haspopup="dialog"
+          >
+            <span className={styles.rulesContent}>
+              <HelpIcon className={styles.rulesIcon} />
+              Rules
+            </span>
+          </Button>
+        ) : (
+          // Holds Home and the title in place whether or not this game has rules.
+          <span className={styles.topBarSpacer} aria-hidden="true" />
+        )}
       </div>
 
       <div className={styles.statusRow}>
@@ -754,6 +784,17 @@ export function GamePlayScreenView<S, M, L = unknown>({
           </Button>
         </div>
       </Modal>
+
+      {rules.rules ? (
+        <RulesSheet
+          isOpen={rules.isOpen}
+          onClose={rules.close}
+          gameTitle={gameTitle}
+          goal={rules.rules.goal}
+          steps={rules.rules.steps}
+          {...(rules.rules.notes ? { notes: rules.rules.notes } : {})}
+        />
+      ) : null}
 
       {/* Full-viewport particle layers on a terminal state — rendered at the
           top level so their fixed positioning isn't trapped by a transformed

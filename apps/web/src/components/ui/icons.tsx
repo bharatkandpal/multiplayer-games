@@ -53,6 +53,30 @@ export function HomeIcon(props: IconProps): React.JSX.Element {
   );
 }
 
+/** Circled question mark — "help" / "how does this work". */
+export function HelpIcon(props: IconProps): React.JSX.Element {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <circle cx={12} cy={12} r={9} />
+      {/* The hook and stem of the "?", drawn rather than set as text so it
+          keeps the same stroke weight as every other icon here. */}
+      <path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.3-2.7 4" />
+      <path d="M12 17.3h.01" />
+    </svg>
+  );
+}
+
 const GEAR_CENTER = { x: 12, y: 12 };
 const GEAR_RING_R = 6.4;
 const GEAR_TOOTH_OUTER_R = 8.8;
