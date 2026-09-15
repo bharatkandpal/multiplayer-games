@@ -3,7 +3,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { TicTacToeState } from "@mpg/engine";
 import { TicTacToeBoard } from "./TicTacToeBoard";
-import styles from "./TicTacToeBoard.module.css";
+// The state rings live on the shared primitive now (UI-10), not on the game's own sheet.
+import styles from "./BoardGrid.module.css";
 
 function emptyState(): TicTacToeState {
   return { board: new Array(9).fill(null) };

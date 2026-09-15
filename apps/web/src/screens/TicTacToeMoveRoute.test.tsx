@@ -3,7 +3,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TicTacToeMoveRoute } from "./games";
 import type { SeatsConfig } from "../game";
-import boardStyles from "../components/board/TicTacToeMoveBoard.module.css";
+// The winning-line rings come from the shared board primitive (UI-10), not
+// from the game's own sheet.
+import boardStyles from "../components/board/BoardGrid.module.css";
 
 /**
  * Integration play-through for the "tictactoe-move" route (MPG-045-d) —

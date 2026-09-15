@@ -9,7 +9,9 @@ import { GamePlayScreen, resultTone } from "./GamePlayScreen";
 import type { OnlineRematchProps } from "./GamePlayScreen";
 import type { SeatsConfig } from "../game";
 import { TicTacToeBoard } from "../components/board";
-import boardStyles from "../components/board/TicTacToeBoard.module.css";
+// The winning-line rings come from the shared board primitive (UI-10), not
+// from the game's own sheet.
+import boardStyles from "../components/board/BoardGrid.module.css";
 
 /** Finds the SeatCard for "Player N" and returns its root element. */
 function seatCardFor(playerNumber: number): HTMLElement {

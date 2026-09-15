@@ -1,3 +1,6 @@
+export { BoardGrid } from "./BoardGrid";
+export type { BoardGridProps, BoardCellSpec, WinningTone } from "./BoardGrid";
+
 export { TicTacToeBoard } from "./TicTacToeBoard";
 export type { TicTacToeBoardProps } from "./TicTacToeBoard";
 

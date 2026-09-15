@@ -314,6 +314,54 @@
   );
 
   /* ---------------------------------------------------------------- */
+  /* Board cell grammar (UI-10)                                        */
+  /*                                                                    */
+  /* Not a new tier — a composition of the two above. Tier 1 says what  */
+  /* a cell MEANS (--color-surface-raised, --color-border-strong),      */
+  /* tier 2 says what it is MADE OF; this block fixes the one set of    */
+  /* dimensions every board cell in the catalogue is cut to, so a       */
+  /* player moving between games sees one table rather than five.       */
+  /*                                                                    */
+  /* Before UI-10 each board picked its own: Tic-Tac-Toe and Move-Mode  */
+  /* shared a byte-identical `.cell` block by copy-paste, Gomoku had a  */
+  /* thinner border and a different press scale, and Nim's `.pile`      */
+  /* re-derived the same raised surface a third time. `BoardGrid` reads */
+  /* these; Connect Four and Nim, whose objects are not grid cells,     */
+  /* read the ones that still apply rather than re-deriving them.       */
+  /*                                                                    */
+  /* Two densities, and the difference is real, not drift: a 9x9 grid   */
+  /* at phone width cannot afford a 3x3 board's gap, padding or 44px    */
+  /* floor. Naming them here is what keeps that a decision instead of   */
+  /* an accident. The dense floor of 0 is the known a11y gap Gomoku     */
+  /* already carries — it belongs to MPG-020, not here.                 */
+  /* ---------------------------------------------------------------- */
+
+  --board-gap: var(--space-2);
+  --board-cell-radius: var(--radius-md);
+  --board-cell-border: var(--border-width-thick) solid var(--color-border-strong);
+  --board-cell-padding: var(--space-2);
+  --board-cell-min-size: var(--size-touch-target);
+
+  --board-gap-dense: var(--space-1);
+  --board-cell-radius-dense: var(--radius-sm);
+  --board-cell-border-dense: var(--border-width-thin) solid var(--color-border-strong);
+  --board-cell-padding-dense: 0;
+  --board-cell-min-size-dense: 0;
+
+  /* Shared across both densities. */
+  --board-cell-bg: var(--color-surface-raised);
+  --board-cell-bg-hover: var(--color-bg-subtle);
+  --board-cell-shadow: var(--shadow-sm);
+  --board-cell-press-scale: 0.96;
+
+  /* State rings. Every board draws its highlights at these widths, including
+     the two (Connect Four, Nim) whose objects are not grid cells — so a
+     "this just moved" ring reads the same weight whatever you are playing. */
+  --board-ring-width: 3px;
+  --board-ring-width-thin: 2px;
+  --board-pulse-scale: 1.06;
+
+  /* ---------------------------------------------------------------- */
   /* Liquid glass — frosted, translucent surfaces (blur + sheen).      */
   /* Consumed via backdrop-filter with a solid @supports fallback so   */
   /* the surface never turns unreadable where blur is unsupported.     */

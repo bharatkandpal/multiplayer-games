@@ -48,7 +48,7 @@
   padding: 0;
   border: none;
   background: transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--board-cell-radius-dense);
   cursor: pointer;
   transition: background-color var(--duration-fast) var(--ease-standard);
 }
@@ -160,7 +160,7 @@
   /* Ring + the cast half of the piece material — the inset catchlight is
      dropped here because the ring already sits where it would read. */
   box-shadow:
-    0 0 0 3px var(--color-accent-text),
+    0 0 0 var(--board-ring-width) var(--color-accent-text),
     var(--game-piece-cast);
   /* The most recently-dropped disc gets an extra little "impact" squash right
      as it lands, on top of the base fall (MPG-043) — makes the drop feel
@@ -192,7 +192,7 @@
    keep their solid/striped fill so the win reads without relying on color. */
 .winning {
   box-shadow:
-    0 0 0 3px var(--color-success),
+    0 0 0 var(--board-ring-width) var(--color-success),
     0 0 10px 2px var(--color-success);
   animation: winPulse var(--duration-slow) var(--ease-emphasized);
 }
@@ -202,7 +202,7 @@
     transform: scale(1);
   }
   50% {
-    transform: scale(1.08);
+    transform: scale(var(--board-pulse-scale));
   }
   100% {
     transform: scale(1);
@@ -221,7 +221,7 @@
    shape is identical to `.winning`, just the hue changes). */
 .winningLoss {
   box-shadow:
-    0 0 0 3px var(--color-danger),
+    0 0 0 var(--board-ring-width) var(--color-danger),
     0 0 10px 2px var(--color-danger);
   animation: winPulse var(--duration-slow) var(--ease-emphasized);
 }

@@ -1,3 +1,10 @@
+/*
+ * Move mode's own layer only — the phase prompt and the two-step selection
+ * affordances. The board frame, cell grammar and state rings come from
+ * `BoardGrid.module.css` (UI-10); this file used to carry a byte-identical
+ * copy of `TicTacToeBoard.module.css`'s cell block.
+ */
+
 .wrapper {
   display: flex;
   flex-direction: column;
@@ -17,124 +24,32 @@
   color: var(--color-text-muted);
 }
 
-.board {
-  display: grid;
-  grid-template-rows: repeat(3, 1fr);
-  gap: var(--space-2);
-  width: 100%;
-  /* MPG-137: square, like `TicTacToeBoard` — but this board sits under a phase
-     prompt inside `.wrapper`, so the height budget it can actually claim is
-     the container's minus that line. See `ConnectFourBoard.module.css` for
-     what `cqh` resolves against. */
-  max-width: min(22rem, calc(100cqh - 3rem));
-  margin: 0 auto;
-}
-
-.row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-2);
-}
-
-.cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  aspect-ratio: 1 / 1;
-  min-height: var(--size-touch-target);
-  min-width: var(--size-touch-target);
-  padding: var(--space-2);
-  border: var(--border-width-thick) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  /* Raised (not flat surface) so empty wells lift off the page background —
-     matters most in dark mode, where surface sits very close to --color-bg. */
-  background-color: var(--color-surface-raised);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    transform var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard);
-}
-
-.cell:hover:not([aria-disabled="true"]) {
-  background-color: var(--color-bg-subtle);
-}
-
-.cell:active:not([aria-disabled="true"]) {
-  transform: scale(0.96);
-}
-
-.cell:focus-visible {
-  outline: var(--border-width-thick) solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-
-.cell[aria-disabled="true"] {
-  cursor: not-allowed;
-}
-
-.lastMove {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-accent) inset;
-}
-
-/* Step 1 of the move-phase two-step flow: the mover's own piece currently
-   picked up, awaiting a destination. Dashed ring — distinct shape, not just a
-   color swap — from the solid `.winning` ring and the `.validTarget` dots. */
-.selected {
+/*
+ * Step 1 of the move-phase two-step flow: the mover's own piece currently
+ * picked up, awaiting a destination. Dashed ring — a distinct shape, not just
+ * a colour swap — against `BoardGrid`'s solid `.winning` and `.lastMove` rings.
+ *
+ * The class is doubled deliberately. `BoardGrid`'s `.cell` and `.lastMove`
+ * live in a different CSS Module, so at equal specificity which one wins would
+ * depend on the order the two stylesheets happen to land in the bundle.
+ * `(0,2,0)` makes "selected beats the ring underneath it" a property of the
+ * rule rather than of the build.
+ */
+.selected.selected {
   border-color: var(--color-accent);
   border-style: dashed;
-  box-shadow: 0 0 0 3px var(--color-accent) inset;
+  box-shadow: 0 0 0 var(--board-ring-width) var(--color-accent) inset;
 }
 
-/* Step 2 of the move-phase two-step flow: empty cells the selected piece may
-   relocate to. A dotted inset marker (shape, not color-only) so it reads
-   distinctly even without color vision. */
+/* Step 2: empty cells the selected piece may relocate to. A dotted inset
+   marker (shape, not colour-only) so it reads distinctly without colour
+   vision. Centred by the shared cell's own flex centring. */
 .validTarget::after {
   content: "";
   width: 30%;
   height: 30%;
   border-radius: var(--radius-full);
   border: var(--border-width-thick) dotted var(--color-accent);
-}
-
-.winning {
-  border-color: var(--color-success);
-  background-color: var(--color-success-bg);
-  box-shadow: 0 0 0 3px var(--color-success) inset;
-  animation: winPulse var(--duration-slow) var(--ease-emphasized);
-}
-
-@keyframes winPulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.06);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .winning {
-    animation: none;
-  }
-}
-
-.winningLoss {
-  border-color: var(--color-danger);
-  background-color: var(--color-danger-bg);
-  box-shadow: 0 0 0 3px var(--color-danger) inset;
-  animation: winPulse var(--duration-slow) var(--ease-emphasized);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .winningLoss {
-    animation: none;
-  }
 }
 
 .mark {

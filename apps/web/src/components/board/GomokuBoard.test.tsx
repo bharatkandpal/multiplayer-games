@@ -3,7 +3,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { GomokuState } from "@mpg/engine";
 import { GomokuBoard } from "./GomokuBoard";
-import styles from "./GomokuBoard.module.css";
+// The state rings live on the shared primitive now (UI-10), not on the game's own sheet.
+import styles from "./BoardGrid.module.css";
 
 const SIZE = 9;
 
