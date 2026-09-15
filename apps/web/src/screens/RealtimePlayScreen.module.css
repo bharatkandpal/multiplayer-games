@@ -39,6 +39,39 @@
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-display);
   margin: 0;
+  /* MPG-138: the flexible middle between Home and Rules — `min-width: 0` keeps
+     a long title from forcing the bar past a 320px viewport. */
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+  overflow-wrap: break-word;
+}
+
+@media (max-width: 420px) {
+  .heading {
+    font-size: var(--font-size-400);
+  }
+}
+
+/* MPG-138: Rules opposite Home, matching `GamePlayScreen` so the control is in
+   the same place at the same weight in both game families. */
+.rulesButton {
+  flex: 0 0 auto;
+}
+
+.rulesContent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rulesIcon {
+  font-size: var(--font-size-300);
+}
+
+.topBarSpacer {
+  flex: 0 0 auto;
+  width: var(--space-8);
 }
 
 /* MPG-136: Home is a labelled exit — house glyph at display scale beside the

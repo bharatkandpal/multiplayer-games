@@ -3,7 +3,9 @@ import type { RealtimeModule } from "@mpg/engine";
 import {
   Button,
   GameActionBar,
+  HelpIcon,
   HomeIcon,
+  RulesSheet,
   ShareAction,
   StatusBadge,
   VisuallyHidden,
@@ -17,6 +19,7 @@ import {
   type RunComplete,
   useRealtimeLoop,
 } from "../game";
+import { useGameRules } from "../hooks/useGameRules";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import styles from "./RealtimePlayScreen.module.css";
 
@@ -181,12 +184,23 @@ export function RealtimePlayScreen<S, I>({
     restart(nextSeed());
   }, [restart, nextSeed]);
 
+  // MPG-138: how to play — on demand from the top-bar Rules control, and
+  // unasked the first time this player opens this game. `module.id` is the
+  // registered id (grid-size variants included), which is what the rules
+  // lookup keys off.
+  const rules = useGameRules(module.id);
+
   useEffect(() => {
+    // While the rules sheet is up it owns focus. Without this guard the phase
+    // effect fires on the same mount as an auto-opened sheet and pulls focus
+    // back to Start *behind* the dialog — the player then tabs through a
+    // control they can't see.
+    if (rules.isOpen) return;
     if (phase === "ready") startBtnRef.current?.focus();
     else if (phase === "paused") resumeBtnRef.current?.focus();
     else if (phase === "over") playAgainBtnRef.current?.focus();
     else if (phase === "running") surfaceRef.current?.focus();
-  }, [phase]);
+  }, [phase, rules.isOpen]);
 
   const isRunning = phase === "running";
   const hintId = `${HINT_ID_PREFIX}-${useId()}`;
@@ -269,6 +283,26 @@ export function RealtimePlayScreen<S, I>({
           </span>
         </Button>
         <h1 className={styles.heading}>{gameTitle}</h1>
+
+        {/* MPG-138: Rules opposite Home — an arcade run gives you no turn to
+            think on, so "which button does what" has to be answerable before
+            the first tap, not discovered by dying. */}
+        {rules.rules ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className={styles.rulesButton}
+            onClick={rules.open}
+            aria-haspopup="dialog"
+          >
+            <span className={styles.rulesContent}>
+              <HelpIcon className={styles.rulesIcon} />
+              Rules
+            </span>
+          </Button>
+        ) : (
+          <span className={styles.topBarSpacer} aria-hidden="true" />
+        )}
       </div>
 
       {/* Score as text + a first-class Pause control (touch parity), always in
@@ -411,6 +445,17 @@ export function RealtimePlayScreen<S, I>({
       {/* MPG-136: the pinned bottom bar. No opponent slot — a solo arcade run
           has nobody to swap — so the bar carries prev/next game alone. */}
       <GameActionBar {...(navigation ? { navigation } : {})} />
+
+      {rules.rules ? (
+        <RulesSheet
+          isOpen={rules.isOpen}
+          onClose={rules.close}
+          gameTitle={gameTitle}
+          goal={rules.rules.goal}
+          steps={rules.rules.steps}
+          {...(rules.rules.notes ? { notes: rules.rules.notes } : {})}
+        />
+      ) : null}
     </div>
   );
 }
