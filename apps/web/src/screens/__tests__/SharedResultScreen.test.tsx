@@ -39,6 +39,7 @@ function renderScreen(overrides: Partial<Parameters<typeof SharedResultScreen>[0
 describe("SharedResultScreen (MPG-056)", () => {
   beforeEach(() => {
     vi.mocked(fetchSharedView).mockReset();
+    window.localStorage.clear();
   });
 
   it("LOADING: shows a labelled skeleton, never a bare spinner", () => {
@@ -133,6 +134,56 @@ describe("SharedResultScreen (MPG-056)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Play Floppy Birds/ }));
     expect(props.onPlayGame).toHaveBeenCalledWith("floppy-birds");
+  });
+
+  it("VARIANT LINK (MPG-089-c): plays the base game immediately with the cosmetics applied — no signup", async () => {
+    vi.mocked(fetchSharedView).mockResolvedValue({
+      kind: "variant",
+      variant: {
+        id: "v1",
+        name: "Party Ghost",
+        baseGameId: "drunk-walk",
+        cosmetics: { hat: "party-hat" },
+        createdAt: "2026-09-15T00:00:00.000Z",
+      },
+    });
+    const props = renderScreen();
+
+    await waitFor(() => expect(props.onPlayGame).toHaveBeenCalledWith("drunk-walk"));
+
+    // The seam it applies cosmetics through: the same storage the customize
+    // menu writes to and the play surface reads from at mount.
+    const stored = window.localStorage.getItem("mpg:cosmetics:drunk-walk");
+    expect(stored && JSON.parse(stored)).toEqual({ hat: "party-hat" });
+  });
+
+  it("VARIANT LINK: never fires twice for the same token (StrictMode-safe)", async () => {
+    vi.mocked(fetchSharedView).mockResolvedValue({
+      kind: "variant",
+      variant: {
+        id: "v1",
+        name: "Party Ghost",
+        baseGameId: "drunk-walk",
+        cosmetics: { hat: "party-hat" },
+        createdAt: "2026-09-15T00:00:00.000Z",
+      },
+    });
+    const props = renderScreen();
+
+    await waitFor(() => expect(props.onPlayGame).toHaveBeenCalledTimes(1));
+    // Give any stray re-render a chance to (wrongly) fire again.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(props.onPlayGame).toHaveBeenCalledTimes(1);
+  });
+
+  it("a dead variant link still ends in a way into a game (same dead-link state)", async () => {
+    vi.mocked(fetchSharedView).mockRejectedValue(new DeadShareLinkError());
+    const props = renderScreen();
+
+    expect(await screen.findByText("Link no longer works")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Browse games" }));
+    expect(props.onBackHome).toHaveBeenCalled();
+    expect(props.onPlayGame).not.toHaveBeenCalled();
   });
 
   it("falls back to the raw game id for a game this build doesn't know", async () => {

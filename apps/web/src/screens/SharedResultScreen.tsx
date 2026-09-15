@@ -6,10 +6,11 @@
 // game, including the dead-link state. A share link that dead-ends is a broken
 // viral loop, which is exactly what this task exists to fix.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button, Skeleton, SkeletonGroup, StatusBadge, Toast } from "../components/ui";
 import { DeadShareLinkError, fetchSharedView, type SharedView } from "../api/share";
+import { storeCosmetics } from "../cosmetics";
 import { GAME_CATALOG, REALTIME_CATALOG } from "./catalog";
 import type { GameId, RealtimeGameId } from "@mpg/engine";
 import styles from "./SharedResultScreen.module.css";
@@ -90,6 +91,26 @@ export function SharedResultScreen({
   }, [token]);
 
   useEffect(() => load(), [load]);
+
+  // A variant link is "come play THIS", not a result to admire — so it skips
+  // the preview card entirely and plays the base game immediately, with the
+  // saved cosmetics applied. No signup, no session required: the seam is the
+  // same one the customize menu already writes through (`storeCosmetics`),
+  // read at mount by the play surface's own `loadStoredDrunkWalkCharacter` /
+  // `loadCosmetics` — so this needs no new global, just the existing "open
+  // this game" path the caller already wires up as `onPlayGame`.
+  //
+  // Guarded per-token so a re-render (or StrictMode's double effect) can't
+  // fire it twice, and reset when the token changes so navigating between two
+  // variant links doesn't get stuck on the first.
+  const autoPlayedTokenRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (status !== "ready" || view?.kind !== "variant") return;
+    if (autoPlayedTokenRef.current === token) return;
+    autoPlayedTokenRef.current = token;
+    storeCosmetics(view.variant.baseGameId, view.variant.cosmetics);
+    onPlayGame(view.variant.baseGameId);
+  }, [status, view, token, onPlayGame]);
 
   return (
     <div className={styles.main}>

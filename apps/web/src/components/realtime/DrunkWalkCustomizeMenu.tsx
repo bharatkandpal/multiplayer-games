@@ -6,6 +6,7 @@ import {
 } from "./drunkWalkCharacter";
 import type { CosmeticConfig, CosmeticSlot } from "../../cosmetics";
 import { Modal } from "../ui";
+import { SaveVariantPanel } from "../variants/SaveVariantPanel";
 import styles from "./DrunkWalkCustomizeMenu.module.css";
 
 export interface DrunkWalkCustomizeMenuProps {
@@ -66,6 +67,11 @@ export function DrunkWalkCustomizeMenu({
             onSelect={(optionId) => selectOption(slot.id, optionId)}
           />
         ))}
+
+        {/* MPG-089-c: save + name this combo. Renders nothing when the backend
+            isn't known-reachable (offline pillar) — customizing and playing
+            with the look never depend on it. */}
+        <SaveVariantPanel baseGameId={DRUNK_WALK_COSMETICS.gameId} cosmetics={config} />
       </div>
     </Modal>
   );
