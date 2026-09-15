@@ -1,8 +1,8 @@
-import { useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
 import type { TicTacToeLine, TicTacToeMove, TicTacToeState } from "@mpg/engine";
 import type { AppliedMove } from "../../game";
 import { cx } from "../ui/cx";
+import { BoardGrid } from "./BoardGrid";
+import type { WinningTone } from "./BoardGrid";
 import styles from "./TicTacToeBoard.module.css";
 
 export interface TicTacToeBoardProps {
@@ -20,7 +20,7 @@ export interface TicTacToeBoardProps {
    * unambiguous case, a sole local human losing. Never color-only: the
    * ring/glow shape stays identical, only the hue changes.
    */
-  winningLineTone?: "win" | "loss";
+  winningLineTone?: WinningTone;
 }
 
 const SIZE = 3;
@@ -53,10 +53,10 @@ function Mark({ mark }: { mark: 1 | 2 }): React.JSX.Element {
 }
 
 /**
- * 3x3 Tic-Tac-Toe board. Cells are individually-focusable buttons with a roving
- * tabindex + arrow-key navigation (WAI-ARIA grid pattern), full labels for
- * assistive tech, and shape-distinct marks. Interaction is disabled (but still
- * visible/legible) whenever it isn't the local human's turn.
+ * 3x3 Tic-Tac-Toe board. The cell grammar, roving tabindex, arrow-key
+ * navigation and state rings all come from the shared `BoardGrid` (UI-10);
+ * what is Tic-Tac-Toe's own is the labelling, the shape-distinct marks, and
+ * what activating a cell means.
  */
 export function TicTacToeBoard({
   state,
@@ -66,94 +66,28 @@ export function TicTacToeBoard({
   winningLine = null,
   winningLineTone = "win",
 }: TicTacToeBoardProps): React.JSX.Element {
-  const [focusIndex, setFocusIndex] = useState(0);
-  const cellRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const winningCells = winningLine ? new Set<number>(winningLine) : null;
 
-  const moveTo = (nextIndex: number): void => {
-    const clamped = ((nextIndex % (SIZE * SIZE)) + SIZE * SIZE) % (SIZE * SIZE);
-    setFocusIndex(clamped);
-    cellRefs.current[clamped]?.focus();
-  };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number): void => {
-    const row = Math.floor(index / SIZE);
-    const col = index % SIZE;
-    switch (event.key) {
-      case "ArrowRight":
-        event.preventDefault();
-        moveTo(row * SIZE + ((col + 1) % SIZE));
-        break;
-      case "ArrowLeft":
-        event.preventDefault();
-        moveTo(row * SIZE + ((col - 1 + SIZE) % SIZE));
-        break;
-      case "ArrowDown":
-        event.preventDefault();
-        moveTo(((row + 1) % SIZE) * SIZE + col);
-        break;
-      case "ArrowUp":
-        event.preventDefault();
-        moveTo(((row - 1 + SIZE) % SIZE) * SIZE + col);
-        break;
-      case "Home":
-        event.preventDefault();
-        moveTo(row * SIZE);
-        break;
-      case "End":
-        event.preventDefault();
-        moveTo(row * SIZE + (SIZE - 1));
-        break;
-      default:
-        break;
-    }
-  };
-
   return (
-    <div
-      className={styles.board}
-      role="grid"
-      aria-label="Tic-Tac-Toe board"
-      aria-disabled={disabled}
-    >
-      {Array.from({ length: SIZE }, (_, row) => (
-        <div key={row} role="row" className={styles.row}>
-          {Array.from({ length: SIZE }, (_, col) => {
-            const index = row * SIZE + col;
-            const mark = state.board[index] as 1 | 2 | null | undefined;
-            const isEmpty = mark === null || mark === undefined;
-            const isLastMove = lastMove?.move.cell === index;
-            const isWinning = winningCells?.has(index) ?? false;
-            const isActivatable = isEmpty && !disabled;
-            return (
-              <button
-                key={index}
-                ref={(el) => {
-                  cellRefs.current[index] = el;
-                }}
-                type="button"
-                role="gridcell"
-                className={cx(
-                  styles.cell,
-                  isLastMove && styles.lastMove,
-                  isWinning && (winningLineTone === "loss" ? styles.winningLoss : styles.winning),
-                )}
-                tabIndex={index === focusIndex ? 0 : -1}
-                aria-disabled={!isActivatable}
-                aria-label={cellLabel(mark ?? null, row, col)}
-                onFocus={() => setFocusIndex(index)}
-                onKeyDown={(event) => handleKeyDown(event, index)}
-                onClick={() => {
-                  if (!isActivatable) return;
-                  onMove({ cell: index });
-                }}
-              >
-                {mark ? <Mark mark={mark} /> : null}
-              </button>
-            );
-          })}
-        </div>
-      ))}
-    </div>
+    <BoardGrid
+      rows={SIZE}
+      cols={SIZE}
+      label="Tic-Tac-Toe board"
+      disabled={disabled}
+      maxWidth="22rem"
+      winningTone={winningLineTone}
+      cell={(row, col) => {
+        const index = row * SIZE + col;
+        const mark = (state.board[index] ?? null) as 1 | 2 | null;
+        return {
+          content: mark ? <Mark mark={mark} /> : null,
+          label: cellLabel(mark, row, col),
+          activatable: mark === null && !disabled,
+          lastMove: lastMove?.move.cell === index,
+          winning: winningCells?.has(index) ?? false,
+        };
+      }}
+      onActivate={(row, col) => onMove({ cell: row * SIZE + col })}
+    />
   );
 }

@@ -1,0 +1,130 @@
+/*
+ * The one cell grammar (UI-10 / MPG-117). Every dimension here comes from the
+ * `--board-*` block in `tokens.css`; nothing in this file picks a radius, gap
+ * or border of its own, and neither should the boards that use it.
+ */
+
+/* Comfortable is the default density: the 3x3 boards. Generous gap, a real
+   44px touch floor. The five locals below are what `.dense` remaps. */
+.board {
+  --gap: var(--board-gap);
+  --radius: var(--board-cell-radius);
+  --border: var(--board-cell-border);
+  --padding: var(--board-cell-padding);
+  --min-size: var(--board-cell-min-size);
+
+  display: grid;
+  grid-template-rows: repeat(var(--board-rows), 1fr);
+  gap: var(--gap);
+  width: 100%;
+  /* MPG-137: a board that cannot claim more height than the frame gives it.
+     The clamp is the board's own aspect (cols/rows, set inline by the
+     component) applied to the height budget — square boards divide by 1,
+     a 7:6 board by 7/6. `--board-height-budget` is normally `100cqh`, the
+     play screen's `.boardArea` height (it declares `container-type: size`);
+     outside a size container the unit falls back to the small viewport,
+     which the `min()` never picks. */
+  max-width: min(var(--board-max-inline), calc(var(--board-height-budget) * var(--board-aspect)));
+  margin: 0 auto;
+}
+
+/* Dense: 9x9 and up. Tighter everything, and no touch-target floor — nine
+   columns of 44px do not fit a phone, and a horizontally-scrolling board
+   would cost the at-a-glance overview a five-in-a-row game depends on.
+   The wider responsive/a11y pass on that trade is MPG-020. */
+.dense {
+  --gap: var(--board-gap-dense);
+  --radius: var(--board-cell-radius-dense);
+  --border: var(--board-cell-border-dense);
+  --padding: var(--board-cell-padding-dense);
+  --min-size: var(--board-cell-min-size-dense);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(var(--board-cols), 1fr);
+  gap: var(--gap);
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  min-width: var(--min-size);
+  min-height: var(--min-size);
+  padding: var(--padding);
+  border: var(--border);
+  border-radius: var(--radius);
+  /* Raised (not flat surface) so empty cells lift off the page background —
+     matters most in dark mode, where surface sits very close to --color-bg. */
+  background-color: var(--board-cell-bg);
+  box-shadow: var(--board-cell-shadow);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.cell:hover:not([aria-disabled="true"]) {
+  background-color: var(--board-cell-bg-hover);
+}
+
+.cell:active:not([aria-disabled="true"]) {
+  transform: scale(var(--board-cell-press-scale));
+}
+
+.cell:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+  /* Keep the focus ring above neighbouring cells at dense grid densities. */
+  z-index: 1;
+}
+
+.cell[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.lastMove {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 var(--board-ring-width-thin) var(--color-accent) inset;
+}
+
+/* Winning line (MPG-035): success ring + tint, never colour-only — the marks
+   and stones (shapes) remain the primary signal. AA-safe non-text contrast. */
+.winning {
+  border-color: var(--color-success);
+  background-color: var(--color-success-bg);
+  box-shadow: 0 0 0 var(--board-ring-width) var(--color-success) inset;
+  animation: winPulse var(--duration-slow) var(--ease-emphasized);
+}
+
+/* Loss variant (MPG-046): identical ring and pulse, danger hue — used when the
+   sole local human loses, so the board itself carries the outcome. The shape
+   is deliberately the same as `.winning`; only the hue changes. */
+.winningLoss {
+  border-color: var(--color-danger);
+  background-color: var(--color-danger-bg);
+  box-shadow: 0 0 0 var(--board-ring-width) var(--color-danger) inset;
+  animation: winPulse var(--duration-slow) var(--ease-emphasized);
+}
+
+@keyframes winPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(var(--board-pulse-scale));
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .winning,
+  .winningLoss {
+    animation: none;
+  }
+}

@@ -45,10 +45,10 @@
   flex: 1 1 5.5rem;
   max-width: 8rem;
   padding: var(--space-3) var(--space-2);
-  border: var(--border-width-thick) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background-color: var(--color-surface-raised);
-  box-shadow: var(--shadow-sm);
+  border: var(--board-cell-border);
+  border-radius: var(--board-cell-radius);
+  background-color: var(--board-cell-bg);
+  box-shadow: var(--board-cell-shadow);
   cursor: pointer;
   transition:
     background-color var(--duration-fast) var(--ease-standard),
@@ -58,8 +58,8 @@
 }
 
 .pile:hover:not([aria-disabled="true"]) {
-  background-color: var(--color-bg-subtle);
-  box-shadow: var(--shadow-md, var(--shadow-sm));
+  background-color: var(--board-cell-bg-hover);
+  box-shadow: var(--shadow-md);
   transform: translateY(-2px);
 }
 
@@ -131,7 +131,7 @@
 
 .token:hover {
   transform: translateY(-2px) scale(1.12);
-  box-shadow: var(--shadow-md, var(--shadow-sm));
+  box-shadow: var(--shadow-md);
 }
 
 /* A token that was just taken: fades and shrinks out in place rather than
@@ -151,7 +151,7 @@
    lighter dashed hover preview below. */
 .tokenPendingTake {
   box-shadow:
-    0 0 0 2px var(--color-danger),
+    0 0 0 var(--board-ring-width-thin) var(--color-danger),
     var(--shadow-sm);
   opacity: 0.65;
   transform: translateY(-1px) scale(0.94);
@@ -160,7 +160,7 @@
 /* Live "if you click here" preview on hover, before anything is committed —
    a lighter dashed treatment so it never reads as already-decided. */
 .tokenHoverTake {
-  box-shadow: 0 0 0 2px var(--color-danger-text, var(--color-danger));
+  box-shadow: 0 0 0 var(--board-ring-width-thin) var(--color-danger-text);
   opacity: 0.8;
   transform: scale(1.08);
 }
@@ -209,7 +209,7 @@
 .selected {
   border-color: var(--color-accent);
   border-style: dashed;
-  box-shadow: 0 0 0 3px var(--color-accent) inset;
+  box-shadow: 0 0 0 var(--board-ring-width) var(--color-accent) inset;
 }
 
 /* The pile a move was just taken from — a brief highlight pulse (shape +
@@ -240,7 +240,7 @@
 .winning {
   border-color: var(--color-success);
   background-color: var(--color-success-bg);
-  box-shadow: 0 0 0 3px var(--color-success) inset;
+  box-shadow: 0 0 0 var(--board-ring-width) var(--color-success) inset;
   animation: winPulse var(--duration-slow) var(--ease-emphasized);
 }
 
@@ -249,7 +249,7 @@
     transform: scale(1);
   }
   50% {
-    transform: scale(1.06);
+    transform: scale(var(--board-pulse-scale));
   }
   100% {
     transform: scale(1);
@@ -265,7 +265,7 @@
 .winningLoss {
   border-color: var(--color-danger);
   background-color: var(--color-danger-bg);
-  box-shadow: 0 0 0 3px var(--color-danger) inset;
+  box-shadow: 0 0 0 var(--board-ring-width) var(--color-danger) inset;
   animation: winPulse var(--duration-slow) var(--ease-emphasized);
 }
 
@@ -282,7 +282,7 @@
   justify-content: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-full, var(--radius-md));
+  border-radius: var(--radius-full);
   background-color: var(--color-surface-raised);
   box-shadow: var(--shadow-sm);
   animation: stepperIn var(--duration-fast) var(--ease-standard);

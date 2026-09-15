@@ -1,9 +1,11 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { KeyboardEvent } from "react";
 import type { Player, TicTacToeMoveLine, TicTacToeMoveMove, TicTacToeMoveState } from "@mpg/engine";
 import type { AppliedMove } from "../../game";
 import { VisuallyHidden } from "../ui";
 import { cx } from "../ui/cx";
+import { BoardGrid } from "./BoardGrid";
+import type { WinningTone } from "./BoardGrid";
 import styles from "./TicTacToeMoveBoard.module.css";
 
 export interface TicTacToeMoveBoardProps {
@@ -19,7 +21,7 @@ export interface TicTacToeMoveBoardProps {
    * How the winning-line highlight should read (mirrors TicTacToeBoard): "win"
    * (default, green/success) or "loss" (red/danger).
    */
-  winningLineTone?: "win" | "loss";
+  winningLineTone?: WinningTone;
 }
 
 const SIZE = 3;
@@ -66,10 +68,11 @@ function Mark({ mark }: { mark: 1 | 2 }): React.JSX.Element {
  * places one (identical UX to classic Tic-Tac-Toe); once all 3 are down, play
  * becomes a two-step select-then-move — pick one of the mover's own pieces,
  * then an empty cell to relocate it to (any empty cell, not just adjacent).
- * Cells are individually-focusable buttons with a roving tabindex + arrow-key
- * navigation (WAI-ARIA grid pattern). Interaction is disabled (but still
- * visible/legible, and still tab-reachable) whenever it isn't the local
- * human's turn.
+ *
+ * The grid, cell grammar and arrow-key navigation are the shared `BoardGrid`
+ * (UI-10). Move mode's own additions are the phase prompt, the two-step
+ * selection state, its dashed/dotted modifier classes, and Escape-to-cancel —
+ * which it layers on via `onCellKeyDown` rather than by forking the primitive.
  */
 export function TicTacToeMoveBoard({
   state,
@@ -79,9 +82,7 @@ export function TicTacToeMoveBoard({
   winningLine = null,
   winningLineTone = "win",
 }: TicTacToeMoveBoardProps): React.JSX.Element {
-  const [focusIndex, setFocusIndex] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
-  const cellRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const winningCells = winningLine ? new Set<number>(winningLine) : null;
 
   const mover = state.toMove;
@@ -95,48 +96,10 @@ export function TicTacToeMoveBoard({
       ? "Select a piece to move."
       : "Choose where to move it — tap it again to cancel.";
 
-  const moveTo = (nextIndex: number): void => {
-    const clamped = ((nextIndex % (SIZE * SIZE)) + SIZE * SIZE) % (SIZE * SIZE);
-    setFocusIndex(clamped);
-    cellRefs.current[clamped]?.focus();
-  };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number): void => {
-    const row = Math.floor(index / SIZE);
-    const col = index % SIZE;
-    switch (event.key) {
-      case "ArrowRight":
-        event.preventDefault();
-        moveTo(row * SIZE + ((col + 1) % SIZE));
-        break;
-      case "ArrowLeft":
-        event.preventDefault();
-        moveTo(row * SIZE + ((col - 1 + SIZE) % SIZE));
-        break;
-      case "ArrowDown":
-        event.preventDefault();
-        moveTo(((row + 1) % SIZE) * SIZE + col);
-        break;
-      case "ArrowUp":
-        event.preventDefault();
-        moveTo(((row - 1 + SIZE) % SIZE) * SIZE + col);
-        break;
-      case "Home":
-        event.preventDefault();
-        moveTo(row * SIZE);
-        break;
-      case "End":
-        event.preventDefault();
-        moveTo(row * SIZE + (SIZE - 1));
-        break;
-      case "Escape":
-        if (selected !== null) {
-          event.preventDefault();
-          setSelected(null);
-        }
-        break;
-      default:
-        break;
+  const handleCellKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
+    if (event.key === "Escape" && selected !== null) {
+      event.preventDefault();
+      setSelected(null);
     }
   };
 
@@ -180,65 +143,46 @@ export function TicTacToeMoveBoard({
           {phasePrompt}
         </div>
       </VisuallyHidden>
-      <div
-        className={styles.board}
-        role="grid"
-        aria-label="Tic-Tac-Toe Move mode board"
-        aria-disabled={disabled}
-      >
-        {Array.from({ length: SIZE }, (_, row) => (
-          <div key={row} role="row" className={styles.row}>
-            {Array.from({ length: SIZE }, (_, col) => {
-              const index = row * SIZE + col;
-              const mark = state.board[index] as 1 | 2 | null | undefined;
-              const resolvedMark = mark ?? null;
-              const isEmpty = resolvedMark === null;
-              const isSelected = selected === index;
-              const isOwnPiece = resolvedMark === mover;
-              const isValidTarget = !isPlacementPhase && selected !== null && isEmpty;
-              const isLastMove =
-                lastMove !== null &&
-                (lastMove.move.kind === "place"
-                  ? lastMove.move.cell === index
-                  : lastMove.move.to === index);
-              const isWinning = winningCells?.has(index) ?? false;
-              const isActivatable =
-                !disabled &&
-                (isPlacementPhase
-                  ? isEmpty
-                  : selected === null
-                    ? isOwnPiece
-                    : isOwnPiece || isEmpty);
-              return (
-                <button
-                  key={index}
-                  ref={(el) => {
-                    cellRefs.current[index] = el;
-                  }}
-                  type="button"
-                  role="gridcell"
-                  className={cx(
-                    styles.cell,
-                    isLastMove && styles.lastMove,
-                    isSelected && styles.selected,
-                    isValidTarget && styles.validTarget,
-                    isWinning && (winningLineTone === "loss" ? styles.winningLoss : styles.winning),
-                  )}
-                  tabIndex={index === focusIndex ? 0 : -1}
-                  aria-disabled={!isActivatable}
-                  aria-pressed={!isPlacementPhase && isOwnPiece ? isSelected : undefined}
-                  aria-label={cellLabel(resolvedMark, row, col, isSelected)}
-                  onFocus={() => setFocusIndex(index)}
-                  onKeyDown={(event) => handleKeyDown(event, index)}
-                  onClick={() => activateCell(index, resolvedMark)}
-                >
-                  {resolvedMark ? <Mark mark={resolvedMark} /> : null}
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </div>
+      <BoardGrid
+        rows={SIZE}
+        cols={SIZE}
+        label="Tic-Tac-Toe Move mode board"
+        disabled={disabled}
+        maxWidth="22rem"
+        /* The board shares its container with the phase prompt above, so the
+           height it can claim is the container's minus that line. */
+        heightBudget="calc(100cqh - 3rem)"
+        winningTone={winningLineTone}
+        onCellKeyDown={handleCellKeyDown}
+        cell={(row, col) => {
+          const index = row * SIZE + col;
+          const mark = (state.board[index] ?? null) as 1 | 2 | null;
+          const isEmpty = mark === null;
+          const isSelected = selected === index;
+          const isOwnPiece = mark === mover;
+          const isValidTarget = !isPlacementPhase && selected !== null && isEmpty;
+          const isLastMove =
+            lastMove !== null &&
+            (lastMove.move.kind === "place"
+              ? lastMove.move.cell === index
+              : lastMove.move.to === index);
+          return {
+            content: mark ? <Mark mark={mark} /> : null,
+            label: cellLabel(mark, row, col, isSelected),
+            activatable:
+              !disabled &&
+              (isPlacementPhase ? isEmpty : selected === null ? isOwnPiece : isOwnPiece || isEmpty),
+            lastMove: isLastMove,
+            winning: winningCells?.has(index) ?? false,
+            pressed: !isPlacementPhase && isOwnPiece ? isSelected : undefined,
+            className: cx(isSelected && styles.selected, isValidTarget && styles.validTarget),
+          };
+        }}
+        onActivate={(row, col) => {
+          const index = row * SIZE + col;
+          activateCell(index, (state.board[index] ?? null) as 1 | 2 | null);
+        }}
+      />
     </div>
   );
 }
