@@ -29,6 +29,68 @@
   max-width: 34rem;
 }
 
+/* ── Tag filter (MPG-112) ─────────────────────────────────────────────────
+   The row sits between the tagline and the shelves: it is a lens on the
+   catalogue, so it reads above the thing it filters. Chips borrow the card
+   tag-chip vocabulary (mono micro-caps, hairline outline) because they name
+   the same tags — the difference is that these are pressable, which the fill
+   in the pressed state is what says. */
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+.filterChip {
+  /* Comfortably tappable on a phone without making eight chips shout: the
+     44px floor is met on the axis a thumb actually misses on. */
+  min-height: var(--size-touch-target);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width-hairline) solid var(--color-table-line);
+  border-radius: var(--radius-full);
+  background-color: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-100);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.filterChip:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.filterChip:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* The on position. Filled rather than merely tinted — never colour-only
+   (UX_PRINCIPLES §4): the swap from hairline-on-transparent to solid is a
+   contrast change a player reads without seeing hue at all, and
+   `aria-pressed` carries the same fact to assistive tech. */
+.filterChip[aria-pressed="true"] {
+  border-color: transparent;
+  background-color: var(--color-text);
+  color: var(--color-bg);
+}
+
+/* ── Filtered results ─────────────────────────────────────────────────────
+   One flat grid replacing the shelves while a filter is on. It reuses the
+   shelf's own header type so the page doesn't change voice mid-session. */
+.results {
+  margin-top: var(--space-2);
+}
+
 /* ── Shelves ──────────────────────────────────────────────────────────────
    One discovery grouping (Featured / Trending / New / More). The rule that
    separates them is the quietest mark on the page by design — a hairline and

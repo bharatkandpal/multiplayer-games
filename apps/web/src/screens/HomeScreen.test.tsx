@@ -396,4 +396,144 @@ describe("HomeScreen", () => {
       expect(onShowGallery).toHaveBeenCalledOnce();
     });
   });
+
+  describe("tag filter (MPG-112 / UI-5)", () => {
+    const CATALOGUE = {
+      games: ["tictactoe", "connect4", "gomoku"] as const,
+      realtimeGames: ["floppy-birds", "reflex-test"] as const,
+    };
+
+    function renderHome(props: Record<string, unknown> = {}) {
+      const onSelectGame = vi.fn();
+      const onConfigureGame = vi.fn();
+      render(
+        <HomeScreen
+          games={[...CATALOGUE.games]}
+          realtimeGames={[...CATALOGUE.realtimeGames]}
+          onSelectGame={onSelectGame}
+          onConfigureGame={onConfigureGame}
+          onShowGallery={vi.fn()}
+          {...props}
+        />,
+      );
+      return { onSelectGame, onConfigureGame };
+    }
+
+    /** The filter row's chips, in render order. */
+    function chips(): HTMLElement[] {
+      return within(screen.getByRole("group", { name: "Filter games by tag" })).getAllByRole(
+        "button",
+      );
+    }
+
+    const chip = (name: string) =>
+      within(screen.getByRole("group", { name: "Filter games by tag" })).getByRole("button", {
+        name,
+      });
+
+    it("offers only tags a listed game actually carries, All first", () => {
+      renderHome();
+      // No game in this catalogue is `multiplayer` (no 3-seat game exists yet),
+      // so that chip is absent rather than present-and-dead.
+      expect(chips().map((c) => c.textContent)).toEqual([
+        "All",
+        "Solo",
+        "2 players",
+        "vs bot",
+        "Online",
+        "Watch",
+        "Quick",
+        "Endless",
+      ]);
+    });
+
+    it("starts on All, with the shelves showing and every game reachable", () => {
+      renderHome();
+      expect(chip("All")).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("heading", { name: "Featured" })).toBeInTheDocument();
+      expect(allCards()).toHaveLength(5);
+    });
+
+    it("collapses the shelves into one flat list, headed by the match count", async () => {
+      const user = userEvent.setup();
+      renderHome();
+
+      await user.click(chip("Solo"));
+
+      // The shelves are gone — the player has said what they want, so the
+      // "what should I play?" framing is no longer what the page is for.
+      expect(screen.queryByRole("heading", { name: "Featured" })).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "2 games" })).toBeInTheDocument();
+
+      const titles = allCards().map(cardTitle);
+      expect(titles).toEqual(["Floppy Birds", "Reflex Test"]);
+      expect(chip("Solo")).toHaveAttribute("aria-pressed", "true");
+      expect(chip("All")).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("says 'game', not 'games', when exactly one matches", async () => {
+      const user = userEvent.setup();
+      renderHome();
+
+      await user.click(chip("Endless"));
+      expect(screen.getByRole("heading", { name: "1 game" })).toBeInTheDocument();
+      expect(allCards().map(cardTitle)).toEqual(["Floppy Birds"]);
+    });
+
+    it("clears back to the shelves via All", async () => {
+      const user = userEvent.setup();
+      renderHome();
+
+      await user.click(chip("Quick"));
+      expect(screen.queryByRole("heading", { name: "Featured" })).not.toBeInTheDocument();
+
+      await user.click(chip("All"));
+      expect(screen.getByRole("heading", { name: "Featured" })).toBeInTheDocument();
+      expect(allCards()).toHaveLength(5);
+      expect(chip("All")).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("clears by re-pressing the active chip — the most obvious place to undo it", async () => {
+      const user = userEvent.setup();
+      renderHome();
+
+      await user.click(chip("Online"));
+      expect(chip("Online")).toHaveAttribute("aria-pressed", "true");
+
+      await user.click(chip("Online"));
+      expect(chip("Online")).toHaveAttribute("aria-pressed", "false");
+      expect(screen.getByRole("heading", { name: "Featured" })).toBeInTheDocument();
+    });
+
+    it("keeps a filtered card fully playable — quick-start and Options both still work", async () => {
+      const user = userEvent.setup();
+      const { onSelectGame, onConfigureGame } = renderHome();
+
+      await user.click(chip("2 players"));
+      const card = allCards().find((c) => cardTitle(c) === "Connect Four");
+      await user.click(card!);
+      expect(onSelectGame).toHaveBeenCalledWith("connect4");
+
+      await user.click(
+        screen.getByRole("button", {
+          name: "Options for Connect Four — play a friend, online, or watch bots",
+        }),
+      );
+      expect(onConfigureGame).toHaveBeenCalledWith("connect4");
+    });
+
+    it("offers no filter row when no chip would narrow the page", () => {
+      render(<HomeScreen games={["tictactoe"]} onSelectGame={vi.fn()} onShowGallery={vi.fn()} />);
+      // One game still carries five tags — but every one of them matches the
+      // whole catalogue, so none of them is a filter. A control that cannot
+      // change the page is worse than no control.
+      expect(screen.queryByRole("group", { name: "Filter games by tag" })).not.toBeInTheDocument();
+    });
+
+    it("offers no filter row when the catalogue is empty", () => {
+      render(<HomeScreen games={[]} onSelectGame={vi.fn()} onShowGallery={vi.fn()} />);
+      expect(screen.queryByRole("group", { name: "Filter games by tag" })).not.toBeInTheDocument();
+      expect(screen.getByText(/No games are available right now/)).toBeInTheDocument();
+    });
+  });
 });

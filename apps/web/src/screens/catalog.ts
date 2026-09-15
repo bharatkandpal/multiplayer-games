@@ -227,6 +227,61 @@ export function hasTag(entry: GameCatalogEntry | RealtimeCatalogEntry, tag: Game
   return gameTags(entry).includes(tag);
 }
 
+/**
+ * Player-facing wording for each tag — the union's ids are not copy.
+ *
+ * Lives here rather than on Home because two surfaces read it: the chips on
+ * each card, and the filter row above them (MPG-112). Typed `Record<GameTag,
+ * string>`, so adding a tag to the union without giving it words is a type
+ * error rather than a raw id leaking into the UI.
+ *
+ * **Declaration order is the filter row's display order** — seat tags first
+ * (the question a player actually arrives with is "can I play this with
+ * someone?"), then how you play, then the shape of a session.
+ */
+export const TAG_LABEL: Record<GameTag, string> = {
+  solo: "Solo",
+  "2-player": "2 players",
+  multiplayer: "Multiplayer",
+  "vs-bot": "vs bot",
+  online: "Online",
+  watch: "Watch",
+  quick: "Quick",
+  endless: "Endless",
+};
+
+/**
+ * The tags worth offering as filters: the ones at least one listed game
+ * actually carries, in `TAG_LABEL` order.
+ *
+ * Derived from what is listed rather than from the union, so the row can never
+ * offer a filter that leads to an empty page. A tag that no listed game carries
+ * is simply not shown — the same "degrade to absence, never to a dead end"
+ * rule the rest of the product follows.
+ */
+export function filterableTags(entries: readonly CatalogEntry[]): GameTag[] {
+  const present = new Set<GameTag>(entries.flatMap((entry) => gameTags(entry)));
+  return (Object.keys(TAG_LABEL) as GameTag[]).filter((tag) => present.has(tag));
+}
+
+/** The listed games carrying `tag`, in catalogue order. */
+export function filterByTag(entries: readonly CatalogEntry[], tag: GameTag): CatalogEntry[] {
+  return entries.filter((entry) => hasTag(entry, tag));
+}
+
+/**
+ * True when some offered tag would actually narrow the catalogue.
+ *
+ * Not "more than one game" and not "more than one tag": a single game still
+ * carries five tags, and a catalogue whose games all share one tag set has
+ * plenty of tags that each match everything. The question worth asking is
+ * whether any chip changes what the player sees — and a control that cannot
+ * change the page is worse than no control at all.
+ */
+export function tagFilterNarrows(entries: readonly CatalogEntry[]): boolean {
+  return filterableTags(entries).some((tag) => filterByTag(entries, tag).length < entries.length);
+}
+
 /** A single entry in the ordered game list, discriminated by family. */
 export type GameItem =
   | { readonly kind: "turn-based"; readonly id: GameId; readonly title: string }
