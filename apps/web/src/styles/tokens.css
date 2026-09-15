@@ -247,6 +247,73 @@
   --shadow-lg: 0 18px 44px rgba(25, 20, 36, 0.16);
 
   /* ---------------------------------------------------------------- */
+  /* Game materials — tier 2 (UI-9)                                    */
+  /*                                                                    */
+  /* Tier 1 is the semantic layer above (--color-*): what a thing MEANS. */
+  /* Tier 2 is what a thing is MADE OF — the highlight and shade films  */
+  /* that make a board read as a physical object sitting on the table   */
+  /* ground rather than a flat colour fill. Tier 3 (UI-11) is the scene */
+  /* ramp the canvas games read.                                        */
+  /*                                                                    */
+  /* Three deliberate properties:                                       */
+  /*                                                                    */
+  /* 1. They are WHOLE VALUES, not a ramp of loose alphas. A board sets */
+  /*    `box-shadow: var(--game-piece-shadow)` and inherits the whole   */
+  /*    material gesture; it never reassembles one from parts. That is  */
+  /*    what lets UI-10's shared `BoardGrid` hand the same material to  */
+  /*    every board instead of each re-deriving it.                     */
+  /*                                                                    */
+  /* 2. They are named for the ROLE in the object — panel, well (a      */
+  /*    punched hole), piece — not for the game. Connect Four's discs   */
+  /*    are the first consumer, not the owner; Nim's piles and the      */
+  /*    Gomoku stones are the same three roles.                         */
+  /*                                                                    */
+  /* 3. They are theme-independent and live only here, in `:root`. A    */
+  /*    highlight film is the same film on a dark board — the ground    */
+  /*    underneath changes with the theme, the film on top does not.    */
+  /*    Do not add per-theme overrides without a real reason: it would  */
+  /*    silently change every board in one theme only.                  */
+  /* ---------------------------------------------------------------- */
+
+  /* A raised panel: top-edge light, bottom-edge shade, so the frame has
+     a lit side and a shaded side. Applied as `background-image` OVER the
+     panel's own background-color, which stays semantic (--color-accent). */
+  --game-panel-sheen: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0) 12%,
+    rgba(0, 0, 0, 0) 88%,
+    rgba(0, 0, 0, 0.12) 100%
+  );
+  /* The catchlight along a raised panel's top edge. A `box-shadow` entry,
+     so it composes: `box-shadow: var(--shadow-lg), var(--game-panel-edge-light)`. */
+  --game-panel-edge-light: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+
+  /* Hover wash for an interactive region of a board (a column, a pile).
+     A light film rather than a colour so it works over any ground. */
+  --game-surface-hover: rgba(255, 255, 255, 0.12);
+
+  /* A well: a hole punched into the panel. Shade at the top edge where the
+     panel overhangs it, a thin bounce of light at the bottom. */
+  --game-well-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.35), inset 0 -1px 1px rgba(255, 255, 255, 0.08);
+
+  /* A piece sitting in (or on) the board: a rim so it separates from its own
+     fill, a cast shadow so it floats, a top catchlight so it reads domed. */
+  --game-piece-rim: rgba(0, 0, 0, 0.25);
+  --game-piece-cast: 0 2px 3px rgba(0, 0, 0, 0.35);
+  --game-piece-shadow: var(--game-piece-cast), 0 1px 0 rgba(255, 255, 255, 0.15) inset;
+  /* Off-centre gloss, layered over whatever fill the piece carries — so a
+     solid and a striped piece keep their non-colour-only pattern underneath
+     (UX_PRINCIPLES §4). */
+  --game-piece-gloss: radial-gradient(
+    circle at 32% 28%,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.12) 30%,
+    rgba(255, 255, 255, 0) 55%
+  );
+
+  /* ---------------------------------------------------------------- */
   /* Liquid glass — frosted, translucent surfaces (blur + sheen).      */
   /* Consumed via backdrop-filter with a solid @supports fallback so   */
   /* the surface never turns unreadable where blur is unsupported.     */

@@ -1,8 +1,13 @@
 {
+  // The node-side half of `apps/web`: the Vercel functions in `api/`, plus any
+  // `*.node.test.ts` — tests that read project files off disk rather than rendering
+  // anything. Both need node types, and neither should be allowed to make `node:fs`
+  // typecheck inside the browser bundle, so they are excluded from tsconfig.json
+  // and picked up here instead.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2022"],
     "types": ["node"]
   },
-  "include": ["api"]
+  "include": ["api", "src/**/*.node.test.ts"]
 }
