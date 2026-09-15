@@ -17,6 +17,7 @@ import { getRealtimeGame } from "@mpg/engine";
 import type { RealtimeGameId } from "@mpg/engine";
 
 import type { EventSink } from "../analytics/sink.js";
+import { resolveOwnerTokens } from "../identity/ownerTokens.js";
 import { noopLimit, type RateLimitFor } from "../middleware/rateLimit.js";
 import { writeGameResult } from "../sessions/resultWriter.js";
 import type { LeaderboardEntry, LeaderboardFilter, Store } from "../store/ports.js";
@@ -45,18 +46,19 @@ interface SubmitScoreBody {
 }
 
 /**
- * Looks up a leaderboard entry for a single owner the same way
- * `GET /leaderboard/:gameId/rank` does — via `rankOf` + a `topN` slice —
- * to avoid adding a new repo method for a single-row lookup.
+ * Looks up the caller's best leaderboard entry across all their linked sessions
+ * (MPG-091-b) the same way `GET /leaderboard/:gameId/rank` does — via
+ * `rankOfBest` + a `topN` slice — to avoid adding a new repo method for a
+ * single-row lookup.
  */
 async function fetchOwnEntry(
   store: Store,
   gameId: string,
   metric: string,
-  ownerToken: string,
+  ownerTokens: readonly string[],
   filter: LeaderboardFilter,
 ): Promise<LeaderboardEntry | undefined> {
-  const rank = await store.leaderboard.rankOf(gameId, metric, ownerToken, filter);
+  const rank = await store.leaderboard.rankOfBest(gameId, metric, ownerTokens, filter);
   if (rank === undefined) return undefined;
   const entries = await store.leaderboard.topN(gameId, metric, rank, filter);
   return entries[rank - 1];
@@ -98,8 +100,15 @@ export function createLeaderboardRouter(
     const entries = await store.leaderboard.topN(gameId, metric, limit, filter);
 
     const token = req.sessionToken;
+    // Rank across every device linked to this identity (MPG-091-b); an unclaimed
+    // session resolves to its bare token, unchanged from before.
     const yourRank = token
-      ? await store.leaderboard.rankOf(gameId, metric, token, filter)
+      ? await store.leaderboard.rankOfBest(
+          gameId,
+          metric,
+          await resolveOwnerTokens(store, token),
+          filter,
+        )
       : undefined;
 
     res.json({ entries, yourRank });
@@ -119,7 +128,8 @@ export function createLeaderboardRouter(
       return;
     }
 
-    const rank = await store.leaderboard.rankOf(gameId, metric, token, filter);
+    const ownerTokens = await resolveOwnerTokens(store, token);
+    const rank = await store.leaderboard.rankOfBest(gameId, metric, ownerTokens, filter);
     if (rank === undefined) {
       res.json({ rank: null });
       return;
@@ -192,7 +202,8 @@ export function createLeaderboardRouter(
       // re-bump (mirrors `ResultRepo.save`'s runId idempotency used for turn-based games).
       const existing = await store.results.findByRunId(runId);
       if (existing) {
-        const entry = await fetchOwnEntry(store, gameId, "score", token, filter);
+        const ownerTokens = await resolveOwnerTokens(store, token);
+        const entry = await fetchOwnEntry(store, gameId, "score", ownerTokens, filter);
         res.json({ ok: true, duplicate: true, entry: entry ?? null, resultId: existing.id });
         return;
       }

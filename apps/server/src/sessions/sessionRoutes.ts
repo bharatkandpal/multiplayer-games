@@ -8,6 +8,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 
+import { resolveOwnerTokens } from "../identity/ownerTokens.js";
 import { noopLimit, type RateLimitFor } from "../middleware/rateLimit.js";
 import { moderateText } from "../moderation/index.js";
 import { forgetMe } from "../retention/retention.js";
@@ -95,7 +96,10 @@ export function createSessionRouter(store: Store, limit: RateLimitFor = noopLimi
     const limit = parseNonNegativeInt(req.query["limit"], DEFAULT_HISTORY_LIMIT, MAX_HISTORY_LIMIT);
     const offset = parseNonNegativeInt(req.query["offset"], 0);
 
-    const results = await store.results.findByOwner(token, { limit, offset });
+    // Resolve across every device linked to this session's identity (MPG-091-b);
+    // an unclaimed session degrades to a one-token set, i.e. the old behaviour.
+    const ownerTokens = await resolveOwnerTokens(store, token);
+    const results = await store.results.findByOwners(ownerTokens, { limit, offset });
     res.json({ results });
   });
 

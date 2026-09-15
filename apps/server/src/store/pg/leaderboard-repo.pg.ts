@@ -109,6 +109,16 @@ export function createPgLeaderboardRepo(db: Database): LeaderboardRepo {
       return idx === -1 ? undefined : idx + 1;
     },
 
+    async rankOfBest(gameId, metric, ownerTokens, filter) {
+      if (ownerTokens.length === 0) return undefined;
+      const owned = new Set(ownerTokens);
+      // Same sorted scan as `rankOf`; the first row owned by any of the caller's
+      // tokens is their best-placed entry. At scale, switch to a window function.
+      const all = await this.topN(gameId, metric, 10_000, filter);
+      const idx = all.findIndex((e) => owned.has(e.ownerToken));
+      return idx === -1 ? undefined : idx + 1;
+    },
+
     async deleteByOwner(ownerToken) {
       const rows = await db
         .delete(leaderboardEntries)
