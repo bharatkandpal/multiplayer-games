@@ -26,7 +26,7 @@ import type { Request, Response } from "express";
 
 import { emit, type EventSink } from "../analytics/sink.js";
 import { noopLimit, type RateLimitFor } from "../middleware/rateLimit.js";
-import type { GameResult, ShareLink, Store } from "../store/ports.js";
+import type { GameResult, ShareLink, Store, Variant } from "../store/ports.js";
 
 /** Cap on `targetId` length — an id is a token or a game id, never a payload. */
 const MAX_TARGET_ID_LENGTH = 256;
@@ -75,6 +75,23 @@ function toPublicResult(result: GameResult): Record<string, unknown> {
     seatsSnapshot: result.seatsSnapshot,
     durationMs: result.durationMs,
     createdAt: result.createdAt.toISOString(),
+  };
+}
+
+/**
+ * The public, read-only projection of a variant (MPG-089). Spoiler-free by
+ * construction: it carries what a stranger needs to *play* the variant — its
+ * name, base game and cosmetic choices — and nothing that identifies its
+ * author. `ownerToken` is absent because nothing here copies it (same allowlist
+ * discipline as `toPublicResult`).
+ */
+function toPublicVariant(variant: Variant): Record<string, unknown> {
+  return {
+    id: variant.id,
+    name: variant.name,
+    baseGameId: variant.baseGameId,
+    cosmetics: variant.cosmetics,
+    createdAt: variant.createdAt.toISOString(),
   };
 }
 
@@ -194,6 +211,21 @@ export function createShareRouter(
 
     if (link.kind === "leaderboard") {
       res.json({ kind: link.kind, gameId: link.targetId, eventId: link.eventId });
+      return;
+    }
+
+    // A variant link points at a variant row, not a result. Resolves to the
+    // spoiler-free public variant — enough to play it, never the owner token
+    // (MPG-089-b). Minted by `POST /api/variants`, not the generic mint above.
+    if (link.kind === "variant") {
+      const variant = await store.variants.findById(link.targetId);
+      if (!variant) {
+        // The link outlived its target (owner forgotten / variant gone). Same
+        // dead-link shape as everything else.
+        res.status(404).json({ error: "LINK_NOT_FOUND" });
+        return;
+      }
+      res.json({ kind: link.kind, variant: toPublicVariant(variant) });
       return;
     }
 
