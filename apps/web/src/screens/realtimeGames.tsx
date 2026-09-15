@@ -43,6 +43,7 @@ import { Game2048CustomizeMenu } from "../components/realtime/Game2048CustomizeM
 import { loadStored2048Size, store2048Size } from "../components/realtime/game2048Size";
 import { BreakoutScene } from "../components/realtime/BreakoutScene";
 import { Button, GearIcon } from "../components/ui";
+import type { GameNavigation } from "../components/ui";
 import {
   RealtimePlayScreen,
   type RealtimeControls,
@@ -309,6 +310,11 @@ export interface RealtimeGameRouteProps {
    * its `challengeTarget`. Omit for an ordinary solo run.
    */
   challenge?: { score: number };
+  /**
+   * MPG-136: neighbouring games for the pinned action bar, forwarded straight
+   * to `RealtimePlayScreen`. Omit and the bar has no prev/next to offer.
+   */
+  navigation?: GameNavigation;
 }
 
 /**
@@ -367,11 +373,15 @@ export function RealtimeGameRoute({
   onExit,
   onViewLeaderboard,
   challenge,
+  navigation,
 }: RealtimeGameRouteProps): React.JSX.Element | null {
   const [seed] = useState(makeSeed);
   // `exactOptionalPropertyTypes` forbids passing `challengeTarget={undefined}`
   // to an optional prop, so spread it in only when there is a target.
   const challengeProps = challenge ? { challengeTarget: challenge.score } : {};
+  // Same reason as `challengeProps`: an optional prop can't be passed as
+  // `undefined` under `exactOptionalPropertyTypes`.
+  const navProps = navigation ? { navigation } : {};
   const { runKey, settled, shareToken, onRunComplete } = useSettledRun();
   // Only meaningful for "drunk-walk" (the one game with a character to
   // customize), but declared unconditionally so this component's hook
@@ -424,6 +434,7 @@ export function RealtimeGameRoute({
           shareUrl={shareToken ?? buildShareUrl(gameId)}
           resultExtra={rankPreview}
           {...challengeProps}
+          {...navProps}
           surfaceExtra={
             <Button
               variant="ghost"
@@ -479,6 +490,7 @@ export function RealtimeGameRoute({
           shareUrl={shareToken ?? buildShareUrl(gameId)}
           resultExtra={rank2048}
           {...challengeProps}
+          {...navProps}
           surfaceExtra={
             <Button
               variant="ghost"
@@ -512,6 +524,7 @@ export function RealtimeGameRoute({
       shareUrl={shareToken ?? buildShareUrl(gameId)}
       resultExtra={rankPreview}
       {...challengeProps}
+      {...navProps}
     />
   );
 }

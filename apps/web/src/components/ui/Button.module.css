@@ -127,7 +127,7 @@
   /* A flex item's automatic minimum size is its content's min-content size
      unless overridden — without this, `.label` refuses to shrink below its
      own text width even when a consumer constrains the button itself (e.g.
-     GameSwitcher's equal-width side slots), so truncation inside never
+     the GameActionBar's bounded prev/next slots), so truncation inside never
      takes effect and the button just overflows its container instead. Only
      matters when a caller opts into a narrower box; unconstrained buttons
      (the overwhelming majority) are unaffected. */

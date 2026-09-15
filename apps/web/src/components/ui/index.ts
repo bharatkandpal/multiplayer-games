@@ -30,5 +30,13 @@ export { Spinner } from "./Spinner";
 export { VisuallyHidden } from "./VisuallyHidden";
 export type { VisuallyHiddenProps } from "./VisuallyHidden";
 
+export { GameActionBar } from "./GameActionBar";
+export type {
+  GameActionBarProps,
+  GameNavigation,
+  GameNavTarget,
+  OpponentAction,
+} from "./GameActionBar";
+
 export { BackArrowIcon, GearIcon, HomeIcon } from "./icons";
 export type { IconProps } from "./icons";

@@ -1,6 +1,6 @@
 # UX Principles & Quality Bar
 
-**Status:** Draft v0.1 · **Last updated:** 2026-08-24
+**Status:** Draft v0.1 · **Last updated:** 2026-09-15
 **Related:** [PRD.md](PRD.md), [TDD.md](TDD.md)
 
 > **This is a P0 product pillar, not polish.** The platform is **UX-centric first**:
@@ -33,6 +33,11 @@
 9. **Copy is part of the UI.** Human, concise, encouraging. No jargon. Consistent tone.
 10. **Consistency via a system.** Shared design tokens + components so every screen feels
     like one product. No one-off styling.
+11. **The screen is the frame.** A player is never made to scroll to reach the game or its
+    controls. Everything needed to play and to navigate fits inside the viewport (§9).
+12. **Nothing needs teaching.** If a pilot player has to be told an affordance exists, the
+    affordance has failed — not the player. Controls are visible, labelled, and where a
+    first-timer would look (§9).
 
 ## 2. Required states for every interactive surface
 
@@ -93,6 +98,10 @@ A task is not done unless, for what it touches:
 - [ ] Copy reviewed for tone and clarity.
 - [ ] **Local play is unaffected with the backend down** (§7) — the feature degrades to
       absence, never to an error or a block.
+- [ ] **Fits the viewport** (§9) — at 320×568 and 390×844, the board and every control
+      needed to play or navigate are reachable without scrolling.
+- [ ] **No control needs explaining** (§9) — every navigation affordance the screen offers
+      is visible and labelled; nothing depends on a player discovering it.
 
 ## 7. Offline-first: no feature may break local play
 
@@ -131,3 +140,59 @@ disappear. This is part of the §6 gate, not a separate pass.
   error/success are impossible to forget.
 - **Optimistic-UI helper** in the net layer: apply locally → reconcile on broadcast → revert
   on rejection, in one reusable place (TDD §6, §7).
+
+## 9. The screen is the frame — no forced scrolling, no hidden navigation
+
+**Added 2026-09-15, from pilot-user feedback.** Two failures were observed together and
+they share one cause: the play screen is laid out as a _document_ that happens to contain a
+game, rather than as a _frame_ the game has to fit inside.
+
+1. **Players were scrolled off the game.** Controls and the board did not co-exist in the
+   viewport, so reaching one meant losing sight of the other.
+2. **Pilot users had to be taught the navigation.** Prev/next game, switching to a bot
+   opponent, and going Home all existed, but none of them announced itself — the Home
+   control in particular is two small glyphs with no visible label.
+
+### The rules
+
+- **The viewport is a hard budget, not a suggestion.** On every screen, the board (or the
+  screen's primary content) plus every control needed to act on it fit within the visible
+  area, at 320×568 and 390×844, with no page scroll. If it doesn't fit, something is cut or
+  demoted — the layout is not extended downward.
+- **Vertical space is spent on the board first.** Chrome (headers, status rows, seat rails,
+  action bars) competes for the same budget and must stay compact. The board is the hero
+  (§1.7) and gets the remainder.
+- **Scrolling, where it is genuinely unavoidable** (long leaderboards, catalogue shelves),
+  is scoped to a single region that scrolls _inside_ the frame. The page itself never
+  scrolls, and controls never scroll out of reach.
+- **Navigation lives in a persistent bottom action bar during play.** Thumb-reachable on a
+  phone, always visible, never revealed by scrolling:
+
+  ```
+  ┌──────────────────────────────────────────┐
+  │ 🏠   Connect Four                        │
+  │                board                     │
+  ├──────────────────────────────────────────┤
+  │  ‹ Prev    🤖 vs Bot    Next ›           │
+  └──────────────────────────────────────────┘
+  ```
+
+  The top bar keeps only Home and the title; prev/next game and the opponent switch move
+  to the bottom bar.
+
+- **Every navigation control carries a visible text label**, not a bare glyph. Icon-only
+  with an `aria-label` satisfies a screen reader and fails a sighted first-timer.
+- **The Home control is larger than it is today** and reads as an exit: a bigger glyph plus
+  the word "Home", meeting the 44px target with room to spare rather than exactly.
+- **No affordance is discovered by gesture.** No swipe-only game switching, no long-press,
+  no off-screen drawer as the only path to a feature.
+
+### How to verify
+
+Load the screen at 320×568 and 390×844 with the browser's page scrollbar disabled, and
+confirm nothing is clipped and every control is reachable. Then hand it to someone who has
+never used the app and say nothing: if they ask "how do I get back?" or "how do I play a
+bot?", the screen has not met this bar.
+
+Backlog: **MPG-136** (in-game bottom action bar + larger Home), **MPG-137** (no-scroll
+viewport layout across the remaining screens).

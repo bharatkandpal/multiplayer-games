@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { RealtimeModule } from "@mpg/engine";
 import {
-  BackArrowIcon,
   Button,
+  GameActionBar,
   HomeIcon,
   ShareAction,
   StatusBadge,
   VisuallyHidden,
 } from "../components/ui";
+import type { GameNavigation } from "../components/ui";
 import { cx } from "../components/ui/cx";
 import {
   type InputSource,
@@ -113,6 +114,12 @@ export interface RealtimePlayScreenProps<S, I> {
    * no change to the mechanic.
    */
   challengeTarget?: number;
+  /**
+   * MPG-136: the neighbouring games in the catalog, for the pinned action bar
+   * at the bottom of the screen. A solo arcade run has no opponent to switch,
+   * so that slot of the bar stays empty here — absent, not disabled.
+   */
+  navigation?: GameNavigation;
 }
 
 const HINT_ID_PREFIX = "rt-hint";
@@ -135,6 +142,7 @@ export function RealtimePlayScreen<S, I>({
   shareUrl,
   resultExtra,
   challengeTarget,
+  navigation,
 }: RealtimePlayScreenProps<S, I>): React.JSX.Element {
   const reducedMotion = usePrefersReducedMotion();
 
@@ -251,11 +259,13 @@ export function RealtimePlayScreen<S, I>({
 
   return (
     <div className={styles.main}>
+      {/* MPG-136: exit and title, nothing else — and Home is a glyph plus the
+          word, sized so it's the first thing a lost player finds. */}
       <div className={styles.topBar}>
-        <Button variant="ghost" size="sm" onClick={onExit} aria-label="Home">
-          <span className={styles.homeIcons}>
-            <BackArrowIcon />
-            <HomeIcon />
+        <Button variant="secondary" className={styles.homeButton} onClick={onExit}>
+          <span className={styles.homeContent}>
+            <HomeIcon className={styles.homeIcon} />
+            Home
           </span>
         </Button>
         <h1 className={styles.heading}>{gameTitle}</h1>
@@ -397,6 +407,10 @@ export function RealtimePlayScreen<S, I>({
       <div aria-live="polite" role="status">
         <VisuallyHidden>{announcement}</VisuallyHidden>
       </div>
+
+      {/* MPG-136: the pinned bottom bar. No opponent slot — a solo arcade run
+          has nobody to swap — so the bar carries prev/next game alone. */}
+      <GameActionBar {...(navigation ? { navigation } : {})} />
     </div>
   );
 }

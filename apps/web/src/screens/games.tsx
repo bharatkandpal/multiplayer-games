@@ -12,6 +12,7 @@ import {
   TicTacToeBoard,
   TicTacToeMoveBoard,
 } from "../components/board";
+import type { GameNavigation } from "../components/ui";
 import type { SeatsConfig } from "../game";
 import type { PublicRoom, Slot } from "../api/roomTypes";
 import { GamePlayScreen } from "./GamePlayScreen";
@@ -27,6 +28,11 @@ export interface GameRouteProps {
   onNextGame?: () => void;
   /** MPG-055: shows a post-game rank preview on the result screen when provided. */
   onViewLeaderboard?: () => void;
+  /**
+   * MPG-136: the neighbouring games in the catalog, for the pinned action bar
+   * at the bottom of the play screen.
+   */
+  navigation?: GameNavigation;
 }
 
 /** Props shared by the `*OnlineRoute` variants below (MPG-068) — the
@@ -69,6 +75,7 @@ export function TicTacToeRoute({
   onPlayAgain,
   onNextGame,
   onViewLeaderboard,
+  navigation,
 }: GameRouteProps): React.JSX.Element {
   return (
     <GamePlayScreen
@@ -79,6 +86,7 @@ export function TicTacToeRoute({
       onExit={onExit}
       {...(onPlayAgain ? { onPlayAgain } : {})}
       {...(onNextGame ? { onNextGame } : {})}
+      {...(navigation ? { navigation } : {})}
       {...(onViewLeaderboard ? { onViewLeaderboard } : {})}
       renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <TicTacToeBoard
@@ -180,6 +188,7 @@ export function TicTacToeMoveRoute({
   onPlayAgain,
   onNextGame,
   onViewLeaderboard,
+  navigation,
 }: GameRouteProps): React.JSX.Element {
   return (
     <GamePlayScreen
@@ -190,6 +199,7 @@ export function TicTacToeMoveRoute({
       onExit={onExit}
       {...(onPlayAgain ? { onPlayAgain } : {})}
       {...(onNextGame ? { onNextGame } : {})}
+      {...(navigation ? { navigation } : {})}
       {...(onViewLeaderboard ? { onViewLeaderboard } : {})}
       renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <TicTacToeMoveBoard
@@ -285,6 +295,7 @@ export function NimRoute({
   onExit,
   onPlayAgain,
   onNextGame,
+  navigation,
 }: GameRouteProps): React.JSX.Element {
   return (
     <GamePlayScreen
@@ -295,6 +306,7 @@ export function NimRoute({
       onExit={onExit}
       {...(onPlayAgain ? { onPlayAgain } : {})}
       {...(onNextGame ? { onNextGame } : {})}
+      {...(navigation ? { navigation } : {})}
       renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <NimBoard
           state={state}
@@ -319,6 +331,7 @@ export function GomokuRoute({
   onExit,
   onPlayAgain,
   onNextGame,
+  navigation,
 }: GameRouteProps): React.JSX.Element {
   return (
     <GamePlayScreen
@@ -329,6 +342,7 @@ export function GomokuRoute({
       onExit={onExit}
       {...(onPlayAgain ? { onPlayAgain } : {})}
       {...(onNextGame ? { onNextGame } : {})}
+      {...(navigation ? { navigation } : {})}
       renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <GomokuBoard
           state={state}
@@ -349,6 +363,7 @@ export function ConnectFourRoute({
   onPlayAgain,
   onNextGame,
   onViewLeaderboard,
+  navigation,
 }: GameRouteProps): React.JSX.Element {
   return (
     <GamePlayScreen
@@ -359,6 +374,7 @@ export function ConnectFourRoute({
       onExit={onExit}
       {...(onPlayAgain ? { onPlayAgain } : {})}
       {...(onNextGame ? { onNextGame } : {})}
+      {...(navigation ? { navigation } : {})}
       {...(onViewLeaderboard ? { onViewLeaderboard } : {})}
       renderBoard={({ state, onMove, disabled, lastMove, winningLine, winningLineTone }) => (
         <ConnectFourBoard

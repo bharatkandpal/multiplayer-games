@@ -679,3 +679,112 @@ describe("resultTone (MPG-051)", () => {
     expect(resultTone(winP2, seatsHvH, 0)).toBe("subdued");
   });
 });
+
+describe("GamePlayScreen — in-game action bar and labelled Home (MPG-136)", () => {
+  const seats: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
+  const navigation = {
+    previous: { title: "Nim", onSelect: vi.fn() },
+    next: { title: "Gomoku", onSelect: vi.fn() },
+  };
+
+  /** Plays a human-vs-human game to a decisive finish (P1 takes the top row). */
+  async function playToWin(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 1, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 2, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 2, column 2, empty" }));
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 3, empty" }));
+  }
+
+  it("shows Home as a labelled control, not a bare glyph", () => {
+    const onExit = vi.fn();
+    render(<TicTacToeRoute seats={seats} onExit={onExit} />);
+
+    // The word is on screen — the old icon-pair had an aria-label and nothing
+    // a sighted first-timer could read.
+    const home = screen.getByRole("button", { name: "Home" });
+    expect(home).toHaveTextContent("Home");
+  });
+
+  it("offers both neighbouring games mid-game, without being asked for", async () => {
+    const user = userEvent.setup();
+    render(<TicTacToeRoute seats={seats} onExit={vi.fn()} navigation={navigation} />);
+
+    const bar = screen.getByRole("navigation", { name: "Game navigation" });
+    expect(bar).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Nim/ }));
+    expect(navigation.previous.onSelect).toHaveBeenCalledOnce();
+  });
+
+  it("offers the opponent switch during play, and switches straight away before any move", async () => {
+    const user = userEvent.setup();
+    const onPlayAgain = vi.fn();
+    render(
+      <TicTacToeRoute
+        seats={seats}
+        onExit={vi.fn()}
+        onPlayAgain={onPlayAgain}
+        navigation={navigation}
+      />,
+    );
+
+    // Hot-seat game, so the switch on offer is the bot one.
+    await user.click(screen.getByRole("button", { name: /Play vs Bot/ }));
+
+    // Nothing to lose yet — no confirmation, straight into the new game.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(onPlayAgain).toHaveBeenCalledOnce();
+    expect(onPlayAgain.mock.calls[0]?.[0]).toEqual([
+      expect.objectContaining({ kind: "human" }),
+      expect.objectContaining({ kind: "bot" }),
+    ]);
+  });
+
+  it("confirms before abandoning a game that is already under way", async () => {
+    const user = userEvent.setup();
+    const onPlayAgain = vi.fn();
+    render(<TicTacToeRoute seats={seats} onExit={vi.fn()} onPlayAgain={onPlayAgain} />);
+
+    await user.click(screen.getByRole("gridcell", { name: "Row 1, column 1, empty" }));
+    await user.click(screen.getByRole("button", { name: /Play vs Bot/ }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(onPlayAgain).not.toHaveBeenCalled();
+
+    // Backing out keeps the board exactly as it was.
+    await user.click(screen.getByRole("button", { name: "Keep playing" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(onPlayAgain).not.toHaveBeenCalled();
+
+    // Confirming starts the new game.
+    await user.click(screen.getByRole("button", { name: /Play vs Bot/ }));
+    await user.click(screen.getAllByRole("button", { name: /Play vs Bot/ })[1] as HTMLElement);
+    expect(onPlayAgain).toHaveBeenCalledOnce();
+  });
+
+  it("drops the opponent switch once the game is over (the result actions carry it)", async () => {
+    const user = userEvent.setup();
+    render(
+      <TicTacToeRoute
+        seats={seats}
+        onExit={vi.fn()}
+        onPlayAgain={vi.fn()}
+        navigation={navigation}
+      />,
+    );
+
+    await playToWin(user);
+
+    // Exactly one "Play vs Bot" on screen, and it's the game-over action.
+    expect(screen.getAllByRole("button", { name: /Play vs Bot/ })).toHaveLength(1);
+    // The bar itself stays — it is chrome, not a transient affordance.
+    expect(screen.getByRole("navigation", { name: "Game navigation" })).toBeInTheDocument();
+  });
+
+  it("renders no bar at all when there is nowhere to go and no opponent to switch", () => {
+    render(<TicTacToeRoute seats={seats} onExit={vi.fn()} />);
+    expect(screen.queryByRole("navigation", { name: "Game navigation" })).not.toBeInTheDocument();
+  });
+});

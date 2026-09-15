@@ -11,7 +11,17 @@
   width: 100%;
   max-width: var(--container-md);
   margin: 0 auto;
-  padding: var(--space-6) var(--space-4);
+  padding: var(--space-6) var(--space-4) 0;
+
+  /* MPG-136: a flex column that fills the shell, so the pinned action bar
+     (`margin-top: auto` on `.bar`) lands on the bottom edge even when the board
+     is short, instead of floating under it mid-screen. The bar itself is the
+     last child; nothing else here is stretched by this. MPG-137 turns the same
+     column into a hard no-scroll frame. */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
 }
 
 /* Narrow viewports (down to 320px): trade some inline padding for board width
@@ -39,13 +49,24 @@
   margin: 0;
 }
 
-/* Home control: back-arrow + house glyph, no visible text (accessible name
-   comes from the Button's aria-label="Home"). */
-.homeIcons {
+/* MPG-136: Home is a labelled exit, not a glyph. The house sits at display
+   scale beside the word so the control reads as "leave this game" at a glance,
+   and the whole thing clears the 44px target with room to spare rather than
+   landing exactly on it. */
+.homeButton {
+  flex: 0 0 auto;
+}
+
+.homeContent {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  font-size: var(--font-size-300);
+  gap: var(--space-2);
+}
+
+.homeIcon {
+  /* Icons size to 1em; this is the one place the glyph is deliberately bigger
+     than the label beside it — it's the control a lost player looks for. */
+  font-size: var(--font-size-400);
 }
 
 .statusRow {
@@ -109,6 +130,21 @@
   align-items: center;
   gap: var(--space-3);
   margin-bottom: var(--space-6);
+}
+
+/* MPG-136: the "you're about to give up this game" confirmation (opened only
+   from the action bar's opponent switch, and only mid-game). */
+.confirmBody {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-200);
+}
+
+.confirmActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 .rematchIcon {
