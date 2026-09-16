@@ -33,6 +33,14 @@ share/leaderboard functions read.
   Neon serverless HTTP driver — the right shape for functions that can't keep a
   connection pool warm. The container keeps using postgres.js.
 
+## Why there is an empty `public/`
+
+This project has no static output — it is functions only. But `framework: null`
+means Vercel still looks for a static output directory once the build command
+runs, and fails the deploy with `No Output Directory named "public" found`. The
+empty `public/` (kept by `.gitkeep`, declared via `outputDirectory`) satisfies
+that check. Deleting it breaks the deploy; it serves nothing.
+
 ## Deploy
 
 1. **Neon**: create a database; copy the **pooled** connection string

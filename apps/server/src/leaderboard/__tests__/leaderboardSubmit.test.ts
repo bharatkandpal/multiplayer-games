@@ -103,6 +103,26 @@ describe("POST /api/leaderboard/:gameId/submit", () => {
     expect(rankBody.rank).toBe(1);
   });
 
+  // MPG-133. `game_results.seats_snapshot` is NOT NULL, and this route used to
+  // write `null` for a solo run — so on Postgres every submission failed its
+  // insert and took the result row, the share target and (being sequenced after
+  // it) the leaderboard entry down with it. In memory the null was accepted and
+  // nothing complained, so the invariant is pinned here instead: a realtime run
+  // records the one seat that played it.
+  it("records the solo player as a real seat, never a null snapshot", async () => {
+    const { inputLog, score } = buildGenuineRun(7);
+
+    await fetch(`${baseUrl}/api/leaderboard/floppy-birds/submit`, {
+      method: "POST",
+      headers: { "content-type": "application/json", [SESSION_HEADER]: "tok-seats" },
+      body: JSON.stringify({ seed: 7, inputLog, runId: "run-seats", score }),
+    });
+
+    const saved = await store.results.findByRunId("run-seats");
+    expect(saved).toBeDefined();
+    expect(saved?.seatsSnapshot).toEqual([{ slot: 1, kind: "human" }]);
+  });
+
   it("rejects an inflated (tampered) score and writes nothing", async () => {
     const { inputLog, score } = buildGenuineRun(7);
 

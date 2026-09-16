@@ -114,6 +114,21 @@ export function createApiApp({
  * function entry memoizes the returned promise across warm invocations.
  */
 export async function createServerlessApiApp(): Promise<Express> {
+  // Refuse to boot storage-less. `createStore()` falls back to the in-memory
+  // adapter when DATABASE_URL is absent, which is right for the container —
+  // offline play must never depend on a database (see CLAUDE.md) — but wrong
+  // here: a function instance's Maps die with the instance and concurrent
+  // requests hit different instances, so every write would 200 and then
+  // vanish. Silent data loss is worse than a dead deployment, and a missing
+  // env var must not be indistinguishable from a healthy one.
+  if (!process.env["DATABASE_URL"]) {
+    throw new Error(
+      "DATABASE_URL is required for the serverless API — refusing to start on " +
+        "the in-memory store, which cannot persist across function invocations. " +
+        "Set it on the Vercel project (see apps/api/.env.example).",
+    );
+  }
+
   const { registerBuiltInGames, registerBuiltInRealtimeGames } = await import("@mpg/engine");
   const { createStore } = await import("./store/index.js");
   const { createStoreSink } = await import("./analytics/sink.js");

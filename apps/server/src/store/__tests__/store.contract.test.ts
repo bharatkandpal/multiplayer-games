@@ -2,20 +2,85 @@
  * Contract tests for the Store interface.
  *
  * Runs against the in-memory adapter (always) so Vitest needs zero external
- * deps. The same suite can be pointed at Postgres by setting DATABASE_URL,
- * but that's opt-in / CI-gated.
+ * deps. **Set `DATABASE_URL` and the identical suite also runs against the
+ * Postgres adapter** (MPG-133) — same assertions, both sides of the seam, which
+ * is the only way "the repos are interchangeable" stops being a claim and
+ * becomes a test. Without it the suite is silently memory-only.
+ *
+ *   docker compose up -d
+ *   pnpm --filter @mpg/server db:migrate   # once, with DATABASE_URL set
+ *   DATABASE_URL=postgres://mpg:mpg_local@localhost:5432/mpg_dev \
+ *     pnpm --filter @mpg/server test
+ *
+ * The Postgres run is destructive — it truncates every table before each test —
+ * so point it at a scratch database, never at anything you care about.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { sql } from "drizzle-orm";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
 
+import type { Database } from "../../db/drizzle.js";
+import type { Sql } from "../../db/connection.js";
 import type { Store } from "../ports.js";
 import { createMemoryStore } from "../memory/index.js";
 
-describe.each([["memory", () => createMemoryStore()]])("%s adapter", (_name, factory) => {
+/**
+ * Every table the store owns. Truncated as one statement so FK order doesn't
+ * matter; `RESTART IDENTITY` keeps serial columns from leaking test to test.
+ */
+const STORE_TABLES = [
+  "sessions",
+  "identities",
+  "game_results",
+  "leaderboard_entries",
+  "share_links",
+  "analytics_events",
+  "reports",
+  "variants",
+] as const;
+
+type Adapter = readonly [name: string, setup: () => Promise<Store>];
+
+/**
+ * The container's driver (postgres.js), built here rather than through
+ * `createDatabaseFromEnv` so the suite owns the connection handle and can close
+ * it in `afterAll` — an open pool outlives the run and hangs Vitest. Driver
+ * *selection* is a separate concern with its own unit coverage; what this suite
+ * is for is the repos.
+ */
+let pgSql: Sql | undefined;
+let pgDb: Database | undefined;
+let pgStore: Store | undefined;
+
+async function setupPostgresStore(): Promise<Store> {
+  if (!pgStore || !pgDb) {
+    const { createSql } = await import("../../db/connection.js");
+    const { createDatabase } = await import("../../db/drizzle.js");
+    const { createPgStore } = await import("../pg/index.js");
+    pgSql = createSql();
+    pgDb = createDatabase(pgSql);
+    pgStore = createPgStore(pgDb);
+  }
+  // The memory adapter gets a fresh instance per test; Postgres gets the
+  // equivalent — an empty database — so the assertions can be identical.
+  await pgDb.execute(sql.raw(`TRUNCATE TABLE ${STORE_TABLES.join(", ")} RESTART IDENTITY CASCADE`));
+  return pgStore;
+}
+
+const adapters: Adapter[] = [["memory", async () => createMemoryStore()]];
+if (process.env["DATABASE_URL"]) {
+  adapters.push(["postgres", setupPostgresStore]);
+}
+
+afterAll(async () => {
+  await pgSql?.end();
+});
+
+describe.each(adapters)("%s adapter", (_name, factory) => {
   let store: Store;
 
-  beforeEach(() => {
-    store = factory();
+  beforeEach(async () => {
+    store = await factory();
   });
 
   // -----------------------------------------------------------------------

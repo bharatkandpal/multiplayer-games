@@ -142,7 +142,17 @@ export const leaderboardEntries = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    unique("leaderboard_upsert_key").on(t.gameId, t.eventId, t.timeBucket, t.ownerToken),
+    // `nullsNotDistinct` is load-bearing, not a detail (MPG-133). Two of these
+    // four columns are nullable, and a plain UNIQUE treats NULL as distinct from
+    // NULL — so for the *default* leaderboard (no event, no time bucket, which
+    // is the common case) the constraint matched nothing, `onConflictDoUpdate`
+    // never fired, and every submission inserted another row instead of
+    // accumulating into the player's. The in-memory adapter keys on the string
+    // "null" and always behaved correctly, which is why only a real Postgres run
+    // could surface this.
+    unique("leaderboard_upsert_key")
+      .on(t.gameId, t.eventId, t.timeBucket, t.ownerToken)
+      .nullsNotDistinct(),
     index("leaderboard_rank_idx").on(t.gameId, t.metric, t.bestScore),
   ],
 );

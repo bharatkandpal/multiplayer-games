@@ -42,6 +42,17 @@ export async function writeGameResult(
   data: GameOverData,
   sink?: EventSink,
 ): Promise<GameResult> {
+  // The owning session must exist before the result can reference it (MPG-133).
+  // Under Postgres `game_results.owner_token` is a real foreign key, and the
+  // socket path never created the row: `RoomManager` mints seat tokens with
+  // `nanoid()` in memory, and only the HTTP middleware upserts. So every online
+  // game failed this insert on an FK violation — silently, because persistence
+  // is deliberately fire-and-forget so it can never block play. No result row
+  // meant no share target and no leaderboard entry either, since both FK the
+  // same table. The in-memory store has no foreign keys, which is why the whole
+  // suite stayed green. Upsert is idempotent; the HTTP path just no-ops here.
+  await store.sessions.upsert(data.ownerToken);
+
   const alreadyExisted = sink ? Boolean(await store.results.findByRunId(data.runId)) : false;
 
   const input: NewGameResult = {

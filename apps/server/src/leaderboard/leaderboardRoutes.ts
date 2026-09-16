@@ -232,7 +232,14 @@ export function createLeaderboardRouter(
           ownerToken: token,
           status: "complete",
           score: replayedScore,
-          seatsSnapshot: null,
+          // A solo realtime run still has a seat — the submitting human — and
+          // `game_results.seats_snapshot` is NOT NULL (MPG-133). Writing `null`
+          // here made every Floppy Birds submission fail its insert on Postgres:
+          // no result row, so no share target, and because the leaderboard write
+          // is sequenced after it, no score on the board either. The in-memory
+          // store has no NOT NULL, so the whole suite stayed green. A real
+          // one-seat snapshot is also what the card renderer wants to read.
+          seatsSnapshot: [{ slot: 1, kind: "human" }],
           moveLog: { seed, inputLog },
           eventId: eventId ?? null,
         },
