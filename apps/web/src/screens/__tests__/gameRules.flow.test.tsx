@@ -44,6 +44,28 @@ describe("in-game rules (MPG-138)", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("offers a 'don't show again' checkbox, ticked once the game has been met", () => {
+    render(<TicTacToeRoute seats={SEATS} onExit={vi.fn()} />);
+
+    // The sheet auto-opened, which already marks the game seen — so the box
+    // reads as ticked, surfacing the once-per-device behaviour explicitly.
+    const checkbox = screen.getByRole("checkbox", { name: /show this automatically again/i });
+    expect(checkbox).toBeChecked();
+  });
+
+  it("unticking the box makes the rules auto-open again next visit", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<TicTacToeRoute seats={SEATS} onExit={vi.fn()} />);
+
+    await user.click(screen.getByRole("checkbox", { name: /show this automatically again/i }));
+    await user.click(screen.getByRole("button", { name: "Got it" }));
+    unmount();
+
+    // Cleared the "seen" flag, so a brand-new visit greets the player again.
+    render(<TicTacToeRoute seats={SEATS} onExit={vi.fn()} />);
+    expect(screen.getByRole("dialog", { name: "How to play Tic-Tac-Toe" })).toBeInTheDocument();
+  });
+
   it("leaves the board playable — dismissing returns the player to their game", async () => {
     const user = userEvent.setup();
     render(<TicTacToeRoute seats={SEATS} onExit={vi.fn()} />);

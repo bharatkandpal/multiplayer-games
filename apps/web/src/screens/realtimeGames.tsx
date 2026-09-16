@@ -473,6 +473,9 @@ export function RealtimeGameRoute({
     const handleChangeSize = (next: Game2048Size): void => {
       setSize(next);
       store2048Size(next);
+      // Picking a size is a complete choice — close the sheet so the fresh run
+      // is visible immediately rather than behind the still-open picker.
+      setMenuOpen(false);
     };
     return (
       <>

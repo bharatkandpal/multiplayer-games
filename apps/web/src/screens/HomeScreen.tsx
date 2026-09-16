@@ -353,6 +353,25 @@ interface GameCardProps {
  * and still addressable as just its title (MPG-052) while the prose that was
  * previously written and never rendered finally reaches the player.
  */
+/**
+ * A card description with its hook phrase bolded. Splits on the first occurrence
+ * of `emphasis` so the phrase reads as emphasised text inside the sentence; when
+ * `emphasis` is absent or isn't found, the description renders unchanged — no
+ * card is ever broken by a mismatched phrase.
+ */
+function renderDescription(description: string, emphasis?: string): React.ReactNode {
+  if (!emphasis) return description;
+  const at = description.indexOf(emphasis);
+  if (at === -1) return description;
+  return (
+    <>
+      {description.slice(0, at)}
+      <strong className={styles.descriptionEmphasis}>{emphasis}</strong>
+      {description.slice(at + emphasis.length)}
+    </>
+  );
+}
+
 function GameCard({ entry, onSelectGame, onSelectRealtimeGame }: GameCardProps): React.JSX.Element {
   const baseId = useId();
   const titleId = `${baseId}-title`;
@@ -386,7 +405,7 @@ function GameCard({ entry, onSelectGame, onSelectRealtimeGame }: GameCardProps):
         {entry.title}
       </span>
       <span className={styles.gameDescription} id={descriptionId}>
-        {entry.description}
+        {renderDescription(entry.description, entry.emphasis)}
       </span>
       <span className={styles.tagRow} id={tagsId}>
         {/* The family marker. The cabinet treatment says "arcade" visually, but

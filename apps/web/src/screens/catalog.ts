@@ -68,6 +68,14 @@ interface DiscoveryFields {
    * real date from the entry's commit rather than a guess, so "New" stays true.
    */
   readonly addedOn: string;
+  /**
+   * An exact substring of `description` to emphasise on the card — the phrase
+   * that names the game's hook (e.g. Gomoku's "five in a row"). Optional and
+   * plain data: the card bolds the first occurrence if present and renders the
+   * description unchanged otherwise, so a typo'd phrase degrades to no emphasis
+   * rather than to a broken card.
+   */
+  readonly emphasis?: string;
 }
 
 export interface GameCatalogEntry extends DiscoveryFields {
@@ -140,6 +148,7 @@ export const GAME_CATALOG: Partial<Record<GameId, GameCatalogEntry>> = {
     title: "Gomoku",
     description:
       "Place stones on a 9x9 board and be the first to line up five in a row — across, down, or diagonally.",
+    emphasis: "five in a row",
     playerCount: gomoku.playerCount,
     kind: "turn-based",
     tags: ["vs-bot", "online", "watch"],
@@ -290,7 +299,8 @@ export type GameItem =
 /**
  * The canonical ordered list of playable games: both registries, tagged by
  * kind, filtered to ids that actually have a catalog entry (title/route wiring
- * exists). Turn-based first, then real-time.
+ * exists). **Real-time (arcade) first, then turn-based** — the arcade games are
+ * the ones that carry discovery, so they lead every shelf and the prev/next walk.
  *
  * This one ordering backs both the Home grid and the prev/next controls, so a
  * game can never appear in one and not the other. The filter is what kept
@@ -300,34 +310,35 @@ export type GameItem =
  */
 export function buildGameItems(games: GameId[], realtimeGames: RealtimeGameId[] = []): GameItem[] {
   return [
-    ...games.flatMap((id): GameItem[] => {
-      const entry = GAME_CATALOG[id];
-      return entry ? [{ kind: "turn-based", id, title: entry.title }] : [];
-    }),
     ...realtimeGames.flatMap((id): GameItem[] => {
       const entry = REALTIME_CATALOG[id];
       return entry ? [{ kind: "realtime", id, title: entry.title }] : [];
+    }),
+    ...games.flatMap((id): GameItem[] => {
+      const entry = GAME_CATALOG[id];
+      return entry ? [{ kind: "turn-based", id, title: entry.title }] : [];
     }),
   ];
 }
 
 /**
- * The same ordering as `buildGameItems`, but carrying the whole catalog entry
- * rather than just `{kind, id, title}`. Home needs descriptions and tags to
- * render a card; the prev/next controls don't, and keeping `GameItem` narrow
- * means a play screen never pulls catalogue prose into its bundle.
+ * The same ordering as `buildGameItems` (real-time first, then turn-based), but
+ * carrying the whole catalog entry rather than just `{kind, id, title}`. Home
+ * needs descriptions and tags to render a card; the prev/next controls don't,
+ * and keeping `GameItem` narrow means a play screen never pulls catalogue prose
+ * into its bundle.
  */
 export function listCatalogEntries(
   games: GameId[],
   realtimeGames: RealtimeGameId[] = [],
 ): CatalogEntry[] {
   return [
-    ...games.flatMap((id): CatalogEntry[] => {
-      const entry = GAME_CATALOG[id];
-      return entry ? [entry] : [];
-    }),
     ...realtimeGames.flatMap((id): CatalogEntry[] => {
       const entry = REALTIME_CATALOG[id];
+      return entry ? [entry] : [];
+    }),
+    ...games.flatMap((id): CatalogEntry[] => {
+      const entry = GAME_CATALOG[id];
       return entry ? [entry] : [];
     }),
   ];

@@ -32,6 +32,15 @@ function markRulesSeen(gameId: string): void {
   }
 }
 
+function clearRulesSeen(gameId: string): void {
+  try {
+    window.localStorage.removeItem(rulesSeenStorageKey(gameId));
+  } catch {
+    // Swallowed — worst case the sheet doesn't come back, which the player can
+    // still reach through the Rules control.
+  }
+}
+
 export interface GameRulesState {
   /** The prose to render, or `null` when this game has no rules written. */
   rules: GameRules | null;
@@ -39,6 +48,14 @@ export interface GameRulesState {
   /** Opens the sheet from the Rules control. */
   open: () => void;
   close: () => void;
+  /**
+   * Whether this game's rules are suppressed from auto-opening — i.e. the player
+   * has already met the game (or ticked "don't show again"). Backs the sheet's
+   * checkbox so the auto-show behaviour is visible and reversible, not silent.
+   */
+  autoShowSuppressed: boolean;
+  /** Sets (and persists) whether the rules auto-open next time this game opens. */
+  setAutoShowSuppressed: (suppressed: boolean) => void;
 }
 
 /**
@@ -64,6 +81,13 @@ export function useGameRules(gameId: string | undefined): GameRulesState {
   const rules = gameId === undefined ? undefined : rulesFor(gameId);
   const [isOpen, setIsOpen] = useState(false);
 
+  // Mirrors the persisted "seen" flag so the sheet's checkbox reflects — and can
+  // toggle — whether the rules will auto-open again. Seeded per game; re-seeded
+  // below when the screen switches games underneath us.
+  const [autoShowSuppressed, setAutoShowSuppressedState] = useState(() =>
+    gameId === undefined ? false : hasSeenRules(gameId),
+  );
+
   // Which game we've already decided about this mount. Guards against the
   // effect re-running (React 18 StrictMode double-invoke, a re-render with a
   // new `rules` identity) and re-opening a sheet the player just dismissed —
@@ -75,18 +99,33 @@ export function useGameRules(gameId: string | undefined): GameRulesState {
     if (gameId === undefined || rules === undefined) return;
     if (decidedFor.current === gameId) return;
     decidedFor.current = gameId;
-    if (!hasSeenRules(gameId)) setIsOpen(true);
+    const seen = hasSeenRules(gameId);
+    setAutoShowSuppressedState(seen);
+    if (!seen) setIsOpen(true);
   }, [gameId, rules]);
 
   // Marked on *open*, not on dismiss: a player who reads the sheet and then
   // navigates away without touching it has still seen it, and reopening it on
   // their next visit would read as the app not noticing.
   useEffect(() => {
-    if (isOpen && gameId !== undefined) markRulesSeen(gameId);
+    if (isOpen && gameId !== undefined) {
+      markRulesSeen(gameId);
+      setAutoShowSuppressedState(true);
+    }
   }, [isOpen, gameId]);
 
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
 
-  return { rules: rules ?? null, isOpen, open, close };
+  const setAutoShowSuppressed = useCallback(
+    (suppressed: boolean) => {
+      setAutoShowSuppressedState(suppressed);
+      if (gameId === undefined) return;
+      if (suppressed) markRulesSeen(gameId);
+      else clearRulesSeen(gameId);
+    },
+    [gameId],
+  );
+
+  return { rules: rules ?? null, isOpen, open, close, autoShowSuppressed, setAutoShowSuppressed };
 }

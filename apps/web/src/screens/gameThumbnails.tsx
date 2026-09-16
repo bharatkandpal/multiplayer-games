@@ -151,28 +151,39 @@ function DrunkWalkThumbnail(): React.JSX.Element {
 }
 
 function NimThumbnail(): React.JSX.Element {
-  // Four bars of increasing height, echoing the default 1/3/5/7 pile sizes —
-  // a quick "piles of objects" read at a glance, no text required.
-  const bars = [
-    { x: 12, height: 18 },
-    { x: 34, height: 38 },
-    { x: 56, height: 58 },
-    { x: 78, height: 78 },
+  // Four piles of matchstick-like objects — 1, 3, 5 and 7, the default Nim
+  // layout — so the icon reads literally as "take objects from piles" rather
+  // than as a bar chart. Each stick is a thin rounded rod with a small head.
+  const piles = [
+    { center: 12, count: 1 },
+    { center: 33, count: 3 },
+    { center: 57, count: 5 },
+    { center: 84, count: 7 },
   ];
+  const baseline = 90;
+  const stickHeight = 46;
+  const pitch = 4;
   return (
     <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
-      <line x1="4" y1="92" x2="96" y2="92" className={styles.grid} strokeWidth="4" />
-      {bars.map(({ x, height }) => (
-        <rect
-          key={x}
-          x={x - 6}
-          y={92 - height}
-          width="12"
-          height={height}
-          rx="2"
-          className={styles.markPlayer1}
-        />
-      ))}
+      <line x1="4" y1={baseline} x2="96" y2={baseline} className={styles.grid} strokeWidth="4" />
+      {piles.flatMap(({ center, count }) => {
+        const start = center - ((count - 1) * pitch) / 2;
+        return Array.from({ length: count }, (_, i) => {
+          const x = start + i * pitch;
+          return (
+            <g key={`${center}-${i}`} className={styles.markPlayer1} stroke="none">
+              <rect
+                x={x - 1.25}
+                y={baseline - stickHeight}
+                width="2.5"
+                height={stickHeight}
+                rx="1.25"
+              />
+              <circle cx={x} cy={baseline - stickHeight} r="2" />
+            </g>
+          );
+        });
+      })}
     </svg>
   );
 }
