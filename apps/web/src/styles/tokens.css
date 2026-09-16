@@ -354,6 +354,21 @@
   --board-cell-shadow: var(--shadow-sm);
   --board-cell-press-scale: 0.96;
 
+  /* The table ground (UI-6). What a turn-based board SITS ON, as distinct from
+     what the board itself is made of: matte, ruled, unlit — see
+     `docs/DESIGN_LANGUAGE.md` §2. Only the turn-based play area wears it; the
+     real-time screens have the cabinet instead, and that split is the whole
+     point of having two grounds.
+
+     Deliberately quiet. Connect Four's frame is already an accent-colored
+     panel and Tic-Tac-Toe's cells are already raised above it, so the table's
+     job here is to give both of them something to sit on — not to compete
+     with either. */
+  --board-table-bg: var(--color-table);
+  --board-table-border: var(--border-width-hairline) solid var(--color-table-line);
+  --board-table-radius: var(--radius-lg);
+  --board-table-padding: var(--space-3);
+
   /* State rings. Every board draws its highlights at these widths, including
      the two (Connect Four, Nim) whose objects are not grid cells — so a
      "this just moved" ring reads the same weight whatever you are playing. */

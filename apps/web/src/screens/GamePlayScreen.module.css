@@ -193,6 +193,19 @@
   align-items: center;
   justify-content: center;
   margin-bottom: var(--space-3);
+
+  /* UI-6/MPG-113: the table ground. The board now sits on a matte, ruled
+     surface instead of floating on the page background — the turn-based half
+     of the two-grounds split in `docs/DESIGN_LANGUAGE.md` §2.
+
+     Padding is inside the height budget, not on top of it: `container-type:
+     size` means `100cqh` (what every board clamps against) already measures
+     this element's *content* box, so the board keeps shrinking to fit and the
+     table's inset comes out of the remainder rather than out of the frame. */
+  padding: var(--board-table-padding);
+  border: var(--board-table-border);
+  border-radius: var(--board-table-radius);
+  background-color: var(--board-table-bg);
 }
 
 /* Positioned so the win/lose overlays (MPG-046) can sit above the board
@@ -205,12 +218,10 @@
   max-height: 100%;
 }
 
-/* Seat presence cards (MPG-042/046): a single row above the board. */
+/* Seat presence cards (MPG-042/046): a single row above the board. The row's
+   own grammar (wrap, centring, gap) belongs to `SeatRail` since UI-6/MPG-113 —
+   what's left here is only how this screen places it in the column. */
 .seatRow {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-2);
   margin-bottom: var(--space-3);
 }
 
