@@ -1,10 +1,18 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import { ENGINE_VERSION } from "@mpg/engine";
 import type { GameId, RealtimeGameId } from "@mpg/engine";
 import { Button } from "../components/ui";
 import { loadPersonalBest } from "../game/personalBest";
 import { GameThumbnail } from "./gameThumbnails";
-import { buildHomeShelves, gameTags } from "./catalog";
+import {
+  TAG_LABEL,
+  buildHomeShelves,
+  filterByTag,
+  filterableTags,
+  gameTags,
+  listCatalogEntries,
+  tagFilterNarrows,
+} from "./catalog";
 import type { CatalogEntry, GameTag, HomeShelf } from "./catalog";
 import styles from "./HomeScreen.module.css";
 
@@ -72,10 +80,18 @@ export function HomeScreen({
   onShowGallery,
   devMode = false,
 }: HomeScreenProps): React.JSX.Element {
+  const [activeTag, setActiveTag] = useState<GameTag | null>(null);
+
   const shelves = buildHomeShelves(games, realtimeGames, {
     ...(trending ? { trending } : {}),
     ...(gameOfTheDay ? { gameOfTheDay } : {}),
   });
+
+  const entries = listCatalogEntries(games, realtimeGames);
+  const tags = filterableTags(entries);
+  // Offered only when some chip would actually narrow the page — see
+  // `tagFilterNarrows`. A filter that cannot change what you see is clutter.
+  const showFilter = shelves.length > 0 && tagFilterNarrows(entries);
 
   return (
     <div className={styles.main}>
@@ -85,12 +101,14 @@ export function HomeScreen({
         Options on any game.
       </p>
 
+      {showFilter ? <TagFilter tags={tags} activeTag={activeTag} onChange={setActiveTag} /> : null}
+
       {shelves.length === 0 ? (
         <p className={styles.empty}>
           No games are available right now. Try reloading the page — if that doesn&apos;t help, this
           is a bug, not something you did.
         </p>
-      ) : (
+      ) : activeTag === null ? (
         shelves.map((shelf) => (
           <Shelf
             key={shelf.id}
@@ -100,6 +118,14 @@ export function HomeScreen({
             onConfigureGame={onConfigureGame}
           />
         ))
+      ) : (
+        <FilteredResults
+          tag={activeTag}
+          matches={filterByTag(entries, activeTag)}
+          onSelectGame={onSelectGame}
+          onSelectRealtimeGame={onSelectRealtimeGame}
+          onConfigureGame={onConfigureGame}
+        />
       )}
 
       {devMode ? (
@@ -115,6 +141,147 @@ export function HomeScreen({
         </footer>
       ) : null}
     </div>
+  );
+}
+
+interface TagFilterProps {
+  tags: readonly GameTag[];
+  activeTag: GameTag | null;
+  onChange: (tag: GameTag | null) => void;
+}
+
+/**
+ * The tag filter row (MPG-112 / UI-5): the first thing that makes a ten-game
+ * catalogue browsable rather than just scrollable.
+ *
+ * Toggle buttons, not a listbox or a set of links — a filter is a thing you
+ * switch on and off, and `aria-pressed` says exactly that without inventing a
+ * widget a screen-reader user has to learn. "All" is the off position rather
+ * than a ninth tag, so clearing is always one tap and never a hunt for which
+ * chip is currently lit.
+ *
+ * Only tags some listed game actually carries are offered (`filterableTags`),
+ * so no chip here can lead to an empty page.
+ */
+function TagFilter({ tags, activeTag, onChange }: TagFilterProps): React.JSX.Element {
+  return (
+    <div className={styles.filterRow} role="group" aria-label="Filter games by tag">
+      <button
+        type="button"
+        className={styles.filterChip}
+        aria-pressed={activeTag === null}
+        onClick={() => onChange(null)}
+      >
+        All
+      </button>
+      {tags.map((tag) => (
+        <button
+          key={tag}
+          type="button"
+          className={styles.filterChip}
+          aria-pressed={activeTag === tag}
+          // Tapping the active chip clears it — the chip a player just pressed
+          // is the most obvious place to reach for to undo it.
+          onClick={() => onChange(activeTag === tag ? null : tag)}
+        >
+          {TAG_LABEL[tag]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+interface FilteredResultsProps {
+  tag: GameTag;
+  matches: readonly CatalogEntry[];
+  onSelectGame: (gameId: GameId) => void;
+  onSelectRealtimeGame: ((gameId: RealtimeGameId) => void) | undefined;
+  onConfigureGame: ((gameId: GameId) => void) | undefined;
+}
+
+/**
+ * What Home shows while a filter is on: one flat grid, replacing the shelves.
+ *
+ * The shelves answer "what should I play?" — once a player has told us what
+ * they want, that framing is noise, and at this catalogue size keeping it would
+ * leave a column of one- and two-card shelves. The shelves come straight back
+ * the moment the filter clears, so nothing is lost, only set aside.
+ *
+ * The count is a heading rather than a bare line so it lands in the document
+ * outline where the shelf headings were, and reuses the shelf's own type so the
+ * page doesn't change voice mid-session. `filterableTags` guarantees `matches`
+ * is never empty, which is why there is no empty state here.
+ */
+function FilteredResults({
+  tag,
+  matches,
+  onSelectGame,
+  onSelectRealtimeGame,
+  onConfigureGame,
+}: FilteredResultsProps): React.JSX.Element {
+  return (
+    <section className={styles.results} aria-labelledby="filter-results">
+      <div className={styles.shelfHeader}>
+        <h2 className={styles.shelfTitle} id="filter-results">
+          {matches.length} {matches.length === 1 ? "game" : "games"}
+        </h2>
+        <p className={styles.shelfBlurb}>Tagged {TAG_LABEL[tag].toLowerCase()}.</p>
+      </div>
+      <GameGrid
+        entries={matches}
+        label={`Games tagged ${TAG_LABEL[tag]}`}
+        onSelectGame={onSelectGame}
+        onSelectRealtimeGame={onSelectRealtimeGame}
+        onConfigureGame={onConfigureGame}
+      />
+    </section>
+  );
+}
+
+interface GameGridProps {
+  entries: readonly CatalogEntry[];
+  label: string;
+  onSelectGame: (gameId: GameId) => void;
+  onSelectRealtimeGame: ((gameId: RealtimeGameId) => void) | undefined;
+  onConfigureGame: ((gameId: GameId) => void) | undefined;
+}
+
+/**
+ * The grid of cards, shared by a shelf and by the filtered result list, so the
+ * two can never drift on card wiring or on the Options control.
+ */
+function GameGrid({
+  entries,
+  label,
+  onSelectGame,
+  onSelectRealtimeGame,
+  onConfigureGame,
+}: GameGridProps): React.JSX.Element {
+  return (
+    <ul className={styles.gameGrid} aria-label={label}>
+      {entries.map((entry) => (
+        <li key={`${entry.kind}:${entry.id}`} className={styles.gameCell}>
+          <GameCard
+            entry={entry}
+            onSelectGame={onSelectGame}
+            onSelectRealtimeGame={onSelectRealtimeGame}
+          />
+          {/* Real-time games are solo — they have no seats to configure, so
+              they get no Options control (ADR 0002 §2). */}
+          {entry.kind === "turn-based" && onConfigureGame ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={styles.gameOptions}
+              onClick={() => onConfigureGame(entry.id)}
+              aria-label={`Options for ${entry.title} — play a friend, online, or watch bots`}
+            >
+              Options
+            </Button>
+          ) : null}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -158,30 +325,13 @@ function Shelf({
         </h2>
         <p className={styles.shelfBlurb}>{shelf.blurb}</p>
       </div>
-      <ul className={styles.gameGrid} aria-label={`${shelf.title} games`}>
-        {shelf.entries.map((entry) => (
-          <li key={`${entry.kind}:${entry.id}`} className={styles.gameCell}>
-            <GameCard
-              entry={entry}
-              onSelectGame={onSelectGame}
-              onSelectRealtimeGame={onSelectRealtimeGame}
-            />
-            {/* Real-time games are solo — they have no seats to configure, so
-                they get no Options control (ADR 0002 §2). */}
-            {entry.kind === "turn-based" && onConfigureGame ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className={styles.gameOptions}
-                onClick={() => onConfigureGame(entry.id)}
-                aria-label={`Options for ${entry.title} — play a friend, online, or watch bots`}
-              >
-                Options
-              </Button>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+      <GameGrid
+        entries={shelf.entries}
+        label={`${shelf.title} games`}
+        onSelectGame={onSelectGame}
+        onSelectRealtimeGame={onSelectRealtimeGame}
+        onConfigureGame={onConfigureGame}
+      />
     </section>
   );
 }
@@ -263,15 +413,3 @@ function GameCard({ entry, onSelectGame, onSelectRealtimeGame }: GameCardProps):
     </button>
   );
 }
-
-/** Player-facing wording for each tag — the union's ids are not copy. */
-const TAG_LABEL: Record<GameTag, string> = {
-  solo: "Solo",
-  "2-player": "2 players",
-  multiplayer: "Multiplayer",
-  "vs-bot": "vs bot",
-  online: "Online",
-  watch: "Watch",
-  quick: "Quick",
-  endless: "Endless",
-};

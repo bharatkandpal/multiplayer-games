@@ -3,8 +3,13 @@ import type { GameId, RealtimeGameId } from "@mpg/engine";
 import {
   buildGameItems,
   buildHomeShelves,
+  filterByTag,
+  filterableTags,
   gameTags,
   hasTag,
+  listCatalogEntries,
+  tagFilterNarrows,
+  TAG_LABEL,
   indexOfGame,
   nextGame,
   prevGame,
@@ -240,5 +245,77 @@ describe("catalog — buildHomeShelves", () => {
   it("renders no spotlight shelf when the pick isn't a listed game", () => {
     const shelves = buildHomeShelves(["nim"], [], { gameOfTheDay: "gomoku" });
     expect(shelf(shelves, "gotd")).toBeUndefined();
+  });
+});
+
+describe("catalog — the tag filter layer (MPG-112)", () => {
+  const entries = listCatalogEntries(
+    ["tictactoe", "connect4", "gomoku"],
+    ["floppy-birds", "reflex-test"],
+  );
+
+  it("gives every tag in the union player-facing words", () => {
+    // Typed `Record<GameTag, string>`, so this is really a guard that nobody
+    // widens the union and leaves a raw id like "2-player" facing the player.
+    for (const [tag, label] of Object.entries(TAG_LABEL)) {
+      expect(label, `${tag} has no label`).toBeTruthy();
+      expect(label).not.toBe(tag);
+    }
+  });
+
+  it("offers only tags at least one listed game carries", () => {
+    // Nothing in this catalogue is `multiplayer` — no three-seat game exists
+    // yet — so the chip is absent rather than present and leading nowhere.
+    expect(filterableTags(entries)).toEqual([
+      "solo",
+      "2-player",
+      "vs-bot",
+      "online",
+      "watch",
+      "quick",
+      "endless",
+    ]);
+  });
+
+  it("offers tags in TAG_LABEL order, so the row never reshuffles", () => {
+    const order = Object.keys(TAG_LABEL);
+    const offered = filterableTags(entries);
+    expect(offered).toEqual([...offered].sort((a, b) => order.indexOf(a) - order.indexOf(b)));
+  });
+
+  it("never offers a tag that would produce an empty page", () => {
+    for (const tag of filterableTags(entries)) {
+      expect(filterByTag(entries, tag).length, `${tag} matched nothing`).toBeGreaterThan(0);
+    }
+  });
+
+  it("filters to the games carrying the tag, in catalogue order", () => {
+    expect(filterByTag(entries, "solo").map((e) => e.id)).toEqual(["floppy-birds", "reflex-test"]);
+    expect(filterByTag(entries, "2-player").map((e) => e.id)).toEqual([
+      "tictactoe",
+      "connect4",
+      "gomoku",
+    ]);
+  });
+
+  it("reports the filter as useful only when some tag actually narrows", () => {
+    expect(tagFilterNarrows(entries)).toBe(true);
+
+    // One game still carries five tags, but every one of them matches the
+    // whole catalogue — so none of them is a filter.
+    const single = listCatalogEntries(["tictactoe"]);
+    expect(filterableTags(single).length).toBeGreaterThan(1);
+    expect(tagFilterNarrows(single)).toBe(false);
+
+    expect(tagFilterNarrows([])).toBe(false);
+  });
+
+  it("partitions the catalogue without losing a game — every entry is reachable", () => {
+    // The filter is a lens, not a gate: no listed game may be unreachable
+    // through every chip at once.
+    const reachable = new Set(
+      filterableTags(entries).flatMap((tag) => filterByTag(entries, tag).map((e) => e.id)),
+    );
+    expect(reachable.size).toBe(entries.length);
   });
 });
