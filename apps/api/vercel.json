@@ -1,6 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "outputDirectory": "public",
+  "git": {
+    "deploymentEnabled": false
+  },
   "functions": {
     "api/[...path].ts": {
       "maxDuration": 15

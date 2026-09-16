@@ -17,7 +17,7 @@ pnpm dev
 
 # 3. (Optional) Start a local Postgres for durable persistence
 docker compose up -d                # Postgres 17 on localhost:5432
-cp .env.example .env                # DATABASE_URL pre-filled for the container
+cp .env.example .env.local          # DATABASE_URL pre-filled for the container
 pnpm --filter @mpg/server db:generate  # generate migration SQL from schema
 pnpm --filter @mpg/server db:migrate   # apply migrations
 
@@ -203,10 +203,18 @@ for dev iteration and tests).
 
 ```bash
 docker compose up -d                          # start Postgres 17 on :5432
-cp .env.example .env                          # pre-filled DATABASE_URL
+cp .env.example .env.local                    # pre-filled DATABASE_URL
 pnpm --filter @mpg/server db:generate         # generate migration SQL from schema
 pnpm --filter @mpg/server db:migrate          # apply migrations
 ```
+
+**How env vars reach the server.** There is no dotenv dependency — `dev` and the
+`db:*` scripts pass `node --env-file-if-exists=../../.env.local`, so the repo-root
+`.env.local` (gitignored) is the one file that is read. It must be `.env.local`,
+not `.env`. A real environment variable always wins over the file, which is what
+makes the explicit `DATABASE_URL=… pnpm db:migrate` form below work — use that to
+target a specific Neon branch rather than editing `.env.local`. If the file is
+absent, Node prints a one-line notice and the server starts in in-memory mode.
 
 The container stores data in a named Docker volume (`pgdata`), so it survives
 `docker compose down`. To nuke everything: `docker compose down -v`.
