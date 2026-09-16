@@ -1,0 +1,15 @@
+/*
+ * The seat rail (UI-6 / MPG-113). One row of seat cards above the board, on
+ * every turn-based play surface.
+ *
+ * MPG-137: this is fixed-size chrome competing with the board for the same
+ * height budget — it may not grow. The play screen still owns `flex: 0 0 auto`
+ * on the element it places (chrome sizing is the layout's business, not the
+ * component's); what belongs here is the rail's own internal grammar.
+ */
+.rail {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}

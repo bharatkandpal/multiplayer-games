@@ -7,7 +7,7 @@ import {
   HomeIcon,
   Modal,
   RulesSheet,
-  SeatCard,
+  SeatRail,
   ShareAction,
   StatusBadge,
   Toast,
@@ -495,9 +495,11 @@ export function GamePlayScreenView<S, M, L = unknown>({
     if (isGameOver && tone === "celebrate") noteValueMoment();
   }, [isGameOver, tone]);
 
-  // MPG-042/046: one SeatCard per seat, all in a single row above the board —
-  // the primary "whose turn" signal (folds in the bot "thinking" affordance,
-  // see below, rather than duplicating it on the status badge too).
+  // MPG-042/046: the seat rail above the board is the primary "whose turn"
+  // signal (it folds in the bot "thinking" affordance rather than duplicating
+  // it on the status badge too). UI-6/MPG-113 moved the row itself into
+  // `SeatRail`; what stays here is the translation from this screen's game
+  // state into the seat indices the rail speaks.
   const thinkingSeatIndex = thinkingSeat !== null ? seatIndexOf(thinkingSeat) : null;
 
   // MPG-051: the crown marks who won, independent of tone/celebration — shown
@@ -505,19 +507,6 @@ export function GamePlayScreenView<S, M, L = unknown>({
   // the winning bot still gets its crown). No crown on a draw.
   const winnerSeatIndex =
     session.result.status === "win" ? seatIndexOf(session.result.winner) : null;
-
-  const renderSeatCard = (seat: (typeof seats)[number], indexInSeats: number): ReactNode => (
-    <SeatCard
-      key={indexInSeats}
-      seatIndex={indexInSeats}
-      kind={seat.kind}
-      // A bot shows its roster name; humans keep the positional "Player N".
-      name={seat.kind === "bot" ? seat.name : undefined}
-      active={!isGameOver && turnSeatIndex === indexInSeats}
-      thinking={thinkingSeatIndex === indexInSeats}
-      winner={winnerSeatIndex === indexInSeats}
-    />
-  );
 
   return (
     <div className={styles.main}>
@@ -602,8 +591,14 @@ export function GamePlayScreenView<S, M, L = unknown>({
         </div>
       ) : null}
 
-      {/* MPG-046: all seats in a single row above the board. */}
-      <div className={styles.seatRow}>{seats.map((seat, i) => renderSeatCard(seat, i))}</div>
+      {/* MPG-046 / UI-6: all seats in a single row above the board. */}
+      <SeatRail
+        className={styles.seatRow}
+        seats={seats}
+        activeSeat={isGameOver ? null : turnSeatIndex}
+        thinkingSeat={thinkingSeatIndex}
+        winnerSeat={winnerSeatIndex}
+      />
 
       {/* MPG-137: the board's height budget. This element takes whatever the
           chrome above and below leaves over and never more (`flex: 1 1 0` +

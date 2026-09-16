@@ -6,6 +6,8 @@ export type { StatusBadgeProps, StatusBadgeStatus } from "./StatusBadge";
 
 export { SeatCard } from "./SeatCard";
 export type { SeatCardProps, SeatCardKind } from "./SeatCard";
+export { SeatRail } from "./SeatRail";
+export type { SeatRailProps } from "./SeatRail";
 
 export { Toast } from "./Toast";
 export type { ToastProps, ToastVariant } from "./Toast";
