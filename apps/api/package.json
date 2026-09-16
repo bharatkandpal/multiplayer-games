@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run --passWithNoTests",
-    "test:fast": "vitest run --passWithNoTests",
+    "test": "vitest run",
+    "test:fast": "vitest run",
     "dev": "vercel dev",
     "build": "echo \"[@mpg/api] built by Vercel\""
   },
