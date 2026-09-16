@@ -4,15 +4,26 @@ name: Deploy
 #   push to main   -> production deploy
 #   pull_request   -> preview deploy (comment left on the PR)
 #
-# Requires three repo secrets (Settings -> Secrets and variables -> Actions):
-#   VERCEL_TOKEN       - https://vercel.com/account/tokens
-#   VERCEL_ORG_ID      - from `.vercel/project.json` after `vercel link`, or Team Settings
-#   VERCEL_PROJECT_ID  - from `.vercel/project.json` after `vercel link`, or Project Settings
+# Two Vercel projects deploy from this one repo, as a matrix:
+#   web  -> `mpg`      (Root Directory apps/web) — the Vite SPA + unfurl shim
+#   api  -> `mpg-api`  (Root Directory apps/api) — stateless functions + Neon
 #
-# Double deploys are already prevented: apps/web/vercel.json sets
-# git.deploymentEnabled=false, so Vercel ignores pushes and this workflow is the
-# only thing that deploys. (That file lives in apps/web because it's the Vercel
-# project's Root Directory — move it if you change that setting.)
+# Each runs from the repo root; Vercel resolves the app from the project's own
+# Root Directory setting, which is what makes the pnpm workspace deps resolve.
+#
+# Requires four repo secrets (Settings -> Secrets and variables -> Actions):
+#   VERCEL_TOKEN           - https://vercel.com/account/tokens
+#   VERCEL_ORG_ID          - from `.vercel/project.json` after `vercel link`, or Team Settings
+#   VERCEL_PROJECT_ID      - the `mpg` project id (web)
+#   VERCEL_API_PROJECT_ID  - the `mpg-api` project id
+#
+# Double deploys are prevented per project by `git.deploymentEnabled=false` in
+# each app's vercel.json, so Vercel ignores pushes and this workflow is the only
+# thing that deploys. (Those files live in each app dir because that's the
+# project's Root Directory — move them if you change that setting.)
+#
+# The two projects deploy independently (fail-fast is off): a broken API build
+# must not block shipping the client, which stays playable with the API absent.
 
 on:
   push:
@@ -26,7 +37,6 @@ concurrency:
 
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
 # Least-privilege GITHUB_TOKEN: the deploy needs nothing writable except the
 # ability to post/update the preview-URL comment on the PR.
@@ -36,12 +46,25 @@ permissions:
 
 jobs:
   deploy:
-    name: Vercel (${{ github.event_name == 'push' && 'production' || 'preview' }})
+    name: Vercel ${{ matrix.app }} (${{ github.event_name == 'push' && 'production' || 'preview' }})
     runs-on: ubuntu-latest
     # Skip PRs from forks: secrets aren't exposed to them, so the deploy can't run.
     if: >-
       github.event_name == 'push' ||
       github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      # Deploy both even if one fails — see header.
+      fail-fast: false
+      matrix:
+        include:
+          - app: web
+            project_id_secret: VERCEL_PROJECT_ID
+          - app: api
+            project_id_secret: VERCEL_API_PROJECT_ID
+    env:
+      # Selects which Vercel project this matrix leg targets. `vercel pull`
+      # reads it, so every later step in the leg is scoped to that project.
+      VERCEL_PROJECT_ID: ${{ secrets[matrix.project_id_secret] }}
     steps:
       - uses: actions/checkout@v4
 
@@ -54,6 +77,15 @@ jobs:
           else
             echo "environment=preview" >> "$GITHUB_OUTPUT"
             echo "prod_flag=" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Fail with a readable message rather than a confusing Vercel auth error
+      # if the project-id secret for this leg was never added.
+      - name: Check project id secret is set
+        run: |
+          if [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "::error::Secret ${{ matrix.project_id_secret }} is not set — the '${{ matrix.app }}' deploy cannot target a Vercel project."
+            exit 1
           fi
 
       # vercel build runs the project's own build, which uses pnpm — it must be
@@ -83,7 +115,7 @@ jobs:
           url=$(vercel deploy --prebuilt ${{ steps.flags.outputs.prod_flag }} --token=${{ secrets.VERCEL_TOKEN }})
           echo "url=$url" >> "$GITHUB_OUTPUT"
           {
-            echo "### Vercel ${{ steps.flags.outputs.environment }} deploy"
+            echo "### Vercel ${{ matrix.app }} ${{ steps.flags.outputs.environment }} deploy"
             echo ""
             echo "$url"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -91,11 +123,17 @@ jobs:
       - name: Comment preview URL on PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        env:
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+          APP: ${{ matrix.app }}
         with:
           script: |
-            const url = '${{ steps.deploy.outputs.url }}';
-            const marker = '<!-- vercel-preview-url -->';
-            const body = `${marker}\n**Preview deploy:** ${url}`;
+            const url = process.env.DEPLOY_URL;
+            const app = process.env.APP;
+            // Per-app marker so the two matrix legs update their own comment
+            // instead of overwriting each other.
+            const marker = `<!-- vercel-preview-url-${app} -->`;
+            const body = `${marker}\n**Preview deploy (${app}):** ${url}`;
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
             const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
