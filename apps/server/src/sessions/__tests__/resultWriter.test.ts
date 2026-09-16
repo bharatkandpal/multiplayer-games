@@ -97,4 +97,26 @@ describe("writeGameResult", () => {
     expect(result.moveLog).toBeNull();
     expect(result.eventId).toBeNull();
   });
+
+  // MPG-133. Under Postgres `game_results.owner_token` is a foreign key into
+  // `sessions`, and the socket path mints seat tokens in memory without ever
+  // creating that row — so every online game's result write died on an FK
+  // violation, silently, because persistence is fire-and-forget. The in-memory
+  // store has no foreign keys and cannot reproduce that, so the guarantee is
+  // asserted as behaviour instead: after a write, the owning session exists.
+  it("creates the owning session, so the result always has something to reference", async () => {
+    store = createMemoryStore();
+    // Deliberately no `sessions.upsert` first — this is a socket-minted token.
+
+    await writeGameResult(store, {
+      runId: "run-fk",
+      gameId: "tictactoe",
+      ownerToken: "tok-never-seen",
+      status: "win",
+      winnerSlot: 1,
+      seatsSnapshot: [{ kind: "human" }],
+    });
+
+    expect(await store.sessions.findByToken("tok-never-seen")).toBeDefined();
+  });
 });

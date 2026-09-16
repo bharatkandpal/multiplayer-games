@@ -36,6 +36,13 @@
       "when": 1789451842139,
       "tag": "0004_right_sabretooth",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789539484626,
+      "tag": "0005_massive_sphinx",
+      "breakpoints": true
     }
   ]
 }

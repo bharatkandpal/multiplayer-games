@@ -84,6 +84,7 @@ Run from the repo root. `pnpm -r` fans a script out across all workspaces.
 | `pnpm --filter @mpg/server db:generate` | Generate Drizzle migration SQL from schema changes                      |
 | `pnpm --filter @mpg/server db:migrate`  | Apply pending migrations to your local Postgres                         |
 | `pnpm --filter @mpg/server db:studio`   | Open Drizzle Studio (visual DB browser)                                 |
+| `pnpm --filter @mpg/server db:smoke`    | Live round-trip against a real Postgres (needs `DATABASE_URL`) — §8     |
 
 **What runs today:** `pnpm dev` gives you the full game catalog with local play (vs bot,
 watch) **plus** the server on :3001 — sessions, room create/join over a shared link,
@@ -264,9 +265,39 @@ Swap the connection string and you're done.
 - Colocate tests next to source as `*.test.ts(x)`.
 - Deterministic and fast — **no `sleep`s**, seed all randomness (engine tests use a
   seeded PRNG). Test through public interfaces, not internals.
-- **Server tests use the in-memory adapter** — no Docker or Postgres needed for
-  `vitest run`. Contract tests in `store/__tests__/store.contract.test.ts` verify
-  that both adapters satisfy the same interface.
+- **Server tests use the in-memory adapter by default** — no Docker or Postgres
+  needed for `vitest run`. Contract tests in `store/__tests__/store.contract.test.ts`
+  verify that both adapters satisfy the same interface, but **only run the
+  Postgres half when `DATABASE_URL` is set** (see below).
+
+### Verifying the Postgres path
+
+The in-memory adapter has no foreign keys, no `NOT NULL`, and no unique-index
+NULL semantics. A green `pnpm test` therefore says nothing about whether the
+Postgres deployment works, and three real bugs hid behind exactly that gap until
+MPG-133. Run both of these before anything that touches persistence ships:
+
+```bash
+docker compose up -d
+DATABASE_URL=postgres://mpg:mpg_local@localhost:5432/mpg_dev pnpm --filter @mpg/server db:migrate
+
+# 1. The whole server suite against Postgres. `--no-file-parallelism` is
+#    required: the contract suite truncates every table, which deadlocks
+#    against test files writing concurrently to the same database.
+cd apps/server
+DATABASE_URL=postgres://mpg:mpg_local@localhost:5432/mpg_dev \
+  pnpm exec vitest run --no-file-parallelism
+
+# 2. The live round-trip through the real production HTTP app: session →
+#    result → score submission → share mint/resolve/revoke → variants →
+#    identity union reads → retention sweep → forget-me.
+DATABASE_URL=postgres://mpg:mpg_local@localhost:5432/mpg_dev pnpm db:smoke
+```
+
+`db:smoke` cleans up after itself (every row it writes is deleted through the
+real "forget me" path) and exits non-zero on the first failed check, so it is
+safe to point at staging and usable as a deploy gate.
+
 - Engine correctness bars (enforced by tests): win/draw detection exhaustive; illegal
   moves rejected; TTT Hard never loses; C4 Hard beats random ≥95%; strength monotonic
   (Hard ≥ Medium ≥ Easy).
