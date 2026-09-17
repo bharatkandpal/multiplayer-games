@@ -54,4 +54,31 @@ describe("RulesSheet (MPG-138)", () => {
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
+
+  it("offers no 'don't show again' control without a change handler", () => {
+    render(<RulesSheet isOpen onClose={vi.fn()} gameTitle="Nim" {...RULES} />);
+
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("reflects and toggles the auto-show preference when wired", async () => {
+    const onAutoShowSuppressedChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <RulesSheet
+        isOpen
+        onClose={vi.fn()}
+        gameTitle="Nim"
+        {...RULES}
+        autoShowSuppressed={false}
+        onAutoShowSuppressedChange={onAutoShowSuppressedChange}
+      />,
+    );
+
+    const checkbox = screen.getByRole("checkbox", { name: /show this automatically again/i });
+    expect(checkbox).not.toBeChecked();
+
+    await user.click(checkbox);
+    expect(onAutoShowSuppressedChange).toHaveBeenCalledWith(true);
+  });
 });

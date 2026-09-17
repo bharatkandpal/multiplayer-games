@@ -273,6 +273,14 @@
   opacity: 0.82;
 }
 
+/* The hook phrase in a description (e.g. Gomoku's "five in a row"): lift it out
+   of the muted body with full-strength ink and weight, so the eye lands on what
+   the game is actually about while scanning the shelf. */
+.descriptionEmphasis {
+  color: var(--color-text);
+  font-weight: var(--font-weight-bold);
+}
+
 .tagRow {
   display: flex;
   flex-wrap: wrap;

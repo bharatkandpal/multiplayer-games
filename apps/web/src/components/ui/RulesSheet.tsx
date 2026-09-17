@@ -19,6 +19,13 @@ export interface RulesSheetProps {
    * themselves mid-game is closing a reference, not agreeing to anything.
    */
   dismissLabel?: string;
+  /**
+   * When provided, renders a "Don't show this automatically again" checkbox
+   * wired to this value. Omit both this and `onAutoShowSuppressedChange` to hide
+   * the control entirely (e.g. a preview with nowhere to persist the choice).
+   */
+  autoShowSuppressed?: boolean;
+  onAutoShowSuppressedChange?: (suppressed: boolean) => void;
 }
 
 /**
@@ -42,7 +49,10 @@ export function RulesSheet({
   steps,
   notes,
   dismissLabel = "Got it",
+  autoShowSuppressed,
+  onAutoShowSuppressedChange,
 }: RulesSheetProps): React.JSX.Element {
+  const showAutoToggle = onAutoShowSuppressedChange !== undefined;
   return (
     <Modal
       isOpen={isOpen}
@@ -67,6 +77,16 @@ export function RulesSheet({
       ) : null}
 
       <div className={styles.actions}>
+        {showAutoToggle ? (
+          <label className={styles.autoShowToggle}>
+            <input
+              type="checkbox"
+              checked={autoShowSuppressed ?? false}
+              onChange={(event) => onAutoShowSuppressedChange?.(event.target.checked)}
+            />
+            <span>Don&rsquo;t show this automatically again</span>
+          </label>
+        ) : null}
         <Button variant="primary" onClick={onClose}>
           {dismissLabel}
         </Button>

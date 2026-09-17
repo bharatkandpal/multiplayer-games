@@ -54,13 +54,37 @@
  * instead, with the negative margins letting its background span the dialog's
  * padding so text passes underneath it cleanly rather than beside it.
  */
+.autoShowToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-200);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.autoShowToggle input {
+  /* Comfortable hit target on touch, and the accent picks up the theme. */
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
 .actions {
   position: sticky;
   bottom: 0;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
   margin: 0 calc(var(--space-6) * -1) calc(var(--space-6) * -1);
   padding: var(--space-3) var(--space-6) var(--space-6);
   background-color: var(--color-surface-raised);
   border-top: var(--border-width-hairline) solid var(--color-border);
+}
+
+/* With no toggle, the dismiss button keeps its right-aligned home. */
+.actions:not(:has(.autoShowToggle)) {
+  justify-content: flex-end;
 }

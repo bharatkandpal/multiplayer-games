@@ -21,12 +21,12 @@ import {
 } from "./catalog";
 
 describe("catalog — buildGameItems", () => {
-  it("lists turn-based games first, then real-time, each tagged by kind", () => {
+  it("lists real-time (arcade) games first, then turn-based, each tagged by kind", () => {
     const items = buildGameItems(["connect4", "nim"], ["drunk-walk"]);
     expect(items).toEqual([
+      { kind: "realtime", id: "drunk-walk", title: "Drunk Walk" },
       { kind: "turn-based", id: "connect4", title: "Connect Four" },
       { kind: "turn-based", id: "nim", title: "Nim" },
-      { kind: "realtime", id: "drunk-walk", title: "Drunk Walk" },
     ]);
   });
 
@@ -45,6 +45,22 @@ describe("catalog — buildGameItems", () => {
 
   it("tolerates an empty real-time registry", () => {
     expect(buildGameItems(["connect4"])).toHaveLength(1);
+  });
+});
+
+describe("catalog — description emphasis", () => {
+  // The card bolds the emphasis phrase by locating it inside the description, so
+  // a phrase that isn't an exact substring would silently render no emphasis.
+  it("keeps every emphasis phrase an exact substring of its description", () => {
+    for (const entry of [...Object.values(GAME_CATALOG), ...Object.values(REALTIME_CATALOG)]) {
+      if (entry?.emphasis) {
+        expect(entry.description).toContain(entry.emphasis);
+      }
+    }
+  });
+
+  it("emphasises Gomoku's five-in-a-row hook", () => {
+    expect(GAME_CATALOG.gomoku!.emphasis).toBe("five in a row");
   });
 });
 
@@ -157,13 +173,13 @@ describe("catalog — buildHomeShelves", () => {
     return (shelf(shelves, id)?.entries ?? []).map((entry) => entry.id);
   }
 
-  it("puts the curated entries on Featured, in catalog order", () => {
+  it("puts the curated entries on Featured, in catalog order (arcade first)", () => {
     const shelves = buildHomeShelves(ALL_GAMES, ALL_REALTIME);
     expect(idsOn(shelves, "featured")).toEqual([
-      "tictactoe",
-      "connect4",
       "floppy-birds",
       "drunk-walk",
+      "tictactoe",
+      "connect4",
     ]);
   });
 

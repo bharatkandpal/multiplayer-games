@@ -797,6 +797,8 @@ export function GamePlayScreenView<S, M, L = unknown>({
           goal={rules.rules.goal}
           steps={rules.rules.steps}
           {...(rules.rules.notes ? { notes: rules.rules.notes } : {})}
+          autoShowSuppressed={rules.autoShowSuppressed}
+          onAutoShowSuppressedChange={rules.setAutoShowSuppressed}
         />
       ) : null}
 

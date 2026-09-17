@@ -460,6 +460,8 @@ export function RealtimePlayScreen<S, I>({
           goal={rules.rules.goal}
           steps={rules.rules.steps}
           {...(rules.rules.notes ? { notes: rules.rules.notes } : {})}
+          autoShowSuppressed={rules.autoShowSuppressed}
+          onAutoShowSuppressedChange={rules.setAutoShowSuppressed}
         />
       ) : null}
     </div>

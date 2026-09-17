@@ -213,6 +213,10 @@ describe("RealtimeGameRoute — 2048 board size (MPG-096)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /3 by 3/ }));
     expect(window.localStorage.getItem("mpg:2048:size")).toBe("3");
+
+    // Picking a size is a complete choice — the sheet closes so the fresh run
+    // is visible immediately, rather than leaving the picker over the board.
+    expect(screen.queryByRole("dialog", { name: "Board size" })).not.toBeInTheDocument();
   });
 
   it("starts on the player's stored non-default size", () => {

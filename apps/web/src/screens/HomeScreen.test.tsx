@@ -42,6 +42,17 @@ describe("HomeScreen", () => {
     expect(screen.getByText("Move-Mode Tic-Tac-Toe")).toBeInTheDocument();
   });
 
+  it("bolds the hook phrase in a description that declares one (Gomoku)", () => {
+    render(<HomeScreen games={["gomoku"]} onSelectGame={vi.fn()} onShowGallery={vi.fn()} />);
+
+    const emphasis = screen.getByText("five in a row");
+    expect(emphasis.tagName).toBe("STRONG");
+    // The rest of the sentence still renders around it.
+    expect(screen.getByRole("button", { name: "Gomoku" })).toHaveAccessibleDescription(
+      /Place stones on a 9x9 board and be the first to line up five in a row/,
+    );
+  });
+
   it("shows a thumbnail per card, and the card's accessible name is just the title (MPG-052)", () => {
     render(
       <HomeScreen
