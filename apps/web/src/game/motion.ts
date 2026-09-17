@@ -5,6 +5,7 @@
 // see bots move without an artificial delay, not just without animation.
 
 const FALLBACK_BOT_THINKING_STEP_MS = 600;
+const FALLBACK_SURPRISE_SPIN_MS = 800;
 
 function readDurationMs(cssVarName: string, fallbackMs: number): number {
   if (typeof window === "undefined" || typeof document === "undefined") {
@@ -27,4 +28,20 @@ function readDurationMs(cssVarName: string, fallbackMs: number): number {
  */
 export function getBotThinkingDelayMs(): number {
   return readDurationMs("--duration-bot-thinking-step", FALLBACK_BOT_THINKING_STEP_MS);
+}
+
+/**
+ * How long "Surprise me" shuffles before it lands on the game it already picked
+ * (MPG-143). Reads `--duration-surprise-spin`, which `prefers-reduced-motion`
+ * zeroes — so a reduced-motion player goes straight into the game rather than
+ * watching a shuffle with the animation stripped out of it.
+ *
+ * The shuffle is decoration over a decision that has already been made, which is
+ * what makes a delay in front of gameplay defensible here at all: it is local,
+ * it is what the player asked for by pressing a dice button, and it is always
+ * skippable (see `SurpriseMe`). If it ever becomes unskippable, it is in breach
+ * of the "never block or delay gameplay" rule in `docs/UX_PRINCIPLES.md` §7.
+ */
+export function getSurpriseSpinMs(): number {
+  return readDurationMs("--duration-surprise-spin", FALLBACK_SURPRISE_SPIN_MS);
 }

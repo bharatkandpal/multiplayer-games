@@ -401,6 +401,7 @@
   --duration-base: 200ms;
   --duration-slow: 400ms;
   --duration-bot-thinking-step: 600ms; /* paced bot-vs-bot watch, UX_PRINCIPLES §3 */
+  --duration-surprise-spin: 800ms; /* "Surprise me" shuffle before it lands, MPG-143 */
 
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-emphasized: cubic-bezier(0.2, 0, 0, 1.4);
@@ -673,6 +674,9 @@
     --duration-base: 0ms;
     --duration-slow: 0ms;
     --duration-bot-thinking-step: 0ms;
+    /* Zeroed, so "Surprise me" goes straight to the game with no shuffle —
+       the pick is already decided before the animation starts (MPG-143). */
+    --duration-surprise-spin: 0ms;
   }
 
   *,

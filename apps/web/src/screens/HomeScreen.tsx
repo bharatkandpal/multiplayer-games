@@ -14,6 +14,7 @@ import {
   tagFilterNarrows,
 } from "./catalog";
 import type { CatalogEntry, GameTag, HomeShelf } from "./catalog";
+import { SurpriseMe } from "./SurpriseMe";
 import styles from "./HomeScreen.module.css";
 
 // The catalog itself lives in `./catalog` so the play screens can walk it for
@@ -93,6 +94,26 @@ export function HomeScreen({
   // `tagFilterNarrows`. A filter that cannot change what you see is clutter.
   const showFilter = shelves.length > 0 && tagFilterNarrows(entries);
 
+  // What the dice may land on: the games currently VISIBLE, so an active tag
+  // filter narrows the draw. A player who filtered to "Quick" has told us what
+  // they want, and a random pick that ignored it would be the one control on the
+  // page that doesn't listen.
+  // ...and only games this Home can actually launch: without an
+  // `onSelectRealtimeGame` handler an arcade pick would do nothing at all, and a
+  // dice that sometimes does nothing is worse than no dice.
+  const visible = activeTag === null ? entries : filterByTag(entries, activeTag);
+  const surpriseFrom = visible.filter(
+    (entry) => entry.kind === "turn-based" || onSelectRealtimeGame !== undefined,
+  );
+
+  // Playing a random pick goes straight into the game, never to seat setup —
+  // "surprise me" promises a game, not a configuration screen. A turn-based pick
+  // starts against the bot, exactly like tapping its card does.
+  const playEntry = (entry: CatalogEntry): void => {
+    if (entry.kind === "realtime") onSelectRealtimeGame?.(entry.id);
+    else onSelectGame(entry.id);
+  };
+
   return (
     <div className={styles.main}>
       <h1 className={styles.heading}>Multiplayer Games</h1>
@@ -101,7 +122,17 @@ export function HomeScreen({
         Options on any game.
       </p>
 
-      {showFilter ? <TagFilter tags={tags} activeTag={activeTag} onChange={setActiveTag} /> : null}
+      {/* The browse controls: narrow the shelf, or skip choosing entirely. Kept
+          on one row because they answer the same question ("what do I play?")
+          from opposite ends. Either half can be absent without the other moving. */}
+      {showFilter || surpriseFrom.length > 0 ? (
+        <div className={styles.controlRow}>
+          {showFilter ? (
+            <TagFilter tags={tags} activeTag={activeTag} onChange={setActiveTag} />
+          ) : null}
+          <SurpriseMe entries={surpriseFrom} onPick={playEntry} />
+        </div>
+      ) : null}
 
       {shelves.length === 0 ? (
         <p className={styles.empty}>
