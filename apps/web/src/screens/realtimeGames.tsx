@@ -6,19 +6,31 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import {
+  aimTrainer,
+  AIM,
   breakout,
   drunkWalk,
   floppyBirds,
   game2048,
   game2048_3,
   game2048_5,
+  lumberjack,
+  memorySequence,
   reflexTest,
+  snake,
+  type AimTrainerInput,
+  type AimTrainerState,
   type BreakoutInput,
   type BreakoutState,
   type DrunkWalkInput,
   type DrunkWalkState,
   type FloppyInput,
   type FloppyState,
+  type LumberjackInput,
+  type LumberjackState,
+  type MemorySequenceInput,
+  type MemorySequenceState,
+  type PadIndex,
   type Game2048Input,
   type Game2048Size,
   type Game2048State,
@@ -26,6 +38,9 @@ import {
   type RealtimeModule,
   type ReflexInput,
   type ReflexState,
+  type SnakeDir,
+  type SnakeInput,
+  type SnakeState,
   type SwipeDir,
 } from "@mpg/engine";
 import { DrunkWalkScene } from "../components/realtime/DrunkWalkScene";
@@ -42,6 +57,10 @@ import { Game2048Scene } from "../components/realtime/Game2048Scene";
 import { Game2048CustomizeMenu } from "../components/realtime/Game2048CustomizeMenu";
 import { loadStored2048Size, store2048Size } from "../components/realtime/game2048Size";
 import { BreakoutScene } from "../components/realtime/BreakoutScene";
+import { SnakeScene } from "../components/realtime/SnakeScene";
+import { LumberjackScene } from "../components/realtime/LumberjackScene";
+import { MemorySequenceScene } from "../components/realtime/MemorySequenceScene";
+import { AimTrainerScene } from "../components/realtime/AimTrainerScene";
 import { Button, GearIcon } from "../components/ui";
 import type { GameNavigation } from "../components/ui";
 import {
@@ -54,7 +73,12 @@ import { RankPreview } from "./RankPreview";
 import { submitRealtimeScore } from "../api/leaderboard";
 import { noteValueMoment } from "../api/identity";
 import { mintResultShareUrl } from "../api/share";
-import { createActionInputSource, createPointerAxisInputSource, type InputSource } from "../game";
+import {
+  createActionInputSource,
+  createPointerAxisInputSource,
+  createTapTargetInputSource,
+  type InputSource,
+} from "../game";
 import type { RunComplete } from "../game/useRealtimeLoop";
 import { recordPersonalBest } from "../game/personalBest";
 
@@ -96,7 +120,12 @@ function defineRealtimeGame<S, I, A extends string>(
   } as unknown as RealtimeGameWiring;
 }
 
-/** An axis game (pointer position + keyboard parity) — supplies its own source factory. */
+/**
+ * A game that supplies its own `InputSource` factory rather than a set of discrete
+ * actions — the pointer-axis games (Breakout) and the tap-target ones (Aim
+ * Trainer). Named for the axis case because that was the only one when it landed;
+ * the shape it actually captures is "brings its own source".
+ */
 function defineRealtimeAxisGame<S, I>(
   module: RealtimeModule<S, I>,
   renderScene: (props: RealtimeSceneProps<S>) => ReactNode,
@@ -192,6 +221,98 @@ const game2048Controls: RealtimeControls<Game2048Input, SwipeDir> = {
   ],
 };
 
+// Memory Sequence's four pads ARE the four actions. The on-screen `touchActions`
+// carry the same glyphs the scene draws on each pad, so the button and the pad it
+// presses are recognisably the same thing — and they give the game a full
+// keyboard/pointer path without a bespoke input source. 1-4 and the arrow keys
+// both map in, because "which arrow is the bottom-right pad?" is a question with
+// no good answer and the number row has an obvious one.
+type MemoryPadAction = "pad0" | "pad1" | "pad2" | "pad3";
+const MEMORY_PADS: readonly MemoryPadAction[] = ["pad0", "pad1", "pad2", "pad3"];
+const memoryControls: RealtimeControls<MemorySequenceInput, MemoryPadAction> = {
+  primaryAction: "pad0",
+  keyMap: {
+    Digit1: "pad0",
+    Digit2: "pad1",
+    Digit3: "pad2",
+    Digit4: "pad3",
+    ArrowUp: "pad0",
+    ArrowRight: "pad1",
+    ArrowLeft: "pad2",
+    ArrowDown: "pad3",
+  },
+  toInput: (pressed) => {
+    const hit = MEMORY_PADS.findIndex((action) => pressed.has(action));
+    return { pad: hit === -1 ? null : (hit as PadIndex) };
+  },
+  actionHint: "Tap the pads (or press 1-4) to repeat the sequence",
+  readyExplainer:
+    "Watch the pads flash, then tap them back in the same order. Each round adds one more. A wrong pad ends the run — and so does taking too long on your turn.",
+  touchActions: [
+    { action: "pad0", label: "▲" },
+    { action: "pad1", label: "●" },
+    { action: "pad2", label: "■" },
+    { action: "pad3", label: "◆" },
+  ],
+};
+
+// Lumberjack's chop is a single committed action per side — the same left/right
+// tap-zone vocabulary Drunk Walk uses, and for the same reason: the two halves of
+// the surface ARE the two choices, so splitting at the midpoint needs no on-screen
+// buttons to be legible. The explainer names the timer, because a player who only
+// discovers the clock by losing to it has been beaten by a rule nobody told them.
+const lumberjackControls: RealtimeControls<LumberjackInput, "left" | "right"> = {
+  primaryAction: "left",
+  keyMap: {
+    ArrowLeft: "left",
+    KeyA: "left",
+    ArrowRight: "right",
+    KeyD: "right",
+  },
+  toInput: (pressed) => {
+    if (pressed.has("left")) return { chop: "left" };
+    if (pressed.has("right")) return { chop: "right" };
+    return { chop: null };
+  },
+  actionHint: "Tap left/right (or ←/→, A/D) to chop from that side",
+  readyExplainer:
+    "Chop from the side with no branch at your height — and watch the log about to drop onto you. The timer drains the whole time and every chop tops it up, so stopping to think is its own way to lose.",
+  resolveTapAction: (fractionX) => (fractionX < 0.5 ? "left" : "right"),
+};
+
+// Snake steers rather than swipes, but the INPUT shape is 2048's: four discrete
+// directions from a drag, a D-pad, arrows or WASD. Deliberately its own controls
+// object rather than a shared one — the two games agree on gesture vocabulary
+// today and have no reason to stay agreed (2048's swipe applies to a settled
+// board; Snake's turn is queued for the next cell boundary), and the copy below
+// is each game's own words either way.
+const SNAKE_PRIORITY: readonly SnakeDir[] = ["up", "down", "left", "right"];
+const snakeControls: RealtimeControls<SnakeInput, SnakeDir> = {
+  primaryAction: "up",
+  keyMap: {
+    ArrowUp: "up",
+    KeyW: "up",
+    ArrowDown: "down",
+    KeyS: "down",
+    ArrowLeft: "left",
+    KeyA: "left",
+    ArrowRight: "right",
+    KeyD: "right",
+  },
+  toInput: (pressed) => ({ turn: SNAKE_PRIORITY.find((dir) => pressed.has(dir)) ?? null }),
+  actionHint: "Swipe, or use the arrows, WASD, or the buttons, to turn",
+  readyExplainer:
+    "The snake never stops — you only steer. Eat the food to grow and score. Hitting a wall or your own tail ends the run, and you can't turn back on yourself.",
+  resolveSwipeAction: (dx, dy) =>
+    Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up",
+  touchActions: [
+    { action: "up", label: "↑" },
+    { action: "left", label: "←" },
+    { action: "right", label: "→" },
+    { action: "down", label: "↓" },
+  ],
+};
+
 // Breakout is POSITION-controlled (MPG-121): the paddle tracks the pointer
 // directly — mouse hover or touch drag — with arrow/A-D keyboard parity. This
 // fixed the lag of the old left/right nudge. The pointer x-fraction becomes the
@@ -206,6 +327,23 @@ function makeBreakoutInputSource(): InputSource<BreakoutInput> {
     readyExplainer:
       "Bounce the ball into the bricks to clear them. The paddle's curved face steers the ball — hit near an edge to angle it, dead centre to send it straight up. Miss and you lose a life; you have three.",
     label: "Mouse & keys",
+  });
+}
+
+// Aim Trainer is POSITION-tapped (MPG-142): where you tap IS the input, so it
+// uses the new `tap-target` source rather than a fixed set of actions. The grid
+// handed to the source is only for the keyboard cursor — pointer taps are
+// continuous, and the engine's `cellAt` is the single authority on which cell a
+// position belongs to.
+function makeAimTrainerInputSource(): InputSource<AimTrainerInput> {
+  return createTapTargetInputSource<AimTrainerInput>({
+    toInput: (tap) => ({ tap }),
+    cols: AIM.cols,
+    rows: AIM.rows,
+    hint: "Tap the targets (or move with ←→↑↓ and hit Space)",
+    readyExplainer:
+      "Targets appear and fade. Tap one before its ring runs out. A target you let expire costs a miss — and so does a tap that hits nothing, so don't spray the board. Five misses ends the run.",
+    label: "Tap & keys",
   });
 }
 
@@ -234,6 +372,26 @@ export const REALTIME_GAMES: Partial<Record<RealtimeGameId, RealtimeGameWiring>>
     game2048,
     (props) => <Game2048Scene {...props} />,
     game2048Controls,
+  ),
+  "memory-sequence": defineRealtimeGame<MemorySequenceState, MemorySequenceInput, MemoryPadAction>(
+    memorySequence,
+    (props) => <MemorySequenceScene {...props} />,
+    memoryControls,
+  ),
+  lumberjack: defineRealtimeGame<LumberjackState, LumberjackInput, "left" | "right">(
+    lumberjack,
+    (props) => <LumberjackScene {...props} />,
+    lumberjackControls,
+  ),
+  snake: defineRealtimeGame<SnakeState, SnakeInput, SnakeDir>(
+    snake,
+    (props) => <SnakeScene {...props} />,
+    snakeControls,
+  ),
+  "aim-trainer": defineRealtimeAxisGame<AimTrainerState, AimTrainerInput>(
+    aimTrainer,
+    (props) => <AimTrainerScene {...props} />,
+    makeAimTrainerInputSource,
   ),
   breakout: defineRealtimeAxisGame<BreakoutState, BreakoutInput>(
     breakout,

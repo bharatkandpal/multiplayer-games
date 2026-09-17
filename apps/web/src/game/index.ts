@@ -56,4 +56,7 @@ export { createActionInputSource } from "./inputSource";
 export type { PointerAxisConfig } from "./pointerAxisInputSource";
 export { createPointerAxisInputSource } from "./pointerAxisInputSource";
 
+export type { TapTargetConfig } from "./tapTargetInputSource";
+export { createTapTargetInputSource } from "./tapTargetInputSource";
+
 export { clearPersonalBest, loadPersonalBest, recordPersonalBest } from "./personalBest";

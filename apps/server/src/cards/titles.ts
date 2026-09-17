@@ -29,6 +29,10 @@ export const GAME_TITLES: Readonly<Record<string, string>> = {
   "2048@3": "2048 (3×3)",
   "2048@5": "2048 (5×5)",
   breakout: "Breakout",
+  snake: "Snake",
+  lumberjack: "Lumberjack",
+  "memory-sequence": "Memory Sequence",
+  "aim-trainer": "Aim Trainer",
 };
 
 /**

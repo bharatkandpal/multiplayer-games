@@ -128,6 +128,58 @@ export const REALTIME_RULES: Partial<Record<RealtimeGameId, GameRules>> = {
       "Let the ball past you and you lose a life. Three lives and the run is over.",
     ],
   },
+  "aim-trainer": {
+    goal: "Hit as many targets as you can before you run out of misses.",
+    steps: [
+      "Targets pop up on the grid, each with a ring that counts down its life.",
+      "Tap a target to hit it and score.",
+      "A target that fades before you reach it costs a miss — and so does a tap that lands on nothing.",
+      "Five misses and the run is over.",
+    ],
+    notes: [
+      "Targets come faster and live shorter the better you do.",
+      "No pointer? Move a cursor with the arrow keys and hit Space. It works, but it's slower than a finger — the leaderboard is the same either way.",
+    ],
+  },
+  "memory-sequence": {
+    goal: "Repeat the flashing sequence back, for as many rounds as you can.",
+    steps: [
+      "Watch: the game flashes the pads one at a time.",
+      "When it's your turn, tap the same pads in the same order (or press 1-4).",
+      "Get the round right and the sequence grows by one pad.",
+      "One wrong pad ends the run — and so does letting your turn time out.",
+    ],
+    notes: [
+      "Each pad has its own shape as well as its own colour, so you can follow the sequence by shape.",
+      "Pressing during the flashes does nothing at all — it isn't a mistake, it just won't count.",
+    ],
+  },
+  lumberjack: {
+    goal: "Chop as many logs as you can before a branch or the clock gets you.",
+    steps: [
+      "Tap the left or right half of the screen (or ←/→) to step to that side and chop.",
+      "Each chop removes the log at your feet, and the trunk drops by one.",
+      "A branch at your height on your side ends the run — so does the log that drops onto you.",
+      "The timer drains constantly. Every chop tops it back up.",
+    ],
+    notes: [
+      "There is always a safe side — two branches never stack directly on top of each other.",
+      "Hesitating is a way to lose. The clock drains faster the further you get.",
+    ],
+  },
+  snake: {
+    goal: "Grow the snake as long as you can without crashing it.",
+    steps: [
+      "The snake moves on its own and never stops — you only choose where it turns.",
+      "Swipe, use the arrow keys, or tap the direction buttons to turn.",
+      "Eat the food to grow one segment and score. New food appears somewhere else.",
+      "Hitting a wall or any part of your own body ends the run.",
+    ],
+    notes: [
+      "You can't turn back on yourself — a turn into your own neck is ignored, not fatal.",
+      "The snake speeds up the more you eat, so plan the turn before you need it.",
+    ],
+  },
 };
 
 /**

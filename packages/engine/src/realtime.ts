@@ -18,7 +18,8 @@
  * `floppy-birds` lands with MPG-040; `drunk-walk` with MPG-076; `lumberjack` with MPG-041;
  * `2048` with MPG-074; `breakout` with MPG-075. `2048@3` / `2048@5` are the 3×3 /
  * 5×5 grid-size variants of 2048 (MPG-096) — separate ids so they rank on separate
- * leaderboards (ADR 0007 §5); the catalog still shows one "2048" card.
+ * leaderboards (ADR 0007 §5); the catalog still shows one "2048" card. `snake` lands
+ * with MPG-140, `memory-sequence` with MPG-141, and `aim-trainer` with MPG-142.
  */
 export type RealtimeGameId =
   | "floppy-birds"
@@ -28,7 +29,10 @@ export type RealtimeGameId =
   | "2048"
   | "2048@3"
   | "2048@5"
-  | "breakout";
+  | "breakout"
+  | "snake"
+  | "memory-sequence"
+  | "aim-trainer";
 
 /**
  * The one interface every real-time game implements — the arcade counterpart to

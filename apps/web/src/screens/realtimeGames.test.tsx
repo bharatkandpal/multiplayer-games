@@ -1,7 +1,15 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { drunkWalk, floppyBirds } from "@mpg/engine";
+import {
+  aimTrainer,
+  drunkWalk,
+  floppyBirds,
+  lumberjack,
+  memorySequence,
+  snake,
+  type RealtimeGameId,
+} from "@mpg/engine";
 import { REALTIME_GAMES, RealtimeGameRoute } from "./realtimeGames";
 import { fetchYourRank, submitRealtimeScore, type LeaderboardEntry } from "../api/leaderboard";
 import { mintResultShareUrl, shareUrlForToken } from "../api/share";
@@ -110,6 +118,167 @@ describe("REALTIME_GAMES wiring map", () => {
     expect(wiring!.controls).toBeUndefined();
     expect(wiring!.makeInputSource().id).toBe("pointer-axis");
   });
+
+  it("resolves 'memory-sequence' to the real engine module + four labelled pads", () => {
+    const wiring = REALTIME_GAMES["memory-sequence"];
+    expect(wiring).toBeDefined();
+    expect(wiring!.module).toBe(memorySequence);
+    expect(wiring!.makeInputSource().id).toBe("actions");
+
+    // The on-screen buttons carry the same glyphs the scene draws on the pads —
+    // the button and the pad it presses have to be recognisably one thing.
+    expect(wiring!.controls!.touchActions?.map((a) => a.label)).toEqual(["▲", "●", "■", "◆"]);
+    // Number-row parity, because "which arrow is the bottom-right pad?" has no
+    // good answer and "which key is pad 3?" has an obvious one.
+    expect(wiring!.controls!.keyMap.Digit1).toBe("pad0");
+    expect(wiring!.controls!.keyMap.Digit4).toBe("pad3");
+  });
+
+  it("resolves 'aim-trainer' to the real engine module + the tap-target source", () => {
+    const wiring = REALTIME_GAMES["aim-trainer"];
+    expect(wiring).toBeDefined();
+    expect(wiring!.module).toBe(aimTrainer);
+    // Position control, not discrete actions — where you tap IS the input.
+    expect(wiring!.controls).toBeUndefined();
+    expect(wiring!.makeInputSource().id).toBe("tap-target");
+  });
+
+  it("resolves 'lumberjack' to the real engine module + left/right tap-zone chopping", () => {
+    const wiring = REALTIME_GAMES["lumberjack"];
+    expect(wiring).toBeDefined();
+    expect(wiring!.module).toBe(lumberjack);
+    expect(wiring!.module.id).toBe("lumberjack");
+    expect(typeof wiring!.renderScene).toBe("function");
+    expect(wiring!.makeInputSource().id).toBe("actions");
+
+    // The two halves of the surface are the two choices, like Drunk Walk.
+    const resolve = wiring!.controls!.resolveTapAction!;
+    expect(resolve(0.1)).toBe("left");
+    expect(resolve(0.9)).toBe("right");
+    expect(wiring!.controls!.keyMap.ArrowLeft).toBe("left");
+    expect(wiring!.controls!.keyMap.KeyD).toBe("right");
+    // The timer is a way to lose, so it is named before the run, not after it.
+    expect(wiring!.controls!.readyExplainer).toMatch(/timer/i);
+  });
+
+  it("resolves 'snake' to the real engine module + four-direction steering", () => {
+    const wiring = REALTIME_GAMES["snake"];
+    expect(wiring).toBeDefined();
+    expect(wiring!.module).toBe(snake);
+    expect(wiring!.module.id).toBe("snake");
+    expect(typeof wiring!.renderScene).toBe("function");
+    expect(wiring!.makeInputSource().id).toBe("actions");
+
+    // Three ways in to the same four actions: a real swipe, on-screen buttons,
+    // and keyboard parity on both arrows and WASD.
+    const resolveSwipe = wiring!.controls!.resolveSwipeAction!;
+    expect(resolveSwipe(40, 5)).toBe("right");
+    expect(resolveSwipe(-40, 5)).toBe("left");
+    expect(resolveSwipe(5, 40)).toBe("down");
+    expect(resolveSwipe(5, -40)).toBe("up");
+    expect(wiring!.controls!.touchActions?.map((a) => a.action).sort()).toEqual([
+      "down",
+      "left",
+      "right",
+      "up",
+    ]);
+    expect(wiring!.controls!.keyMap.ArrowUp).toBe("up");
+    expect(wiring!.controls!.keyMap.KeyW).toBe("up");
+    expect(wiring!.controls!.keyMap.KeyD).toBe("right");
+    // The reversal rule is a losing surprise if nobody says it — so it's in the
+    // explainer the player sees BEFORE starting, not just in the rules sheet.
+    expect(wiring!.controls!.readyExplainer).toMatch(/turn back on yourself/i);
+  });
+});
+
+describe("RealtimeGameRoute — Aim Trainer end-to-end", () => {
+  it("mounts the scene and runs out of misses when nobody shoots", () => {
+    render(<RealtimeGameRoute gameId="aim-trainer" onExit={vi.fn()} />);
+
+    const canvas = document.querySelector("canvas");
+    expect(canvas).not.toBeNull();
+    expect(canvas).toHaveAttribute("aria-hidden", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    // Letting targets expire is a miss; five of them ends the run.
+    let clock = 1000;
+    frame(clock);
+    for (let i = 0; i < 60 && screen.queryByRole("button", { name: /Play again/ }) === null; i++) {
+      clock += 250;
+      frame(clock);
+    }
+
+    expect(screen.getByText("Game over")).toBeInTheDocument();
+    expect(screen.getByText(/Final score:/)).toBeInTheDocument();
+  });
+});
+
+describe("RealtimeGameRoute — Memory Sequence end-to-end", () => {
+  it("mounts the scene and ends the run when the turn times out", () => {
+    render(<RealtimeGameRoute gameId="memory-sequence" onExit={vi.fn()} />);
+
+    const canvas = document.querySelector("canvas");
+    expect(canvas).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    let clock = 1000;
+    frame(clock);
+    for (let i = 0; i < 80 && screen.queryByRole("button", { name: /Play again/ }) === null; i++) {
+      clock += 250;
+      frame(clock);
+    }
+
+    expect(screen.getByText("Game over")).toBeInTheDocument();
+  });
+});
+
+describe("RealtimeGameRoute — Lumberjack end-to-end", () => {
+  it("mounts the Lumberjack scene and loses to the timer when nobody chops", () => {
+    render(<RealtimeGameRoute gameId="lumberjack" onExit={vi.fn()} />);
+
+    const canvas = document.querySelector("canvas");
+    expect(canvas).not.toBeNull();
+    expect(canvas).toHaveAttribute("aria-hidden", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    // The clock is the point: idle long enough and the run ends on its own.
+    let clock = 1000;
+    frame(clock);
+    for (let i = 0; i < 40 && screen.queryByRole("button", { name: /Play again/ }) === null; i++) {
+      clock += 250;
+      frame(clock);
+    }
+
+    expect(screen.getByText("Game over")).toBeInTheDocument();
+    expect(screen.getByText(/Final score:/)).toBeInTheDocument();
+  });
+});
+
+describe("RealtimeGameRoute — Snake end-to-end", () => {
+  it("mounts the Snake scene and plays a real run through to game-over", () => {
+    render(<RealtimeGameRoute gameId="snake" onExit={vi.fn()} />);
+
+    const canvas = document.querySelector("canvas");
+    expect(canvas).not.toBeNull();
+    expect(canvas).toHaveAttribute("aria-hidden", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    // No steering: the snake runs straight into the right wall in a handful of
+    // steps. Pump 250ms frames until the run reaches its terminal state.
+    let clock = 1000;
+    frame(clock);
+    for (let i = 0; i < 20 && screen.queryByRole("button", { name: /Play again/ }) === null; i++) {
+      clock += 250;
+      frame(clock);
+    }
+
+    expect(screen.getByText("Game over")).toBeInTheDocument();
+    expect(screen.getByText(/Final score:/)).toBeInTheDocument();
+  });
 });
 
 describe("RealtimeGameRoute — Floppy Birds end-to-end", () => {
@@ -140,7 +309,13 @@ describe("RealtimeGameRoute — Floppy Birds end-to-end", () => {
   });
 
   it("renders nothing for an unregistered real-time game id", () => {
-    const { container } = render(<RealtimeGameRoute gameId="lumberjack" onExit={vi.fn()} />);
+    // Every member of `RealtimeGameId` is now wired (MPG-041 spent the last
+    // reserved id, `lumberjack`), so this case has to be provoked with a cast.
+    // It is still worth asserting: the union is the COMPILE-time contract, and
+    // this is the runtime behaviour for an id that reaches the route without a
+    // wiring row — degrade to absence, never to a crash.
+    const unregistered = "not-a-game" as RealtimeGameId;
+    const { container } = render(<RealtimeGameRoute gameId={unregistered} onExit={vi.fn()} />);
     expect(container).toBeEmptyDOMElement();
   });
 });

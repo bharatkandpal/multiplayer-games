@@ -62,6 +62,45 @@ export type { Game2048State, Game2048Input, Game2048Size, SwipeDir } from "./gam
 export { breakout, BREAKOUT_WORLD, bounceOffPaddle, brickRect } from "./breakout";
 export type { BreakoutState, BreakoutInput } from "./breakout";
 
+export { snake, SNAKE, stepTicks, foodsEaten, snakeLength } from "./snake";
+export type { SnakeState, SnakeInput, SnakeDir } from "./snake";
+
+export {
+  lumberjack,
+  LUMBERJACK,
+  drainPerTick,
+  timeLeftFraction,
+  incomingBranch,
+} from "./lumberjack";
+export type { LumberjackState, LumberjackInput, Branch, Side } from "./lumberjack";
+
+export {
+  memorySequence,
+  MEMORY,
+  PAD_COUNT,
+  inputTicksFor,
+  inputTimeFraction,
+  litPad,
+  round,
+} from "./memory-sequence";
+export type {
+  MemorySequenceState,
+  MemorySequenceInput,
+  MemoryPhase,
+  PadIndex,
+} from "./memory-sequence";
+
+export {
+  aimTrainer,
+  AIM,
+  AIM_CELLS,
+  cellAt,
+  lifetimeFor,
+  missesLeft,
+  spawnTicksFor,
+} from "./aim-trainer";
+export type { AimTrainerState, AimTrainerInput, AimTarget } from "./aim-trainer";
+
 export { builtInRealtimeGames, registerBuiltInRealtimeGames } from "./realtime-games";
 
 export { ticTacToe } from "./tictactoe";

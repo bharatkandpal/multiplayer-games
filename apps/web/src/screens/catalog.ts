@@ -206,6 +206,46 @@ export const REALTIME_CATALOG: Partial<Record<RealtimeGameId, RealtimeCatalogEnt
     tags: ["endless"],
     addedOn: "2026-09-11",
   },
+  "aim-trainer": {
+    id: "aim-trainer",
+    title: "Aim Trainer",
+    description:
+      "Targets appear and fade. Hit them before they go — but a tap that hits nothing costs you too.",
+    emphasis: "a tap that hits nothing costs you too",
+    kind: "realtime",
+    tags: ["quick"],
+    addedOn: "2026-09-17",
+  },
+  "memory-sequence": {
+    id: "memory-sequence",
+    title: "Memory Sequence",
+    description:
+      "Watch the pads flash, then tap them back in order. Every round adds one more to remember.",
+    emphasis: "Every round adds one more",
+    kind: "realtime",
+    tags: ["quick"],
+    addedOn: "2026-09-17",
+  },
+  lumberjack: {
+    id: "lumberjack",
+    title: "Lumberjack",
+    description:
+      "Chop the trunk from whichever side has no branch — and keep chopping, because the timer never stops draining.",
+    emphasis: "the timer never stops draining",
+    kind: "realtime",
+    tags: ["endless"],
+    addedOn: "2026-09-17",
+  },
+  snake: {
+    id: "snake",
+    title: "Snake",
+    description:
+      "Steer a snake that never stops. Eat to grow — and the longer you get, the less room you have to turn.",
+    emphasis: "the longer you get, the less room you have to turn",
+    kind: "realtime",
+    tags: ["endless"],
+    addedOn: "2026-09-17",
+  },
 };
 
 /**
