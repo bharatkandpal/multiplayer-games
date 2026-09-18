@@ -52,7 +52,7 @@ function readPalette(el: HTMLElement): Palette {
     brick: v("--color-accent", "#7c9cff"),
     brickAlt: v("--color-success", "#3ddc84"),
     paddle: v("--color-warning", "#ffd23f"),
-    ball: v("--color-text", "#e8eaf0"),
+    ball: v("--color-danger", "#ef4444"),
     ink: v("--color-text", "#e8eaf0"),
   };
 }
