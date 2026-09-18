@@ -77,9 +77,15 @@ jobs:
             project_id_secret: VERCEL_API_PROJECT_ID
             # Read-only, no session required, empty result is fine. A 200 here
             # means the function booted AND reached Neon.
+            #
+            # MULTI-SEGMENT ON PURPOSE. The gameId is a path parameter
+            # (`/leaderboard/:gameId`), and a single-segment probe would have
+            # missed the routing bug this path exists to catch: Vercel was
+            # generating `^/api/([^/]+)$` for the catch-all, so anything with a
+            # second slash never reached the function at all.
             # `[` pins it to a JSON array — the leaderboard's real shape.
             smoke_expect: "["
-            smoke_path: /api/leaderboard?gameId=connect-four
+            smoke_path: /api/leaderboard/connect-four
     env:
       # Selects which Vercel project this matrix leg targets. `vercel pull`
       # reads it, so every later step in the leg is scoped to that project.
@@ -131,12 +137,47 @@ jobs:
       - name: Deploy prebuilt output
         id: deploy
         run: |
-          url=$(vercel deploy --prebuilt ${{ steps.flags.outputs.prod_flag }} --token=${{ secrets.VERCEL_TOKEN }})
+          # stdout is the deployment URL; the alias is announced on stderr.
+          # Both are captured to files rather than through a pipe, so nothing
+          # depends on flush ordering.
+          # `if !` rather than `$?`: the default shell runs with `-e`, which
+          # would abort before the status could be read.
+          if ! vercel deploy --prebuilt ${{ steps.flags.outputs.prod_flag }} \
+                 --token=${{ secrets.VERCEL_TOKEN }} >/tmp/deploy.out 2>/tmp/deploy.err; then
+            cat /tmp/deploy.err >&2
+            exit 1
+          fi
+          cat /tmp/deploy.err >&2
+
+          url=$(tail -1 /tmp/deploy.out)
           echo "url=$url" >> "$GITHUB_OUTPUT"
+
+          # Prefer the production ALIAS for smoke-testing.
+          #
+          # `vercel deploy` prints the unique deployment URL on stdout, and that
+          # URL is covered by Deployment Protection even in production — so
+          # smoking it gets a 302 to SSO and verifies nothing. The alias
+          # (mpg-brown / mpg-api-pink) is the public one, and is also what users
+          # actually hit. The CLI reports it on stderr as "Aliased <url>".
+          alias_url=$(sed 's/\x1b\[[0-9;]*m//g' /tmp/deploy.err \
+                      | sed -n 's|.*Aliased[[:space:]]*\(https://[^[:space:]]*\).*|\1|p' \
+                      | tail -1)
+          smoke_url="${alias_url:-$url}"
+          echo "smoke_url=$smoke_url" >> "$GITHUB_OUTPUT"
+          echo "Deployment: $url"
+          echo "Alias:      ${alias_url:-<none — preview deploys are not aliased>}"
+
           {
             echo "### Vercel ${{ matrix.app }} ${{ steps.flags.outputs.environment }} deploy"
             echo ""
             echo "$url"
+            # `if`, not `[ … ] && …`: under `set -e` a false test as the final
+            # command of the group fails the whole step. It did exactly that on
+            # every preview, where there is no alias to report.
+            if [ -n "$alias_url" ]; then
+              echo ""
+              echo "Aliased: $alias_url"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       # THE GATE THIS WORKFLOW WAS MISSING.
@@ -162,9 +203,13 @@ jobs:
       #  2. STATUS IS NOT ENOUGH. Each leg declares `smoke_expect`, a string the
       #     body must actually contain, so "some 200 came back" cannot pass for
       #     "our function answered".
+      #  3. SMOKE THE ALIAS, NOT THE DEPLOYMENT URL — protection covers the
+      #     unique per-deployment hostname even in production, so the first
+      #     production run 302'd on both legs and verified nothing. The deploy
+      #     step resolves the alias for us (`smoke_url`).
       - name: Smoke-test the deployment
         env:
-          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+          DEPLOY_URL: ${{ steps.deploy.outputs.smoke_url }}
           SMOKE_PATH: ${{ matrix.smoke_path }}
           SMOKE_EXPECT: ${{ matrix.smoke_expect }}
           BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
