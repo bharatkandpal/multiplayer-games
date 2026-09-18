@@ -171,7 +171,13 @@ jobs:
             echo "### Vercel ${{ matrix.app }} ${{ steps.flags.outputs.environment }} deploy"
             echo ""
             echo "$url"
-            [ -n "$alias_url" ] && echo "" && echo "Aliased: $alias_url"
+            # `if`, not `[ … ] && …`: under `set -e` a false test as the final
+            # command of the group fails the whole step. It did exactly that on
+            # every preview, where there is no alias to report.
+            if [ -n "$alias_url" ]; then
+              echo ""
+              echo "Aliased: $alias_url"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       # THE GATE THIS WORKFLOW WAS MISSING.
