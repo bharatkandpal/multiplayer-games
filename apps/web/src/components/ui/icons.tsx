@@ -77,6 +77,31 @@ export function HelpIcon(props: IconProps): React.JSX.Element {
   );
 }
 
+/** Two crossing arrows — "shuffle" / "re-roll". Used by the username badge to
+ * spin up a fresh adjective+animal default. */
+export function ShuffleIcon(props: IconProps): React.JSX.Element {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M4 6h3.5l9 12H20" />
+      <path d="M16.5 15.5L20 18l-3.5 2.5" />
+      <path d="M4 18h3.5l2.4-3.2" />
+      <path d="M14.1 9.2L16.5 6H20" />
+      <path d="M16.5 3.5L20 6l-3.5 2.5" />
+    </svg>
+  );
+}
+
 const GEAR_CENTER = { x: 12, y: 12 };
 const GEAR_RING_R = 6.4;
 const GEAR_TOOTH_OUTER_R = 8.8;

@@ -1,0 +1,33 @@
+.badge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-200);
+}
+
+.name {
+  color: var(--color-text);
+  font-weight: 600;
+  /* Long auto names shouldn't be broken mid-word onto a new line. */
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Icon-only shuffle control: keep the >=44px touch target from Button's `sm`
+   size but tighten the horizontal padding so a single glyph isn't lost in a
+   wide pill. */
+.iconButton {
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+}

@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import { ENGINE_VERSION } from "@mpg/engine";
 import type { GameId, RealtimeGameId } from "@mpg/engine";
-import { Button } from "../components/ui";
+import { Button, UsernameBadge } from "../components/ui";
 import { loadPersonalBest } from "../game/personalBest";
 import { GameThumbnail } from "./gameThumbnails";
 import {
@@ -121,6 +121,8 @@ export function HomeScreen({
         Tap a game to start playing straight away — you against the bot. Want a friend instead? Use
         Options on any game.
       </p>
+
+      <UsernameBadge />
 
       {/* The browse controls: narrow the shelf, or skip choosing entirely. Kept
           on one row because they answer the same question ("what do I play?")
