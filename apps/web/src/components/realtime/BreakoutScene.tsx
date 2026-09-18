@@ -132,17 +132,29 @@ function draw(
   ctx.closePath();
   ctx.fill();
 
-  // Ball. A short motion trail adds speed feel — decorative, dropped under
-  // reduced motion.
+  // Ball. A tapering smoke tail trails behind it along the velocity vector —
+  // each puff a step further back, smaller and fainter, so it dissipates like
+  // smoke behind a moving asteroid. Decorative, dropped under reduced motion.
   const bx = px(state.ballX);
   const by = px(state.ballY);
   const br = px(BREAKOUT_WORLD.ballRadius);
   if (!reducedMotion) {
-    ctx.globalAlpha = 0.25;
+    const TRAIL_PUFFS = 5;
+    const TRAIL_STEP = 0.6; // fraction of one frame's travel between puffs
     ctx.fillStyle = palette.ball;
-    ctx.beginPath();
-    ctx.arc(bx - px(state.ballVX), by - px(state.ballVY), br, 0, Math.PI * 2);
-    ctx.fill();
+    for (let i = 1; i <= TRAIL_PUFFS; i += 1) {
+      const t = i / (TRAIL_PUFFS + 1); // 0..1 along the tail
+      ctx.globalAlpha = 0.22 * (1 - t); // fade to nothing at the tail's end
+      ctx.beginPath();
+      ctx.arc(
+        bx - px(state.ballVX) * TRAIL_STEP * i,
+        by - px(state.ballVY) * TRAIL_STEP * i,
+        br * (1 - 0.6 * t), // shrink as it dissipates
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+    }
     ctx.globalAlpha = 1;
   }
   ctx.fillStyle = palette.ball;
