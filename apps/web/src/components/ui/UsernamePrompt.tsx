@@ -16,9 +16,21 @@ export interface UsernamePromptProps {
    * sync found a genuine, server-confirmed collision (see `useUsernameGate`).
    */
   collisionMessage?: string | undefined;
+  /**
+   * Pre-fills the input — used by the "change your name" flow so an existing
+   * (auto-assigned or chosen) name is there to edit rather than a blank box.
+   * Defaults to empty (the first-run picker).
+   */
+  initialValue?: string;
+  /** Modal heading. Defaults to the first-run "Pick a username". */
+  title?: string;
+  /** Intro copy above the field. Defaults to the online-play explanation. */
+  intro?: string;
 }
 
 const FORMAT_ERROR = "3–20 characters: letters, numbers, _ or - only.";
+const DEFAULT_INTRO =
+  "Playing online needs a name so other players (and the leaderboard) can recognize you.";
 
 /**
  * First-run username picker (MPG-077). Local-first: submitting a valid name
@@ -33,8 +45,11 @@ export function UsernamePrompt({
   onSubmit,
   onCancel,
   collisionMessage,
+  initialValue = "",
+  title = "Pick a username",
+  intro = DEFAULT_INTRO,
 }: UsernamePromptProps): React.JSX.Element {
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initialValue);
   const [submitting, setSubmitting] = useState(false);
   const [formatError, setFormatError] = useState<string | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,11 +61,16 @@ export function UsernamePrompt({
     if (!isOpen) return;
     setSubmitting(false);
     setFormatError(undefined);
-    if (collisionMessage) {
-      // Reopened after a collision — refocus so the user can immediately retype.
-      requestAnimationFrame(() => inputRef.current?.focus());
+    // Seed the field with the current name each time it opens (edit flow), and
+    // select it so a re-type replaces rather than appends.
+    setValue(initialValue);
+    if (initialValue || collisionMessage) {
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      });
     }
-  }, [isOpen, collisionMessage]);
+  }, [isOpen, collisionMessage, initialValue]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -72,11 +92,9 @@ export function UsernamePrompt({
   };
 
   return (
-    <Modal isOpen={isOpen} title="Pick a username" onClose={onCancel}>
+    <Modal isOpen={isOpen} title={title} onClose={onCancel}>
       <form onSubmit={handleSubmit} noValidate>
-        <p className={styles.intro}>
-          Playing online needs a name so other players (and the leaderboard) can recognize you.
-        </p>
+        <p className={styles.intro}>{intro}</p>
 
         <label className={styles.label} htmlFor="username-input">
           Username

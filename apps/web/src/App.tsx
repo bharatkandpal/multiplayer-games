@@ -39,7 +39,7 @@ import { SharedResultScreen } from "./screens/SharedResultScreen";
 import { buildGameItems, nextGame, prevGame, type GameItem } from "./screens/catalog";
 import { pickGameOfTheDay } from "./screens/gameOfTheDay";
 import { isAllBotRoom, publicRoomToSeats, toSeatConfigInput } from "./api/roomSeats";
-import { getStoredUsername } from "./api/username";
+import { ensureUsername, getStoredUsername, reconcileUsername } from "./api/username";
 import { initSession } from "./api/session";
 import { installFlushOnHide } from "./api/events";
 import { markColdArrival } from "./analytics/firstInput";
@@ -429,6 +429,18 @@ export default function App(): React.JSX.Element {
     void initSession().catch(() => {
       // Intentionally swallowed — see above.
     });
+  }, []);
+
+  // Auto-assign a friendly default username (an adjective+animal like
+  // `strongWolf`) the instant the site opens, so a first-time visitor never
+  // meets an empty name box — and online play, the leaderboard, and share
+  // cards all have something to show immediately. Purely local and synchronous;
+  // the best-effort uniqueness sync is fire-and-forget and silently regenerates
+  // on a genuine collision (see `reconcileUsername`/`syncUsername`). A name the
+  // player already has — chosen or previously auto-assigned — is left untouched.
+  useEffect(() => {
+    ensureUsername();
+    void reconcileUsername();
   }, []);
 
   // MPG-097: flush queued funnel events when the page goes away. Same

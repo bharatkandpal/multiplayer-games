@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  ensureUsername,
   getStoredUsername,
   hasUnconfirmedUsername,
+  isAutoUsername,
   isValidUsernameFormat,
+  onUsernameChange,
   onUsernameCollision,
   reconcileUsername,
+  rerollUsername,
   setStoredUsername,
   syncUsername,
 } from "../username.js";
@@ -137,6 +141,80 @@ describe("username client", () => {
       const result = await syncUsername("bharat_k");
 
       expect(result).toEqual({ ok: false, reason: "offline" });
+    });
+  });
+
+  describe("ensureUsername", () => {
+    it("assigns a valid adjective+animal default on first visit", () => {
+      expect(getStoredUsername()).toBeNull();
+      const name = ensureUsername();
+      expect(isValidUsernameFormat(name)).toBe(true);
+      expect(getStoredUsername()).toBe(name);
+      expect(isAutoUsername()).toBe(true);
+      expect(hasUnconfirmedUsername()).toBe(true);
+    });
+
+    it("leaves an existing name untouched (chosen or auto)", () => {
+      setStoredUsername("bharat_k", false, false);
+      expect(ensureUsername()).toBe("bharat_k");
+      expect(isAutoUsername()).toBe(false);
+    });
+
+    it("is idempotent across repeated calls", () => {
+      const first = ensureUsername();
+      expect(ensureUsername()).toBe(first);
+      expect(ensureUsername()).toBe(first);
+    });
+  });
+
+  describe("rerollUsername", () => {
+    it("replaces the name with a fresh valid auto default and fires the sync", () => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { username: "x" }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const next = rerollUsername();
+
+      expect(isValidUsernameFormat(next)).toBe(true);
+      expect(getStoredUsername()).toBe(next);
+      expect(isAutoUsername()).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("onUsernameChange", () => {
+    it("fires with the new name on any store mutation", () => {
+      const listener = vi.fn();
+      const unsubscribe = onUsernameChange(listener);
+
+      setStoredUsername("first_name");
+      setStoredUsername("second_name");
+
+      expect(listener).toHaveBeenNthCalledWith(1, "first_name");
+      expect(listener).toHaveBeenNthCalledWith(2, "second_name");
+      unsubscribe();
+    });
+  });
+
+  describe("auto-name collision", () => {
+    it("regenerates silently (no collision listener) and confirms without prompting", async () => {
+      ensureUsername(); // stores an auto name
+      const autoName = getStoredUsername();
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse(409, { error: "USERNAME_TAKEN" }))
+        .mockResolvedValue(jsonResponse(200, { username: "resolved_name" }));
+      vi.stubGlobal("fetch", fetchMock);
+      const listener = vi.fn();
+      const unsubscribe = onUsernameCollision(listener);
+
+      const result = await syncUsername(autoName as string);
+
+      expect(result).toEqual({ ok: true, username: "resolved_name" });
+      expect(listener).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(hasUnconfirmedUsername()).toBe(false);
+      expect(isAutoUsername()).toBe(true);
+      unsubscribe();
     });
   });
 
