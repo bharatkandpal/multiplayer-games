@@ -102,6 +102,62 @@ export function ShuffleIcon(props: IconProps): React.JSX.Element {
   );
 }
 
+const SUN_RAY_COUNT = 8;
+const SUN_CORE_R = 4.2;
+const SUN_RAY_INNER_R = 6.6;
+const SUN_RAY_OUTER_R = 9.2;
+
+/** Sun — the light half of the theme switch. Rays are computed from
+ * `SUN_RAY_COUNT` so the glyph stays evenly spoked; at the 14px the switch
+ * renders it at, an eight-ray sun still reads as a sun and not a snowflake. */
+export function SunIcon(props: IconProps): React.JSX.Element {
+  const rays = Array.from({ length: SUN_RAY_COUNT }, (_, i) => {
+    const angle = ((2 * Math.PI) / SUN_RAY_COUNT) * i;
+    const x1 = 12 + SUN_RAY_INNER_R * Math.cos(angle);
+    const y1 = 12 + SUN_RAY_INNER_R * Math.sin(angle);
+    const x2 = 12 + SUN_RAY_OUTER_R * Math.cos(angle);
+    const y2 = 12 + SUN_RAY_OUTER_R * Math.sin(angle);
+    // Fixed-count, order-stable geometry (not a dynamic list) — index as key is fine.
+    return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} />;
+  });
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <circle cx={12} cy={12} r={SUN_CORE_R} />
+      {rays}
+    </svg>
+  );
+}
+
+/** Crescent moon — the dark half of the theme switch. One filled path rather
+ * than a stroked outline: at icon size a stroked crescent's two tips collapse
+ * into a blob, while a solid one keeps its silhouette. */
+export function MoonIcon(props: IconProps): React.JSX.Element {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      fill="currentColor"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M20.2 14.6A8.6 8.6 0 0 1 9.4 3.8a8.6 8.6 0 1 0 10.8 10.8z" />
+    </svg>
+  );
+}
+
 const GEAR_CENTER = { x: 12, y: 12 };
 const GEAR_RING_R = 6.4;
 const GEAR_TOOTH_OUTER_R = 8.8;

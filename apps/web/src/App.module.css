@@ -48,38 +48,15 @@
   overflow: hidden;
 }
 
-.themeToggle {
-  /* Fixed chrome above the scrolling screen: it must not absorb slack or be
-     squeezed by a tall screen below it. */
+/* The site chrome above the scrolling screen. Today it carries only the theme
+   switch; MPG-145 gives it the mark and wordmark. Fixed height: it must not
+   absorb slack or be squeezed by a tall screen below it. */
+.chromeBar {
   flex: 0 0 auto;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: var(--size-touch-target);
-  min-width: var(--size-touch-target);
-  padding: var(--space-2) var(--space-4);
-  margin: var(--space-4);
-  border: var(--border-width-thin) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background-color: var(--color-surface);
-  color: var(--color-text);
-  font-size: var(--font-size-200);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  transition: background-color var(--duration-fast) var(--ease-standard);
-}
-
-.themeToggle:hover {
-  background-color: var(--color-bg-subtle);
-}
-
-.themeToggle:active {
-  background-color: var(--color-bg-inset);
-}
-
-.themeToggle:focus-visible {
-  outline: var(--border-width-thick) solid var(--color-focus-ring);
-  outline-offset: 2px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2);
 }
 
 .galleryWrap {

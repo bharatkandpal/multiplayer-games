@@ -407,12 +407,21 @@ function makeSeed(): number {
 
 /**
  * Where a share falls back to when there is no durable result link (MPG-087):
- * the game's own URL. Still the right fallback — "here's the game" beats a
- * button that does nothing — but the durable per-result link (MPG-056) is what
- * a finished run shares whenever one could be minted.
+ * the game's own URL, with the score riding along as `?challenge=<score>`.
+ *
+ * The durable per-result link (MPG-056) is still what a finished run shares
+ * whenever one could be minted — that link unfurls a card and carries the score
+ * server-side. But when it can't be minted (backend down, offline), the score
+ * must still travel, or the recipient just opens the game with nothing to beat.
+ * So it rides in the URL instead, and the router parses it straight back into a
+ * "Beat this score" target — no backend involved, honouring the offline pillar.
+ *
+ * The score is omitted only when there genuinely isn't one (a non-finite value),
+ * in which case this degrades to the bare game link it used to be.
  */
-function buildShareUrl(gameId: RealtimeGameId): string {
-  const path = `/${gameId}`;
+function buildShareUrl(gameId: RealtimeGameId, score?: number): string {
+  const query = typeof score === "number" && Number.isFinite(score) ? `?challenge=${score}` : "";
+  const path = `/${gameId}${query}`;
   if (typeof window === "undefined") return path;
   return `${window.location.origin}${path}`;
 }
@@ -486,6 +495,7 @@ function useSettledRun(): {
   runKey: number;
   settled: boolean;
   shareToken: string | undefined;
+  lastScore: number | undefined;
   onRunComplete: (r: RunComplete<unknown>) => void;
 } {
   // `runKey` is bumped per run so the preview remounts (and refetches) on every
@@ -495,12 +505,18 @@ function useSettledRun(): {
   // The durable `/s/:token` URL for the run just finished. Cleared at the start
   // of each run so one run's link can never be shared under the next run's score.
   const [shareToken, setShareToken] = useState<string | undefined>(undefined);
+  // The score of the run just finished — folded into the fallback share URL so
+  // that even without a durable link the shared score still travels (see
+  // `buildShareUrl`). Kept from `onRunComplete` rather than read out of the play
+  // surface so it's the same authoritative number that gets submitted.
+  const [lastScore, setLastScore] = useState<number | undefined>(undefined);
 
   const onRunComplete = (result: RunComplete<unknown>): void => {
     // Local first, and synchronously: the Home personal-best chip must reflect
     // the run the player just finished even if the score submission never
     // reaches the server. This write touches no network and cannot throw.
     recordPersonalBest(result.gameId, result.score);
+    setLastScore(result.score);
     setRun((prev) => ({ ...prev, settled: false }));
     setShareToken(undefined);
     void submitRun(result).then(async (resultId) => {
@@ -517,7 +533,7 @@ function useSettledRun(): {
     });
   };
 
-  return { runKey, settled, shareToken, onRunComplete };
+  return { runKey, settled, shareToken, lastScore, onRunComplete };
 }
 
 /**
@@ -540,7 +556,7 @@ export function RealtimeGameRoute({
   // Same reason as `challengeProps`: an optional prop can't be passed as
   // `undefined` under `exactOptionalPropertyTypes`.
   const navProps = navigation ? { navigation } : {};
-  const { runKey, settled, shareToken, onRunComplete } = useSettledRun();
+  const { runKey, settled, shareToken, lastScore, onRunComplete } = useSettledRun();
   // Only meaningful for "drunk-walk" (the one game with a character to
   // customize), but declared unconditionally so this component's hook
   // count/order stays stable across `gameId` values.
@@ -589,7 +605,7 @@ export function RealtimeGameRoute({
           renderScene={(props) => <DrunkWalkScene {...props} character={character} />}
           onExit={onExit}
           onRunComplete={onRunComplete}
-          shareUrl={shareToken ?? buildShareUrl(gameId)}
+          shareUrl={shareToken ?? buildShareUrl(gameId, lastScore)}
           resultExtra={rankPreview}
           {...challengeProps}
           {...navProps}
@@ -648,7 +664,7 @@ export function RealtimeGameRoute({
           renderScene={(props) => <Game2048Scene {...props} />}
           onExit={onExit}
           onRunComplete={onRunComplete}
-          shareUrl={shareToken ?? buildShareUrl(gameId)}
+          shareUrl={shareToken ?? buildShareUrl(gameId, lastScore)}
           resultExtra={rank2048}
           {...challengeProps}
           {...navProps}
@@ -682,7 +698,7 @@ export function RealtimeGameRoute({
       renderScene={wiring.renderScene}
       onExit={onExit}
       onRunComplete={onRunComplete}
-      shareUrl={shareToken ?? buildShareUrl(gameId)}
+      shareUrl={shareToken ?? buildShareUrl(gameId, lastScore)}
       resultExtra={rankPreview}
       {...challengeProps}
       {...navProps}

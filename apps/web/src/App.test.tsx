@@ -308,6 +308,31 @@ describe("MPG-087: a bare /:gameId deep link opens the game (share fallback)", (
     expect(screen.queryByRole("list", { name: "Featured games" })).not.toBeInTheDocument();
   });
 
+  // The backend-free counterpart to "Beat this score": when the durable link
+  // couldn't be minted, the score rides in the URL as `?challenge=<n>`, and this
+  // link must reproduce the same challenge — the game open AND the Target set.
+  it("a `?challenge=<score>` rider opens the game with that score as the Target", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    window.history.pushState({}, "", "/floppy-birds?challenge=42");
+
+    render(<App />);
+
+    expect(screen.getByRole("application", { name: /Floppy Birds play area/ })).toBeInTheDocument();
+    expect(screen.getByText("Target")).toBeInTheDocument();
+    expect(screen.getByText("42")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Featured games" })).not.toBeInTheDocument();
+  });
+
+  it("a malformed challenge rider is ignored — the game opens without a Target", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    window.history.pushState({}, "", "/floppy-birds?challenge=not-a-number");
+
+    render(<App />);
+
+    expect(screen.getByRole("application", { name: /Floppy Birds play area/ })).toBeInTheDocument();
+    expect(screen.queryByText("Target")).not.toBeInTheDocument();
+  });
+
   it("an unknown single-segment path still falls through to Home", () => {
     window.history.pushState({}, "", "/not-a-game");
 

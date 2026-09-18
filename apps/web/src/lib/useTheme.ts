@@ -15,8 +15,6 @@ export interface UseThemeResult {
   resolvedTheme: "light" | "dark";
   /** Sets and persists a new theme preference. */
   setTheme: (theme: Theme) => void;
-  /** Cycles light -> dark -> system -> light, handy for a single toggle button. */
-  cycleTheme: () => void;
 }
 
 /**
@@ -52,13 +50,5 @@ export function useTheme(): UseThemeResult {
     setThemeState(next);
   }, []);
 
-  const cycleTheme = useCallback(() => {
-    setThemeState((current) => {
-      const next: Theme = current === "light" ? "dark" : current === "dark" ? "system" : "light";
-      persistTheme(next);
-      return next;
-    });
-  }, []);
-
-  return { theme, resolvedTheme, setTheme, cycleTheme };
+  return { theme, resolvedTheme, setTheme };
 }
