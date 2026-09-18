@@ -62,8 +62,8 @@ export const BREAKOUT_WORLD = {
   paddleWidth: 16,
   paddleHeight: 2.5,
   ballRadius: 1.4,
-  baseBallSpeed: 3.15, // per tick, level 0 (3× the original 1.05 — faster arcade feel)
-  ballSpeedRampPerLevel: 0.24, // added to speed per cleared wall (3× the original 0.08)
+  baseBallSpeed: 2.5, // per tick, level 0 (~2.4× the original 1.05 — fast arcade feel, eased back from 3×)
+  ballSpeedRampPerLevel: 0.19, // added to speed per cleared wall (~2.4× the original 0.08)
   /** Fraction of the ball's speed the seeded launch lean can steer horizontally. */
   paddleSteer: 0.85,
   /**
