@@ -83,8 +83,10 @@ jobs:
             # missed the routing bug this path exists to catch: Vercel was
             # generating `^/api/([^/]+)$` for the catch-all, so anything with a
             # second slash never reached the function at all.
-            # `[` pins it to a JSON array — the leaderboard's real shape.
-            smoke_expect: "["
+            # Pinned to the payload's actual shape. A loose marker like "["
+            # would match almost any HTML too, which is the whole failure mode
+            # this field exists to prevent.
+            smoke_expect: '{"entries"'
             smoke_path: /api/leaderboard/connect-four
     env:
       # Selects which Vercel project this matrix leg targets. `vercel pull`
@@ -227,7 +229,26 @@ jobs:
             args+=(--header "x-vercel-protection-bypass: $BYPASS")
           fi
 
-          code=$(curl "${args[@]}" "$url" || echo "000")
+          # RETRY, because an alias does not repoint instantly. The first
+          # production run of this step queried mpg-api-pink 40ms after deploy
+          # and got a platform 404 from the PREVIOUS deployment — a real red
+          # against a deploy that was in fact fine (verified by hand seconds
+          # later: 200 {"entries":[]}). A gate that cries wolf gets ignored,
+          # which would cost more than the bug it is guarding.
+          code=000
+          for attempt in 1 2 3 4 5 6; do
+            code=$(curl "${args[@]}" "$url" || echo "000")
+            if [ "$code" = "200" ] && grep -qF -- "$SMOKE_EXPECT" /tmp/smoke-body; then
+              break
+            fi
+            # Protection redirects are terminal — retrying cannot help.
+            case "$code" in 3*|401|403) break ;; esac
+            if [ "$attempt" -lt 6 ]; then
+              echo "attempt $attempt: HTTP $code — retrying in 10s (alias may still be propagating)"
+              sleep 10
+            fi
+          done
+
           echo "HTTP $code"
           echo "--- first 400 bytes of body ---"
           head -c 400 /tmp/smoke-body || true
