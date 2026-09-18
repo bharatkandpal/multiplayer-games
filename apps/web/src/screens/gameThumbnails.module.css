@@ -119,3 +119,73 @@
 .breakoutPaddle {
   fill: var(--color-warning);
 }
+
+/* Snake: the body recedes behind the head, and the food is the one warm mark. */
+.snakeBody {
+  fill: var(--color-accent);
+  opacity: 0.6;
+}
+
+.snakeHead {
+  fill: var(--color-accent);
+}
+
+.snakeFood {
+  fill: var(--color-success);
+}
+
+/* Aim Trainer: a bullseye with its countdown arc, on a sparse grid. */
+.aimCell {
+  fill: var(--color-bg-inset);
+}
+
+.aimTarget {
+  fill: var(--color-accent);
+}
+
+.aimRing {
+  fill: none;
+  stroke: var(--color-on-accent);
+  stroke-width: 5;
+}
+
+.aimFuse {
+  fill: none;
+  stroke: var(--color-success);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+/* Memory Sequence: four pads, one lit. Shape carries as much as colour. */
+.padDim {
+  fill: var(--color-bg-inset);
+}
+
+.padLit {
+  fill: var(--color-accent);
+}
+
+.padGlyph {
+  fill: var(--color-text-muted);
+}
+
+.padGlyphLit {
+  fill: var(--color-on-accent);
+}
+
+/* Lumberjack: a wooden trunk, branches that read as the obstacle, and the axe. */
+.lumberTrunk {
+  fill: var(--color-cabinet-raised);
+}
+
+.lumberBranch {
+  fill: var(--color-success);
+}
+
+.lumberCut {
+  fill: var(--color-cabinet-line);
+}
+
+.lumberAxe {
+  fill: var(--color-accent);
+}

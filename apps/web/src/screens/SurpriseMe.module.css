@@ -1,0 +1,88 @@
+/* "Surprise me" (MPG-143) — the dice control in Home's filter row.
+   Styled as a sibling of `.filterChip` (same pill, same touch floor, same
+   focus treatment) but FILLED, because it is an action rather than a filter:
+   the row's other controls change what you see, this one starts a game. */
+
+.surprise {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--size-touch-target);
+  padding: var(--space-2) var(--space-4);
+  border: var(--border-width-hairline) solid transparent;
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-100);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.surprise:hover {
+  background-color: var(--color-accent-hover);
+}
+
+.surprise:active {
+  background-color: var(--color-accent-active);
+}
+
+.surprise:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* While the shuffle runs the button becomes "Skip", and it says so in text as
+   well as in treatment — never colour-only (UX_PRINCIPLES §4). */
+.surprise[data-spinning="true"] {
+  border-color: var(--color-on-accent);
+}
+
+.face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25em;
+  height: 1.25em;
+  flex: none;
+}
+
+.dice {
+  width: 100%;
+  height: 100%;
+}
+
+.label {
+  /* Fixed width, and it has to be: the label cycles through game titles of
+     wildly different lengths, and a button that resized on every frame would
+     shove the filter chips around for the whole shuffle. Overflow is clipped
+     rather than wrapped for the same reason — the row must not change height. */
+  /* Wide enough that the RESTING label ("Surprise me") is never clipped — a
+     control whose own name is truncated reads as broken. Longer game titles do
+     ellipsize mid-shuffle, which is fine: that text is transient and decorative.
+     `ch` ignores letter-spacing, hence the headroom over the 11 characters. */
+  width: 14ch;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Announced, never shown. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

@@ -254,6 +254,126 @@ function BreakoutThumbnail(): React.JSX.Element {
   );
 }
 
+function SnakeThumbnail(): React.JSX.Element {
+  // An L-shaped body with the head at the turn and the food ahead of it — the
+  // shape of the decision the game is actually about.
+  const body = [
+    [8, 68],
+    [30, 68],
+    [52, 68],
+    [52, 46],
+  ] as const;
+  return (
+    <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      {body.map(([x, y], i) => (
+        <rect
+          key={`${x}-${y}`}
+          x={x}
+          y={y}
+          width="18"
+          height="18"
+          rx="5"
+          className={i === body.length - 1 ? styles.snakeHead : styles.snakeBody}
+        />
+      ))}
+      <circle cx="79" cy="29" r="8" className={styles.snakeFood} />
+    </svg>
+  );
+}
+
+function AimTrainerThumbnail(): React.JSX.Element {
+  // One target mid-countdown on a sparse grid — the bullseye plus its fuse arc.
+  return (
+    <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      {[
+        [20, 20],
+        [66, 20],
+        [20, 66],
+      ].map(([x, y]) => (
+        <rect
+          key={`${x}-${y}`}
+          x={x}
+          y={y}
+          width="14"
+          height="14"
+          rx="4"
+          className={styles.aimCell}
+        />
+      ))}
+      <circle cx="68" cy="68" r="17" className={styles.aimTarget} />
+      <circle cx="68" cy="68" r="9" className={styles.aimRing} />
+      {/* The fuse: an arc, so time-left reads as an angle rather than a colour. */}
+      <path d="M 68 45 A 23 23 0 1 1 45 68" className={styles.aimFuse} />
+    </svg>
+  );
+}
+
+function MemorySequenceThumbnail(): React.JSX.Element {
+  // Four pads, one lit — the moment the game is entirely made of. The glyphs
+  // match the ones the scene and the on-screen buttons draw.
+  const pads = [
+    { x: 8, y: 8, glyph: "▲", lit: false },
+    { x: 54, y: 8, glyph: "●", lit: true },
+    { x: 8, y: 54, glyph: "■", lit: false },
+    { x: 54, y: 54, glyph: "◆", lit: false },
+  ];
+  return (
+    <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      {pads.map((pad) => (
+        <g key={pad.glyph}>
+          <rect
+            x={pad.x}
+            y={pad.y}
+            width="38"
+            height="38"
+            rx="8"
+            className={pad.lit ? styles.padLit : styles.padDim}
+          />
+          <text
+            x={pad.x + 19}
+            y={pad.y + 20}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize="17"
+            className={pad.lit ? styles.padGlyphLit : styles.padGlyph}
+          >
+            {pad.glyph}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function LumberjackThumbnail(): React.JSX.Element {
+  // The trunk with branches alternating sides, and the axe cut at the bottom —
+  // the read the whole game is: which side is clear?
+  return (
+    <svg className={styles.svg} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      <rect x="39" y="6" width="22" height="80" rx="3" className={styles.lumberTrunk} />
+      {[
+        [18, 5],
+        [61, 30],
+        [18, 55],
+      ].map(([x, y]) => (
+        <rect
+          key={`${x}-${y}`}
+          x={x}
+          y={y}
+          width="21"
+          height="9"
+          rx="4.5"
+          className={styles.lumberBranch}
+        />
+      ))}
+      {/* Cut lines on the trunk, and the axe head biting in from the clear side. */}
+      <rect x="39" y="45" width="22" height="2" className={styles.lumberCut} />
+      <rect x="39" y="66" width="22" height="2" className={styles.lumberCut} />
+      <rect x="62" y="72" width="20" height="7" rx="3.5" className={styles.lumberAxe} />
+    </svg>
+  );
+}
+
 // Partial, mirroring GAME_CATALOG's pattern (see HomeScreen.tsx): a game can
 // exist without a bespoke thumbnail yet. GenericThumbnail below covers that.
 export const GAME_THUMBNAILS: Partial<Record<GameId, () => React.JSX.Element>> = {
@@ -270,6 +390,10 @@ export const REALTIME_THUMBNAILS: Partial<Record<RealtimeGameId, () => React.JSX
   "reflex-test": ReflexTestThumbnail,
   "2048": Game2048Thumbnail,
   breakout: BreakoutThumbnail,
+  snake: SnakeThumbnail,
+  lumberjack: LumberjackThumbnail,
+  "memory-sequence": MemorySequenceThumbnail,
+  "aim-trainer": AimTrainerThumbnail,
 };
 
 /** Accepts either family's id (both are plain string unions); falls back to the generic mark. */
