@@ -1,2 +1,8 @@
 .vercel
 .env*
+
+# Build output from scripts/bundle.mjs. Generated during `vercel build`; the
+# hand-written app.d.ts beside it IS tracked, since typecheck needs it.
+api/_bundle/*.js
+api/_bundle/fonts/
+api/_bundle/*.js.map

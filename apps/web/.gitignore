@@ -1,2 +1,7 @@
 .vercel
 .env*
+
+# Build output from scripts/bundle-api.mjs. The hand-written meta.d.ts beside it
+# IS tracked, since typecheck needs it.
+api/_bundle/*.js
+api/_bundle/*.js.map
