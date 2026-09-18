@@ -17,7 +17,18 @@
  */
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createServerlessApiApp } from "@mpg/server/app";
+
+// Imported from the PRE-BUNDLED build output, not from `@mpg/server/app`
+// directly. Vercel's Node builder transpiles this entry file but rewrites none
+// of its imports, and `@mpg/server`'s exports map points at raw `.ts` sources —
+// so importing the package here deploys a function that cannot boot (it did,
+// silently, until 2026-09-18). `scripts/bundle.mjs` produces this file; see its
+// header for the full story.
+//
+// The `@mpg/server/app` types are still what this module is checked against —
+// `_bundle/app.d.ts` re-exports them from source, so the seam stays type-safe
+// and a signature change still breaks the build.
+import { createServerlessApiApp } from "./_bundle/app.js";
 
 // Derived from the factory so this package needn't depend on `express` directly
 // (it comes transitively through @mpg/server).

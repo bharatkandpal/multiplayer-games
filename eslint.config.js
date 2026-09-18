@@ -17,6 +17,9 @@ export default tseslint.config(
       // ("multiple candidate TSConfigRootDirs"), breaking `pnpm lint`
       // repo-wide for everyone until the worktree is cleaned up.
       ".claude/worktrees/**",
+      // Generated function bundles (apps/*/scripts/bundle*.mjs output). Third-
+      // party code we didn't write and can't fix, emitted fresh on every build.
+      "**/api/_bundle/*.js",
     ],
   },
   js.configs.recommended,
@@ -43,6 +46,14 @@ export default tseslint.config(
           caughtErrorsIgnorePattern: "^_",
         },
       ],
+    },
+  },
+  {
+    // Build scripts run under Node, outside any tsconfig, so `no-undef` has no
+    // compiler to defer to and flags `console`/`process`.
+    files: ["**/scripts/**/*.mjs"],
+    languageOptions: {
+      globals: { console: "readonly", process: "readonly" },
     },
   },
   // Keep ESLint out of formatting's lane; Prettier owns style.

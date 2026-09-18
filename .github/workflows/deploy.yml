@@ -17,6 +17,13 @@ name: Deploy
 #   VERCEL_PROJECT_ID      - the `mpg` project id (web)
 #   VERCEL_API_PROJECT_ID  - the `mpg-api` project id
 #
+# Optional fifth secret:
+#   VERCEL_AUTOMATION_BYPASS_SECRET - Protection Bypass for Automation token
+#     (Vercel project -> Settings -> Deployment Protection). Without it the
+#     post-deploy smoke step cannot reach PREVIEW deployments and will warn
+#     rather than verify. Do not disable Deployment Protection instead:
+#     previews are wired to the real dev database (MPG-139).
+#
 # Double deploys are prevented per project by `git.deploymentEnabled=false` in
 # each app's vercel.json, so Vercel ignores pushes and this workflow is the only
 # thing that deploys. (Those files live in each app dir because that's the
@@ -59,8 +66,15 @@ jobs:
         include:
           - app: web
             project_id_secret: VERCEL_PROJECT_ID
+            # Exercises the unfurl function (ADR 0009). A junk token is the
+            # documented degrade-to-shell path, so 200 is the correct answer —
+            # and it proves the function BOOTED, which is the point.
+            smoke_path: /s/deploysmoketoken
           - app: api
             project_id_secret: VERCEL_API_PROJECT_ID
+            # Read-only, no session required, empty result is fine. A 200 here
+            # means the function booted AND reached Neon.
+            smoke_path: /api/leaderboard?gameId=connect-four
     env:
       # Selects which Vercel project this matrix leg targets. `vercel pull`
       # reads it, so every later step in the leg is scoped to that project.
@@ -120,8 +134,60 @@ jobs:
             echo "$url"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # THE GATE THIS WORKFLOW WAS MISSING.
+      #
+      # `vercel build` + `vercel deploy` exiting 0 proves the bundle compiled and
+      # uploaded. It does NOT prove a function can boot. Both projects deployed
+      # green for weeks while every single invocation died at import time
+      # (ERR_MODULE_NOT_FOUND on a raw .ts specifier) — found by hand on
+      # 2026-09-18, not by CI. One real request is the difference.
+      #
+      # Production is a hard gate. Previews are best-effort: Deployment
+      # Protection puts them behind SSO, so without a bypass secret we cannot
+      # reach them — and we do NOT disable protection, because previews talk to
+      # the real dev database (MPG-139).
+      - name: Smoke-test the deployment
+        env:
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+          SMOKE_PATH: ${{ matrix.smoke_path }}
+          BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          IS_PRODUCTION: ${{ github.event_name == 'push' }}
+        run: |
+          set -uo pipefail
+          url="${DEPLOY_URL}${SMOKE_PATH}"
+          echo "Smoke: GET $url"
+
+          args=(--silent --show-error --max-time 30 --location
+                --output /tmp/smoke-body --write-out '%{http_code}')
+          if [ -n "$BYPASS" ]; then
+            args+=(--header "x-vercel-protection-bypass: $BYPASS")
+          fi
+
+          code=$(curl "${args[@]}" "$url" || echo "000")
+          echo "HTTP $code"
+          echo "--- first 400 bytes of body ---"
+          head -c 400 /tmp/smoke-body || true
+          echo
+
+          if [ "$code" = "200" ]; then
+            echo "::notice::Smoke passed for ${{ matrix.app }} ($code)"
+            exit 0
+          fi
+
+          # A protected preview we have no key for: unreachable, not broken.
+          if [ "$IS_PRODUCTION" != "true" ] && [ -z "$BYPASS" ] \
+             && { [ "$code" = "401" ] || [ "$code" = "403" ] || [ "$code" = "404" ]; }; then
+            echo "::warning::Preview for ${{ matrix.app }} is behind Deployment Protection and no VERCEL_AUTOMATION_BYPASS_SECRET is set — smoke skipped, NOT passed. See MPG-139."
+            exit 0
+          fi
+
+          echo "::error::Smoke FAILED for ${{ matrix.app }}: GET $SMOKE_PATH returned $code (expected 200). The deploy succeeded but the function does not work."
+          exit 1
+
+      # `always()`: a failed smoke must still leave the URL on the PR — that is
+      # exactly when someone needs to go and look at it.
       - name: Comment preview URL on PR
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request' && steps.deploy.outputs.url != ''
         uses: actions/github-script@v7
         env:
           DEPLOY_URL: ${{ steps.deploy.outputs.url }}

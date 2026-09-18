@@ -4,5 +4,8 @@
     "lib": ["ES2022"],
     "types": ["node"]
   },
-  "include": ["api", "test"]
+  // `scripts` is included so the bundle entry (which injects the card fonts) is
+  // typechecked like everything else — it imports real `@mpg/server` symbols and
+  // must break loudly if they change. scripts/woff2.d.ts declares the font imports.
+  "include": ["api", "test", "scripts"]
 }

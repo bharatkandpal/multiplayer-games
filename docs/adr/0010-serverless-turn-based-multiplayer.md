@@ -38,12 +38,26 @@ their siblings — consists of games where a player makes one discrete move and 
 The continuous, low-latency, frame-accurate transport we're paying for is being used to
 carry roughly one message per player per several seconds.
 
-**2. Everything else already deploys without a container.** ADR 0009 and MPG-086 moved
-production HTTP to Vercel functions against Neon; `apps/api` now serves sessions,
+**2. Everything else is architected to deploy without a container.** ADR 0009 and MPG-086
+moved production HTTP to Vercel functions against Neon; `apps/api` owns sessions,
 leaderboard, results, share, events and card images. The container's remaining exclusive
 job is rooms + sockets. Shipping and paying for a persistent process to serve that one
 feature is a large fixed cost for the least-used surface, and it puts PvP on a different
 availability footing than the rest of the product.
+
+> **Correction (2026-09-18).** This paragraph originally read "already deploys without a
+> container" — stated in the present tense, and false. At the time of writing, **no
+> deployed function had ever executed a line of our code**: both `apps/api` and the
+> `apps/web` unfurl shim 500'd on every invocation with `ERR_MODULE_NOT_FOUND`, because
+> Vercel transpiles a function's entry file without rewriting its imports and our packages
+> export raw `.ts`. Deploys were green throughout, since `vercel build` + `vercel deploy`
+> never invoke anything. Fixed by pre-bundling the handlers (MPG-148), with a post-deploy
+> smoke request now gating the workflow.
+>
+> The argument below is unaffected — it rests on the _architecture_ of the serverless half,
+> which was sound, not on its deployment having worked. But the distinction matters enough
+> to record: this ADR was drafted on an assumption nobody had tested, and "CI is green" was
+> what made it feel safe to assume.
 
 **What is already in our favour.** The transport seam we would need was built deliberately
 and has held. `RoomManager.ts:5`:

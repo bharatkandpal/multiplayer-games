@@ -23,7 +23,11 @@
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-import { buildUnfurlMeta, injectUnfurlMeta, parseShareRecord } from "../src/unfurl/meta";
+// From the PRE-BUNDLED build output, not `../src/unfurl/meta` directly: Vercel
+// transpiles this entry but leaves its import specifiers alone, so a TypeScript
+// (and extensionless) path here deploys a function that cannot boot. It did,
+// silently, from MPG-086 until 2026-09-18. See scripts/bundle-api.mjs.
+import { buildUnfurlMeta, injectUnfurlMeta, parseShareRecord } from "./_bundle/meta.js";
 
 /** Max ms we'll wait on the backend resolve before degrading to the plain shell. */
 const RESOLVE_TIMEOUT_MS = 2500;
