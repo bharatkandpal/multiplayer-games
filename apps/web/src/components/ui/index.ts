@@ -43,7 +43,18 @@ export type {
 export { RulesSheet } from "./RulesSheet";
 export type { RulesSheetProps } from "./RulesSheet";
 
-export { BackArrowIcon, GearIcon, HelpIcon, HomeIcon, ShuffleIcon } from "./icons";
+export { ThemeSwitch } from "./ThemeSwitch";
+export type { ThemeSwitchProps } from "./ThemeSwitch";
+
+export {
+  BackArrowIcon,
+  GearIcon,
+  HelpIcon,
+  HomeIcon,
+  MoonIcon,
+  ShuffleIcon,
+  SunIcon,
+} from "./icons";
 export type { IconProps } from "./icons";
 
 export { UsernameBadge } from "./UsernameBadge";

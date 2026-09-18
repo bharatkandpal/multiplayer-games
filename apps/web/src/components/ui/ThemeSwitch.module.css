@@ -1,0 +1,95 @@
+/* Two-state theme switch (MPG-144). The visible track is 52x28, deliberately
+   smaller than a finger: the 44px hit area comes from the button's padding, so
+   the control reads as chrome rather than as a second primary button. */
+
+.switch {
+  /* Fixed chrome above the scrolling screen: it must not absorb slack or be
+     squeezed by a tall screen below it. */
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--size-touch-target);
+  min-width: var(--size-touch-target);
+  padding: var(--space-2);
+  border: none;
+  background: none;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.switch:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.track {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: 3.25rem; /* 52px */
+  height: 1.75rem; /* 28px */
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background-color: var(--color-bg-subtle);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.switch:hover .track {
+  background-color: var(--color-bg-inset);
+}
+
+/* The knob is the state. It slides between the two icon slots rather than
+   changing colour, so the switch is still readable in grayscale and for a
+   player who can't tell the two tints apart (UX_PRINCIPLES §4). */
+.knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  box-sizing: border-box;
+  width: 1.375rem; /* 22px */
+  height: 1.375rem;
+  /* The outline, not the fill, is what makes the knob a knob: in dark
+     `--color-surface-raised` and the track's `--color-bg-subtle` are close
+     enough that a fill alone would leave the position unreadable — which is
+     the one thing this control cannot afford, since position IS the state. */
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface-raised);
+  box-shadow: var(--shadow-sm);
+  /* Zeroed by the reduced-motion block in tokens.css — the knob then jumps
+     straight to its new end, which is the whole point of the control. */
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.switch[aria-checked="true"] .knob {
+  transform: translateX(1.5rem); /* 24px — 50px of track less two 22px slots and 2px of end gap */
+}
+
+/* Both icons are always on screen; the knob picks one out. Slots are sized and
+   placed exactly like the knob so the glyph sits dead centre on it. */
+.slot {
+  position: absolute;
+  top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  font-size: var(--font-size-200); /* 14px — icons are 1em */
+  color: var(--color-text-muted);
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.sun {
+  left: 2px;
+}
+
+.moon {
+  left: 1.625rem; /* 26px */
+}
+
+.slotActive {
+  color: var(--color-text);
+}

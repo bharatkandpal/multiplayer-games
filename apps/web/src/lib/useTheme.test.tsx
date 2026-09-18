@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { useTheme } from "./useTheme";
 
 function ThemeProbe(): React.JSX.Element {
-  const { theme, resolvedTheme, setTheme, cycleTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   return (
     <div>
       <p data-testid="theme">{theme}</p>
@@ -12,7 +12,6 @@ function ThemeProbe(): React.JSX.Element {
       <button onClick={() => setTheme("dark")}>Set dark</button>
       <button onClick={() => setTheme("light")}>Set light</button>
       <button onClick={() => setTheme("system")}>Set system</button>
-      <button onClick={cycleTheme}>Cycle</button>
     </div>
   );
 }
@@ -81,21 +80,16 @@ describe("useTheme", () => {
     expect(window.localStorage.getItem("mpg.theme")).toBe("dark");
   });
 
-  it("cycles light -> dark -> system -> light", async () => {
+  it("keeps 'system' settable — it stays the stored default even though the switch never writes it", async () => {
     const user = userEvent.setup();
     render(<ThemeProbe />);
 
-    await user.click(screen.getByRole("button", { name: "Set light" }));
-    expect(screen.getByTestId("theme")).toHaveTextContent("light");
+    await user.click(screen.getByRole("button", { name: "Set dark" }));
+    await user.click(screen.getByRole("button", { name: "Set system" }));
 
-    await user.click(screen.getByRole("button", { name: "Cycle" }));
-    expect(screen.getByTestId("theme")).toHaveTextContent("dark");
-
-    await user.click(screen.getByRole("button", { name: "Cycle" }));
     expect(screen.getByTestId("theme")).toHaveTextContent("system");
-
-    await user.click(screen.getByRole("button", { name: "Cycle" }));
-    expect(screen.getByTestId("theme")).toHaveTextContent("light");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("system");
+    expect(window.localStorage.getItem("mpg.theme")).toBe("system");
   });
 
   it("re-resolves 'system' when the OS preference changes while mounted", () => {

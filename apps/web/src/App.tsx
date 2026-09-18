@@ -10,7 +10,7 @@ import {
 import type { GameId, RealtimeGameId } from "@mpg/engine";
 import { useTheme } from "./lib/useTheme";
 import { UiGallery } from "./components/UiGallery";
-import { Button, ClaimHandlePrompt, UsernamePrompt } from "./components/ui";
+import { Button, ClaimHandlePrompt, ThemeSwitch, UsernamePrompt } from "./components/ui";
 import { cx } from "./components/ui/cx";
 import {
   ConnectFourOnlineRoute,
@@ -128,22 +128,45 @@ function parseRoomPath(pathname: string): { gameId: GameId; roomId: string } | u
 }
 
 /**
+ * Reads a `?challenge=<score>` rider off a deep link (MPG-087). This is how a
+ * shared score travels when no durable `/s/:token` could be minted: the score
+ * itself rides in the URL (see `buildShareUrl`), needing no backend to resolve.
+ * Only a real, non-negative number counts — anything else (missing, blank, NaN,
+ * negative) is ignored, so a malformed link degrades to just opening the game.
+ */
+function parseChallengeScore(search: string): number | undefined {
+  const raw = new URLSearchParams(search).get("challenge");
+  if (raw === null || raw.trim() === "") return undefined;
+  const score = Number(raw);
+  return Number.isFinite(score) && score >= 0 ? score : undefined;
+}
+
+/**
  * Parses a bare `/:gameId` deep link into the route that OPENS that game
  * (MPG-087). This is the destination the shared score link points at when no
  * durable `/s/:token` could be minted (the offline / backend-down fallback in
  * `buildShareUrl`): "here's the game" has to actually land IN the game, not on
  * Home. It needs no session and no network — a real-time game goes straight to
- * its solo play surface; a turn-based game opens quick-started against the bot,
- * exactly as tapping it on Home would. Returns `undefined` for anything that
- * isn't a registered game id, so unknown single-segment paths still fall to Home.
+ * its solo play surface (with the shared score as a "Beat this score" target
+ * when the link carries one); a turn-based game opens quick-started against the
+ * bot, exactly as tapping it on Home would. Returns `undefined` for anything
+ * that isn't a registered game id, so unknown single-segment paths fall to Home.
  */
-function parseGameSlug(pathname: string): Route | undefined {
+function parseGameSlug(pathname: string, search = ""): Route | undefined {
   const match = GAME_SLUG_RE.exec(pathname);
   const slug = match?.[1];
   if (!slug) return undefined;
   const gameId = decodeURIComponent(slug);
   if (hasRealtimeGame(gameId as RealtimeGameId)) {
-    return { screen: "realtime", gameId: gameId as RealtimeGameId };
+    // Only real-time games are scored, so only they carry a challenge target —
+    // and only when the link actually has one, so an ordinary `/floppy-birds`
+    // still opens a plain run.
+    const challengeScore = parseChallengeScore(search);
+    return {
+      screen: "realtime",
+      gameId: gameId as RealtimeGameId,
+      ...(challengeScore !== undefined ? { challenge: { score: challengeScore } } : {}),
+    };
   }
   if (hasGame(gameId as GameId)) {
     const playerCount = GAME_CATALOG[gameId as GameId]?.playerCount ?? 2;
@@ -172,7 +195,7 @@ function initialRoute(): Route {
     // A bare `/:gameId` deep link — the fallback a shared score link uses when
     // no durable `/s/:token` exists. Open the game directly (and count the
     // cold arrival, same as a share link: a stranger can land here too).
-    const slugRoute = parseGameSlug(window.location.pathname);
+    const slugRoute = parseGameSlug(window.location.pathname, window.location.search);
     if (slugRoute) {
       markColdArrival();
       return slugRoute;
@@ -206,12 +229,6 @@ function buildInviteUrl(gameId: GameId, roomId: string): string {
   if (typeof window === "undefined") return path;
   return `${window.location.origin}${path}`;
 }
-
-const THEME_LABEL: Record<ReturnType<typeof useTheme>["theme"], string> = {
-  light: "Light",
-  dark: "Dark",
-  system: "System",
-};
 
 const GAME_ROUTES: Partial<Record<GameId, (props: GameRouteProps) => React.JSX.Element>> = {
   tictactoe: TicTacToeRoute,
@@ -294,7 +311,7 @@ const LEADERBOARD_METRIC: Partial<Record<GameId, "wld" | "score">> = {
 export default function App(): React.JSX.Element {
   const games = useMemo(() => listGames(), []);
   const realtimeGames = useMemo(() => listRealtimeGames(), []);
-  const { theme, resolvedTheme, cycleTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const [route, setRoute] = useState<Route>(initialRoute);
   // MPG-050: `useLocalPlayController` only (re-)initializes its session on
   // mount, so starting a genuinely fresh game (different opponents, not a
@@ -461,7 +478,9 @@ export default function App(): React.JSX.Element {
       }
       // Keep bare `/:gameId` deep links working under back/forward too, not just
       // on a cold load (mirrors `initialRoute`).
-      setRoute(parseGameSlug(window.location.pathname) ?? { screen: "home" });
+      setRoute(
+        parseGameSlug(window.location.pathname, window.location.search) ?? { screen: "home" },
+      );
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -485,20 +504,14 @@ export default function App(): React.JSX.Element {
 
   return (
     <main className={styles.main}>
-      {/* MPG-137: the theme toggle is site chrome, and costs ~76px of a 568px
-          budget. In-game that is board height, and the top bar is spoken for
-          (Home + title + Rules, UX_PRINCIPLES §9) — so it's offered on every
-          page screen and withheld from the frame, exactly like the footer
-          credit below. */}
+      {/* MPG-137: the theme switch is site chrome. In-game its height is board
+          height, and the top bar is spoken for (Home + title + Rules,
+          UX_PRINCIPLES §9) — so it's offered on every page screen and withheld
+          from the frame, exactly like the footer credit below. */}
       {inGame ? null : (
-        <button
-          type="button"
-          className={styles.themeToggle}
-          onClick={cycleTheme}
-          aria-label={`Theme: ${THEME_LABEL[theme]}. Activate to switch theme.`}
-        >
-          Theme: {THEME_LABEL[theme]} ({resolvedTheme})
-        </button>
+        <div className={styles.chromeBar}>
+          <ThemeSwitch dark={resolvedTheme === "dark"} onChange={(next) => setTheme(next)} />
+        </div>
       )}
 
       {/* MPG-137: the one scrolling region. A page screen scrolls in here; an
