@@ -189,8 +189,14 @@
 }
 
 /* Winning line (MPG-035): success ring + glow on the 4 winning discs. The discs
-   keep their solid/striped fill so the win reads without relying on color. */
+   keep their solid/striped fill so the win reads without relying on color.
+   `z-index` lifts the four winning discs above the terminal-state overlays
+   (the win flash, and especially the loss vignette in GamePlayScreen, z-index 2)
+   so the winning line always punches through the gloom — a line that reaches the
+   board edges is no longer buried where the vignette is darkest. */
 .winning {
+  position: relative;
+  z-index: 3;
   box-shadow:
     0 0 0 var(--board-ring-width) var(--color-success),
     0 0 10px 2px var(--color-success);
@@ -218,8 +224,11 @@
 /* Loss variant (MPG-046): same ring/glow shape, red/danger hue — used when
    the sole local human loses, so the board itself carries the outcome
    (never color-only: the discs keep their solid/striped fill, and the ring
-   shape is identical to `.winning`, just the hue changes). */
+   shape is identical to `.winning`, just the hue changes). Same `z-index` lift
+   as `.winning` so the red line stays legible above the loss vignette. */
 .winningLoss {
+  position: relative;
+  z-index: 3;
   box-shadow:
     0 0 0 var(--board-ring-width) var(--color-danger),
     0 0 10px 2px var(--color-danger);
