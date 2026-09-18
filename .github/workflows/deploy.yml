@@ -70,10 +70,15 @@ jobs:
             # documented degrade-to-shell path, so 200 is the correct answer —
             # and it proves the function BOOTED, which is the point.
             smoke_path: /s/deploysmoketoken
+            # A string the real response must contain. Status alone is NOT
+            # enough — see the step's header.
+            smoke_expect: '<div id="root">'
           - app: api
             project_id_secret: VERCEL_API_PROJECT_ID
             # Read-only, no session required, empty result is fine. A 200 here
             # means the function booted AND reached Neon.
+            # `[` pins it to a JSON array — the leaderboard's real shape.
+            smoke_expect: "["
             smoke_path: /api/leaderboard?gameId=connect-four
     env:
       # Selects which Vercel project this matrix leg targets. `vercel pull`
@@ -146,18 +151,32 @@ jobs:
       # Protection puts them behind SSO, so without a bypass secret we cannot
       # reach them — and we do NOT disable protection, because previews talk to
       # the real dev database (MPG-139).
+      #
+      # TWO RULES LEARNED THE HARD WAY, both on this step's first ever run:
+      #
+      #  1. DO NOT FOLLOW REDIRECTS. A protected deployment answers 302 to
+      #     vercel.com/sso-api, which serves its login page as a cheerful 200.
+      #     With `--location` this step reported "Smoke passed (200)" against
+      #     Vercel's own login HTML — a false green, in the very step written to
+      #     stop false greens.
+      #  2. STATUS IS NOT ENOUGH. Each leg declares `smoke_expect`, a string the
+      #     body must actually contain, so "some 200 came back" cannot pass for
+      #     "our function answered".
       - name: Smoke-test the deployment
         env:
           DEPLOY_URL: ${{ steps.deploy.outputs.url }}
           SMOKE_PATH: ${{ matrix.smoke_path }}
+          SMOKE_EXPECT: ${{ matrix.smoke_expect }}
           BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           IS_PRODUCTION: ${{ github.event_name == 'push' }}
         run: |
           set -uo pipefail
           url="${DEPLOY_URL}${SMOKE_PATH}"
           echo "Smoke: GET $url"
+          echo "Expecting HTTP 200 whose body contains: $SMOKE_EXPECT"
 
-          args=(--silent --show-error --max-time 30 --location
+          # No --location, deliberately. See rule 1 above.
+          args=(--silent --show-error --max-time 30
                 --output /tmp/smoke-body --write-out '%{http_code}')
           if [ -n "$BYPASS" ]; then
             args+=(--header "x-vercel-protection-bypass: $BYPASS")
@@ -169,19 +188,24 @@ jobs:
           head -c 400 /tmp/smoke-body || true
           echo
 
-          if [ "$code" = "200" ]; then
-            echo "::notice::Smoke passed for ${{ matrix.app }} ($code)"
+          if [ "$code" = "200" ] && grep -qF -- "$SMOKE_EXPECT" /tmp/smoke-body; then
+            echo "::notice::Smoke passed for ${{ matrix.app }} — 200 and the body looks like ours."
             exit 0
           fi
 
           # A protected preview we have no key for: unreachable, not broken.
+          # 3xx is the usual shape (redirect to SSO), 401/403 if it answers directly.
           if [ "$IS_PRODUCTION" != "true" ] && [ -z "$BYPASS" ] \
-             && { [ "$code" = "401" ] || [ "$code" = "403" ] || [ "$code" = "404" ]; }; then
-            echo "::warning::Preview for ${{ matrix.app }} is behind Deployment Protection and no VERCEL_AUTOMATION_BYPASS_SECRET is set — smoke skipped, NOT passed. See MPG-139."
+             && { [ "${code#3}" != "$code" ] || [ "$code" = "401" ] || [ "$code" = "403" ]; }; then
+            echo "::warning::Preview for ${{ matrix.app }} is behind Deployment Protection ($code) and no VERCEL_AUTOMATION_BYPASS_SECRET is set — smoke SKIPPED, not passed. This deploy is unverified. See MPG-139."
             exit 0
           fi
 
-          echo "::error::Smoke FAILED for ${{ matrix.app }}: GET $SMOKE_PATH returned $code (expected 200). The deploy succeeded but the function does not work."
+          if [ "$code" = "200" ]; then
+            echo "::error::Smoke FAILED for ${{ matrix.app }}: got 200 but the body does not contain '$SMOKE_EXPECT' — something answered, but not our function."
+          else
+            echo "::error::Smoke FAILED for ${{ matrix.app }}: GET $SMOKE_PATH returned $code (expected 200). The deploy succeeded but the function does not work."
+          fi
           exit 1
 
       # `always()`: a failed smoke must still leave the URL on the PR — that is
