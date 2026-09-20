@@ -36,12 +36,25 @@ const FIELD_X = (RES - (PAD * 2 + PAD_GAP)) / 2;
 /** One glyph per pad — the non-colour channel that makes the sequence readable. */
 const GLYPHS = ["▲", "●", "■", "◆"] as const;
 
+/**
+ * A distinct hue per pad (MPG-141 follow-up). Simon's whole visual language is
+ * "four differently-coloured pads", so each pad now owns a colour rather than
+ * sharing one accent — `dim` is its resting fill, `lit` its flash, and `glyph`
+ * the glyph colour ON the lit fill (chosen dark or light per hue for contrast).
+ * Colour is still never the ONLY channel: the glyphs and the lit pad's grow +
+ * ring carry the same information for a colour-blind player (see `draw`).
+ */
+const PAD_COLORS = [
+  { dim: "#14432c", lit: "#2ee06a", glyph: "#04210f" }, // ▲ green (top-left)
+  { dim: "#4a1530", lit: "#ff4d7d", glyph: "#2a0512" }, // ● rose  (top-right)
+  { dim: "#13284d", lit: "#3d8bff", glyph: "#041025" }, // ■ blue  (bottom-left)
+  { dim: "#4a3a10", lit: "#ffc21f", glyph: "#241a02" }, // ◆ amber (bottom-right)
+] as const;
+
 interface Palette {
   bg: string;
-  padDim: string;
-  padLit: string;
   glyph: string;
-  glyphLit: string;
+  ring: string;
   clock: string;
   clockLow: string;
   clockTrack: string;
@@ -54,10 +67,10 @@ function readPalette(el: HTMLElement): Palette {
     cs.getPropertyValue(name).trim() || fallback;
   return {
     bg: v("--color-bg", "#05070f"),
-    padDim: v("--color-bg-inset", "#0b1020"),
-    padLit: v("--color-accent", "#7c9cff"),
+    // Glyph colour on a DIM (resting) pad — muted so the coloured pad reads first.
     glyph: v("--color-text-muted", "#8b93a7"),
-    glyphLit: v("--color-on-accent", "#ffffff"),
+    // The bright ring drawn around a lit pad, on top of its own colour.
+    ring: v("--color-on-accent", "#ffffff"),
     clock: v("--color-accent", "#7c9cff"),
     clockLow: v("--color-danger", "#ff5c5c"),
     clockTrack: v("--color-bg-inset", "#0b1020"),
@@ -121,20 +134,23 @@ function draw(ctx: CanvasRenderingContext2D, state: MemorySequenceState, palette
     const row = Math.floor(i / 2);
     const x = FIELD_X + col * (PAD + PAD_GAP);
     const y = FIELD_TOP + row * (PAD + PAD_GAP);
+    const pad = PAD_COLORS[i] ?? PAD_COLORS[0];
     // A lit pad also GROWS — a size change reads at a glance and survives any
     // colour-vision difference.
     const grow = isLit ? PAD * 0.035 : 0;
 
-    ctx.fillStyle = isLit ? palette.padLit : palette.padDim;
+    ctx.fillStyle = isLit ? pad.lit : pad.dim;
     roundRect(ctx, x - grow, y - grow, PAD + grow * 2, PAD + grow * 2, PAD * 0.16);
     ctx.fill();
     if (isLit) {
-      ctx.strokeStyle = palette.glyphLit;
+      ctx.strokeStyle = palette.ring;
       ctx.lineWidth = RES * 0.008;
       ctx.stroke();
     }
 
-    ctx.fillStyle = isLit ? palette.glyphLit : palette.glyph;
+    // On the bright lit fill, the glyph takes the pad's own dark ink; on the
+    // resting fill it stays muted so the colour is what reads first.
+    ctx.fillStyle = isLit ? pad.glyph : palette.glyph;
     ctx.font = `700 ${PAD * (isLit ? 0.46 : 0.4)}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";

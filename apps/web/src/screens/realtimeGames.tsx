@@ -221,12 +221,13 @@ const game2048Controls: RealtimeControls<Game2048Input, SwipeDir> = {
   ],
 };
 
-// Memory Sequence's four pads ARE the four actions. The on-screen `touchActions`
-// carry the same glyphs the scene draws on each pad, so the button and the pad it
-// presses are recognisably the same thing — and they give the game a full
-// keyboard/pointer path without a bespoke input source. 1-4 and the arrow keys
-// both map in, because "which arrow is the bottom-right pad?" is a question with
-// no good answer and the number row has an obvious one.
+// Memory Sequence's four pads ARE the four actions — and, laid out 2×2, they are
+// literally the four quadrants of the play surface. So a tap is resolved by WHERE
+// it lands (`resolveTapAction`) rather than always meaning "pad 0", and there are
+// no on-screen buttons: the board itself is the control, exactly as the pads you
+// watch flash are the pads you press back. The quadrant order matches the scene's
+// layout (col = i % 2, row = ⌊i / 2⌋): pad0 top-left, pad1 top-right, pad2
+// bottom-left, pad3 bottom-right. 1-4 and the arrow keys keep a keyboard path.
 type MemoryPadAction = "pad0" | "pad1" | "pad2" | "pad3";
 const MEMORY_PADS: readonly MemoryPadAction[] = ["pad0", "pad1", "pad2", "pad3"];
 const memoryControls: RealtimeControls<MemorySequenceInput, MemoryPadAction> = {
@@ -245,15 +246,17 @@ const memoryControls: RealtimeControls<MemorySequenceInput, MemoryPadAction> = {
     const hit = MEMORY_PADS.findIndex((action) => pressed.has(action));
     return { pad: hit === -1 ? null : (hit as PadIndex) };
   },
-  actionHint: "Tap the pads (or press 1-4) to repeat the sequence",
+  // Which quadrant the tap fell in → that pad. The 0.5/0.5 split mirrors the
+  // scene's 2×2 grid and is robust to any letterboxing (the canvas stays
+  // centred), the same assumption the left/right tap games already rely on.
+  resolveTapAction: (fractionX, fractionY): MemoryPadAction => {
+    const col = fractionX < 0.5 ? 0 : 1;
+    const row = fractionY < 0.5 ? 0 : 1;
+    return MEMORY_PADS[row * 2 + col] ?? "pad0";
+  },
+  actionHint: "Tap the pads on the board (or press 1-4) to repeat the sequence",
   readyExplainer:
     "Watch the pads flash, then tap them back in the same order. Each round adds one more. A wrong pad ends the run — and so does taking too long on your turn.",
-  touchActions: [
-    { action: "pad0", label: "▲" },
-    { action: "pad1", label: "●" },
-    { action: "pad2", label: "■" },
-    { action: "pad3", label: "◆" },
-  ],
 };
 
 // Lumberjack's chop is a single committed action per side — the same left/right

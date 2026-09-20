@@ -57,14 +57,15 @@ export interface RealtimeControls<I, A extends string = string> {
    */
   readonly touchActions?: readonly TouchAction<A>[];
   /**
-   * For a play surface split into tap zones (e.g. left half / right half),
-   * resolves a plain tap's horizontal position — as a fraction of the surface
-   * width, `0` (left edge) to `1` (right edge) — to the action it triggers.
-   * Takes priority over `primaryAction` for plain taps on the surface; keyboard
-   * input is unaffected (driven entirely by `keyMap`). Omit for a game where
-   * every tap on the surface means the same thing.
+   * For a play surface split into tap zones, resolves a plain tap's position —
+   * `fractionX`/`fractionY` are fractions of the surface, `0` (left/top edge) to
+   * `1` (right/bottom edge) — to the action it triggers. A left/right split reads
+   * only `fractionX` (Drunk Walk, Lumberjack); a 2×2 grid reads both (Memory
+   * Sequence, whose four pads ARE the four quadrants). Takes priority over
+   * `primaryAction` for plain taps on the surface; keyboard input is unaffected
+   * (driven entirely by `keyMap`). Omit for a game where every tap means the same.
    */
-  readonly resolveTapAction?: (fractionX: number) => A;
+  readonly resolveTapAction?: (fractionX: number, fractionY: number) => A;
   /**
    * For a drag/swipe-controlled game (e.g. 2048): resolves a completed pointer
    * drag on the play surface — `dx`/`dy` in pixels, end minus start — to the
@@ -208,11 +209,12 @@ export function createActionInputSource<I, A extends string = string>(
     // A tap that fell short of a swipe (or a swipe-less game): the pre-existing
     // resolution order — tap-zone first, else the single primary action.
     const pressAsTap = useCallback(
-      (clientX: number): void => {
+      (clientX: number, clientY: number): void => {
         if (controls.resolveTapAction) {
           const rect = surfaceRef.current?.getBoundingClientRect();
           const fractionX = rect && rect.width > 0 ? (clientX - rect.left) / rect.width : 0.5;
-          press(controls.resolveTapAction(fractionX));
+          const fractionY = rect && rect.height > 0 ? (clientY - rect.top) / rect.height : 0.5;
+          press(controls.resolveTapAction(fractionX, fractionY));
           return;
         }
         press(controls.primaryAction);
@@ -253,7 +255,7 @@ export function createActionInputSource<I, A extends string = string>(
             }
             // Too short (or an ignored direction) to be a swipe — treat the
             // release point as a plain tap.
-            pressAsTap(endX);
+            pressAsTap(endX, endY);
           };
           const onPointerUp = (ev: PointerEvent): void => finish(ev.clientX, ev.clientY);
           const onPointerCancel = (): void => {
@@ -266,7 +268,7 @@ export function createActionInputSource<I, A extends string = string>(
           return;
         }
 
-        pressAsTap(e.clientX);
+        pressAsTap(e.clientX, e.clientY);
       },
       [press, pressAsTap],
     );

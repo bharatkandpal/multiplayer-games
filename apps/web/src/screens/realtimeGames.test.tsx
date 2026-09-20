@@ -99,8 +99,9 @@ describe("REALTIME_GAMES wiring map", () => {
     // Left/right tap-zone resolution, not a single fixed primary action.
     expect(typeof wiring!.controls!.resolveTapAction).toBe("function");
     const resolve = wiring!.controls!.resolveTapAction!;
-    expect(resolve(0.1)).toBe("left");
-    expect(resolve(0.9)).toBe("right");
+    // A left/right game ignores the vertical fraction — any Y resolves the same.
+    expect(resolve(0.1, 0.5)).toBe("left");
+    expect(resolve(0.9, 0.5)).toBe("right");
     // Keyboard parity: arrows AND A/D map to the same left/right actions.
     expect(wiring!.controls!.keyMap.ArrowLeft).toBe("left");
     expect(wiring!.controls!.keyMap.KeyA).toBe("left");
@@ -119,15 +120,21 @@ describe("REALTIME_GAMES wiring map", () => {
     expect(wiring!.makeInputSource().id).toBe("pointer-axis");
   });
 
-  it("resolves 'memory-sequence' to the real engine module + four labelled pads", () => {
+  it("resolves 'memory-sequence' to the real engine module + four quadrant tap-zones", () => {
     const wiring = REALTIME_GAMES["memory-sequence"];
     expect(wiring).toBeDefined();
     expect(wiring!.module).toBe(memorySequence);
     expect(wiring!.makeInputSource().id).toBe("actions");
 
-    // The on-screen buttons carry the same glyphs the scene draws on the pads —
-    // the button and the pad it presses have to be recognisably one thing.
-    expect(wiring!.controls!.touchActions?.map((a) => a.label)).toEqual(["▲", "●", "■", "◆"]);
+    // No on-screen buttons: the board itself is the control. A tap resolves by
+    // the quadrant it lands in, matching the scene's 2×2 layout — pad0 top-left,
+    // pad1 top-right, pad2 bottom-left, pad3 bottom-right.
+    expect(wiring!.controls!.touchActions).toBeUndefined();
+    const resolve = wiring!.controls!.resolveTapAction!;
+    expect(resolve(0.25, 0.25)).toBe("pad0");
+    expect(resolve(0.75, 0.25)).toBe("pad1");
+    expect(resolve(0.25, 0.75)).toBe("pad2");
+    expect(resolve(0.75, 0.75)).toBe("pad3");
     // Number-row parity, because "which arrow is the bottom-right pad?" has no
     // good answer and "which key is pad 3?" has an obvious one.
     expect(wiring!.controls!.keyMap.Digit1).toBe("pad0");
@@ -153,8 +160,8 @@ describe("REALTIME_GAMES wiring map", () => {
 
     // The two halves of the surface are the two choices, like Drunk Walk.
     const resolve = wiring!.controls!.resolveTapAction!;
-    expect(resolve(0.1)).toBe("left");
-    expect(resolve(0.9)).toBe("right");
+    expect(resolve(0.1, 0.5)).toBe("left");
+    expect(resolve(0.9, 0.5)).toBe("right");
     expect(wiring!.controls!.keyMap.ArrowLeft).toBe("left");
     expect(wiring!.controls!.keyMap.KeyD).toBe("right");
     // The timer is a way to lose, so it is named before the run, not after it.
