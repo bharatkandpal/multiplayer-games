@@ -1,5 +1,10 @@
 pnpm-lock.yaml
 **/dist/**
+# Generated function bundle (apps/api/scripts/bundle.mjs output). Gitignored, so
+# CI never sees it, but a local `vercel build` leaves it behind and it is not
+# ours to format. ESLint ignores it for the same reason.
+**/api/_bundle/*.js
+**/api/_bundle/*.js.map
 **/coverage/**
 **/node_modules/**
 playwright-report/

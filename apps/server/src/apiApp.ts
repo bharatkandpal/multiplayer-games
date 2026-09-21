@@ -28,7 +28,7 @@ import { createCardRouter } from "./cards/cardRoutes.js";
 // Re-exported so a bundled deployment can inject the card fonts it embedded at
 // build time without reaching past this module's public surface — see
 // `cards/raster.ts` and `apps/api/scripts/bundle.mjs`.
-export { setFontBuffers } from "./cards/raster.js";
+export { setCardFontBuffers } from "./cards/raster.js";
 
 import { JSON_BODY_LIMIT } from "./config.js";
 import { createIdentityRouter } from "./identity/identityRoutes.js";

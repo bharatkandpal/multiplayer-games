@@ -12,18 +12,27 @@ there is no forked handler logic here.
 | rooms (`/api/rooms`) + Socket.IO realtime                                   | `@mpg/server` container            | need a long-running process holding the `RoomManager` and live sockets |
 
 `GET /api/cards/:token.png` is the unfurl image (ADR 0009's `og:image` target). It
-rasterises the share card with `@resvg/resvg-js` and a Nunito face
-(`@fontsource/nunito`) — serverless has no system fonts, so the font must ship.
-Vercel installs the linux resvg binary and traces it correctly; the **woff2 files
-it does not trace**, because `cards/raster.ts` reaches them through
-`require.resolve`, a runtime call on a string that no static analyser can follow.
-`functions.includeFiles` does not rescue them either (tried, verified against a
-local `vercel build`: zero woff2 in the `.func` output).
+rasterises the share card with `@resvg/resvg-js` and a Nunito face — serverless
+has no system fonts, so the font must ship. Vercel installs the linux resvg
+binary and traces it correctly; the **font files it does not trace**, because
+`cards/raster.ts` reaches them through a runtime path resolution that no static
+analyser can follow. `functions.includeFiles` does not rescue them either (tried,
+verified against a local `vercel build`: zero font files in the `.func` output).
 
 So the bytes are embedded in the JavaScript instead — `scripts/serverlessEntry.ts`
 imports the two faces through esbuild's `binary` loader and injects them via
-`setFontBuffers`, which removes file resolution from the card path entirely. ~32KB
-of base64, in exchange for a route that cannot fail on file layout.
+`setCardFontBuffers`, which writes them to `/tmp` once per cold start and hands
+resvg the paths. ~105KB of base64, in exchange for a route that cannot fail on
+file layout.
+
+**The faces are uncompressed TTF, and that is load-bearing.** resvg 2.6.2 reads
+fonts only from disk and only as TTF/OTF: it cannot decompress woff2, and it has
+no option to accept a font as a buffer. This package shipped woff2 into a
+`fontBuffers` key that does not exist for a month, and every card rendered blank
+behind a valid 200 PNG the whole time. `apps/server/src/cards/fonts/` holds the
+decompressed subsets and explains how to regenerate them; the regression is
+pinned by `apps/server/src/cards/__tests__/raster.test.ts`, which counts ink
+pixels because status codes cannot see this class of failure.
 
 Both deployments talk to the **same Neon database** — that is by design: the
 socket move-handler on the container persists results to the same store the

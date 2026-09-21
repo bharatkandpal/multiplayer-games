@@ -69,6 +69,12 @@ jobs:
             # Exercises the unfurl function (ADR 0009). A junk token is the
             # documented degrade-to-shell path, so 200 is the correct answer —
             # and it proves the function BOOTED, which is the point.
+            #
+            # NOTE what this canNOT prove: the degraded shell is byte-identical
+            # to what a *misconfigured* shim returns, so this probe passes just
+            # as happily when the deployment has no API origin and no share link
+            # can ever unfurl. That was live for a month. The "Verify the web
+            # app is wired to the API" step below is the gate for that half.
             smoke_path: /s/deploysmoketoken
             # A string the real response must contain. Status alone is NOT
             # enough — see the step's header.
@@ -83,11 +89,19 @@ jobs:
             # missed the routing bug this path exists to catch: Vercel was
             # generating `^/api/([^/]+)$` for the catch-all, so anything with a
             # second slash never reached the function at all.
+            #
+            # `connect4` is the id the engine actually registers (packages/
+            # engine/src/connect4.ts). This probe said `connect-four` for its
+            # first month — not a real game. The leaderboard route does not
+            # validate the id, so it answered `{"entries":[]}` regardless and
+            # the probe still passed; it proved boot + Neon reach but would
+            # never have noticed the id was fiction. Keep it a real id so the
+            # empty result means "no scores yet", not "no such game".
             # Pinned to the payload's actual shape. A loose marker like "["
             # would match almost any HTML too, which is the whole failure mode
             # this field exists to prevent.
             smoke_expect: '{"entries"'
-            smoke_path: /api/leaderboard/connect-four
+            smoke_path: /api/leaderboard/connect4
     env:
       # Selects which Vercel project this matrix leg targets. `vercel pull`
       # reads it, so every later step in the leg is scoped to that project.
@@ -273,6 +287,134 @@ jobs:
             echo "::error::Smoke FAILED for ${{ matrix.app }}: GET $SMOKE_PATH returned $code (expected 200). The deploy succeeded but the function does not work."
           fi
           exit 1
+
+      # THE SECOND GATE THIS WORKFLOW WAS MISSING (found by hand, 2026-09-20).
+      #
+      # The `mpg` project had NO environment variables at all, which broke two
+      # things at once while every check above stayed green:
+      #
+      #   * `VITE_API_URL` unset at build time → the SPA's `apiFetch` falls back
+      #     to same-origin (apps/web/src/api/session.ts), so every call went to
+      #     `mpg-brown.vercel.app/api/*` and 404'd. Sessions, leaderboard,
+      #     history and share were silently absent in production. The offline
+      #     pillar means the games still played perfectly, which is precisely
+      #     why nobody noticed.
+      #   * `UNFURL_API_ORIGIN` unset at runtime → the shim cannot resolve a
+      #     token, so it serves the plain shell and NO share link has ever
+      #     unfurled.
+      #
+      # Both are invisible to a status check and to the shell smoke above, so
+      # this step asserts the two observable consequences instead:
+      #   1. the shipped JS bundle actually contains the API origin, and
+      #   2. a REAL share link, minted here against the API, comes back from
+      #      `/s/:token` carrying `og:title`.
+      #
+      # Needs the repo variable API_ORIGIN (Settings -> Secrets and variables ->
+      # Actions -> Variables) set to the API deployment's public origin, the
+      # same value the Vercel project's VITE_API_URL/UNFURL_API_ORIGIN carry.
+      # Without it the gate cannot know what to look for and warns instead of
+      # failing — it is off until someone sets the variable.
+      - name: Verify the web app is wired to the API
+        if: matrix.app == 'web' && steps.deploy.outputs.smoke_url != ''
+        env:
+          WEB_URL: ${{ steps.deploy.outputs.smoke_url }}
+          API_ORIGIN: ${{ vars.API_ORIGIN }}
+          BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          IS_PRODUCTION: ${{ github.event_name == 'push' }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "$API_ORIGIN" ]; then
+            echo "::warning::Repo variable API_ORIGIN is not set — cannot verify the web app is wired to the API. This deploy is unverified for the share/leaderboard surface. See this step's header."
+            exit 0
+          fi
+
+          curl_args=(--silent --show-error --max-time 30)
+          if [ -n "$BYPASS" ]; then
+            curl_args+=(--header "x-vercel-protection-bypass: $BYPASS")
+          fi
+
+          fail=0
+
+          # --- 1. Is VITE_API_URL compiled into the SPA? -----------------------
+          # The origin is interpolated into every request the client makes, so
+          # it appears verbatim in the bundle when it was set, and not at all
+          # when it was not.
+          echo "Checking the shipped bundle references $API_ORIGIN"
+          shell_html=$(curl "${curl_args[@]}" "$WEB_URL/")
+          bundle=$(printf '%s' "$shell_html" \
+                   | sed -n 's|.*<script[^>]*src="\([^"]*\.js\)".*|\1|p' | head -1)
+          if [ -z "$bundle" ]; then
+            echo "::error::Could not find the SPA's script tag in $WEB_URL/ — cannot verify the API origin."
+            fail=1
+          elif curl "${curl_args[@]}" "$WEB_URL$bundle" | grep -qF -- "$API_ORIGIN"; then
+            echo "  OK — the bundle targets $API_ORIGIN"
+          else
+            echo "::error::The deployed SPA bundle ($bundle) does not contain '$API_ORIGIN'. VITE_API_URL was not set at BUILD time, so the client is calling its own origin for /api/* and every network feature is silently absent. Set it on the Vercel project and redeploy (a rebuild is required — it is baked in at build time)."
+            fail=1
+          fi
+
+          # --- 2. Does a real share link actually unfurl? ----------------------
+          # Posts a genuine (replay-validated) Connect Four win, mints a result
+          # link for it, asks the web host to unfurl it, then revokes the link.
+          # A working shim injects og:* into the shell; a shim with no API origin
+          # returns the shell untouched.
+          #
+          # A `result` link rather than the cheaper `leaderboard` one on purpose:
+          # it is the only kind that carries an `og:image`, so it exercises the
+          # card URL this step asserts on. (The leaderboard kind used to 500 here
+          # too — `target_id` was a `uuid` column and a leaderboard link targets a
+          # game id — fixed by migration 0006.)
+          echo "Minting a share link against $API_ORIGIN"
+          session=$(curl --silent --show-error --max-time 30 "$API_ORIGIN/api/session" \
+                    | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          token=""
+          if [ -n "$session" ]; then
+            # slot 1 stacks column 0 four high while slot 2 stacks column 1.
+            result_id=$(curl --silent --show-error --max-time 30 -X POST "$API_ORIGIN/api/results" \
+                          --header "x-session-token: $session" \
+                          --header 'content-type: application/json' \
+                          --data "{\"runId\":\"deploy-smoke-$GITHUB_RUN_ID\",\"gameId\":\"connect4\",\"durationMs\":4200,\"seatsSnapshot\":[{\"slot\":1,\"kind\":\"human\"},{\"slot\":2,\"kind\":\"bot\",\"difficulty\":\"easy\"}],\"moveLog\":[{\"slot\":1,\"move\":{\"column\":0}},{\"slot\":2,\"move\":{\"column\":1}},{\"slot\":1,\"move\":{\"column\":0}},{\"slot\":2,\"move\":{\"column\":1}},{\"slot\":1,\"move\":{\"column\":0}},{\"slot\":2,\"move\":{\"column\":1}},{\"slot\":1,\"move\":{\"column\":0}}]}" \
+                        | sed -n 's/.*"resultId":"\([^"]*\)".*/\1/p')
+            if [ -n "$result_id" ]; then
+              token=$(curl --silent --show-error --max-time 30 -X POST "$API_ORIGIN/api/share" \
+                        --header "x-session-token: $session" \
+                        --header 'content-type: application/json' \
+                        --data "{\"kind\":\"result\",\"targetId\":\"$result_id\"}" \
+                      | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+            fi
+          fi
+
+          if [ -z "$token" ]; then
+            echo "::warning::Could not mint a share link against $API_ORIGIN — skipping the unfurl check. The API leg of this workflow covers whether the API itself is healthy."
+          else
+            echo "Unfurling $WEB_URL/s/$token"
+            body=$(curl "${curl_args[@]}" "$WEB_URL/s/$token")
+            # og:image too, not just og:title: it is the half that has to carry
+            # the API origin into the markup, so it is what proves the shim was
+            # configured rather than merely reachable.
+            if printf '%s' "$body" | grep -qF 'property="og:title"' \
+               && printf '%s' "$body" | grep -qF "property=\"og:image\" content=\"$API_ORIGIN"; then
+              echo "  OK — the shim resolved the token and injected og:* tags"
+            else
+              echo "::error::GET /s/<a REAL token> returned no og:title — the unfurl shim could not resolve it, so every shared link unfurls as a bare URL. Set UNFURL_API_ORIGIN on the Vercel project."
+              fail=1
+            fi
+            # Best-effort cleanup; a leftover link is harmless but untidy.
+            curl --silent --max-time 30 -X DELETE "$API_ORIGIN/api/share/$token" \
+              --header "x-session-token: $session" >/dev/null || true
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            # Previews behind Deployment Protection we have no key for cannot be
+            # read at all; do not report that as a wiring failure.
+            if [ "$IS_PRODUCTION" != "true" ] && [ -z "$BYPASS" ]; then
+              echo "::warning::Preview could not be verified (likely Deployment Protection with no bypass secret) — treating as unverified rather than broken."
+              exit 0
+            fi
+            exit 1
+          fi
+          echo "::notice::Web deployment is correctly wired to $API_ORIGIN."
 
       # `always()`: a failed smoke must still leave the URL on the PR — that is
       # exactly when someone needs to go and look at it.

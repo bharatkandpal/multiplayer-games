@@ -1,0 +1,19 @@
+-- share_links.target_id: uuid -> text
+--
+-- The column holds two different kinds of identifier, picked by `kind`:
+-- `result`/`replay`/`variant` point at a row id (a uuid), but `leaderboard`
+-- points at a GAME id — `connect4`, `drunk-walk`. As a `uuid` column that
+-- second case could not be stored at all, so every `POST /api/share` with
+-- `kind: "leaderboard"` answered 500 in production from the day the endpoint
+-- shipped. The in-memory store accepts any string, so the test suite stayed
+-- green throughout (the same blind spot as MPG-133).
+--
+-- Safe on existing data: every current value is a uuid, and Postgres converts
+-- uuid -> text losslessly via I/O conversion (no USING clause needed). The
+-- uuid type bought no referential integrity here either — there is no FK,
+-- because which table the target lives in varies by `kind`.
+--
+-- Not reversible without data loss once a leaderboard link exists: those rows
+-- hold values that are not uuids. To roll back, delete
+-- `WHERE kind = 'leaderboard'` first.
+ALTER TABLE "share_links" ALTER COLUMN "target_id" SET DATA TYPE text;

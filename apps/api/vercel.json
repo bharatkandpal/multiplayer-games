@@ -13,8 +13,7 @@
   },
   "functions": {
     "api/[...path].ts": {
-      "maxDuration": 15,
-      "includeFiles": "api/_bundle/fonts/**"
+      "maxDuration": 15
     }
   }
 }

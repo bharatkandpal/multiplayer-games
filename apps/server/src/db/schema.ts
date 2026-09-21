@@ -166,8 +166,22 @@ export const shareLinks = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     token: text("token").notNull().unique(),
-    kind: text("kind").notNull(), // result | replay | leaderboard
-    targetId: uuid("target_id").notNull(),
+    kind: text("kind").notNull(), // result | replay | leaderboard | variant
+    /**
+     * What the link points at — and NOT a `uuid`, deliberately.
+     *
+     * `result`, `replay` and `variant` links target a row id, which is a uuid.
+     * A `leaderboard` link targets a **game id** (`connect4`), which is not.
+     * While this column was `uuid`, every `POST /api/share` with
+     * `kind: "leaderboard"` died on the insert with a 500 — in production, from
+     * the day the endpoint shipped. The in-memory store takes any string, so
+     * the whole suite stayed green over it (the same blind spot as MPG-133).
+     *
+     * `text` is the honest type for a column holding two different kinds of
+     * identifier. The narrower uuid bought no integrity either — there is no FK
+     * here, because the target table varies by `kind`.
+     */
+    targetId: text("target_id").notNull(),
     ownerToken: text("owner_token")
       .notNull()
       .references(() => sessions.token, { onDelete: "cascade" }),

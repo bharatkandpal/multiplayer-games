@@ -32,7 +32,7 @@ import { build } from "esbuild";
 // pnpm's strict layout. Vercel's tracer follows it fine (verified: the .func
 // output contains the binary).
 //
-// @fontsource/nunito is NOT external — see scripts/serverlessEntry.ts. Its bytes
+// The card fonts are NOT external — see scripts/serverlessEntry.ts. Their bytes
 // are embedded in the bundle, because neither tracing nor `includeFiles` ships
 // them.
 const EXTERNAL = ["@resvg/resvg-js"];
@@ -45,8 +45,10 @@ const result = await build({
   format: "esm",
   target: "node22",
   external: EXTERNAL,
-  // Card fonts are embedded as bytes by scripts/serverlessEntry.ts.
-  loader: { ".woff2": "binary" },
+  // Card fonts are embedded as bytes by scripts/serverlessEntry.ts. TTF only —
+  // resvg cannot read woff2, which is why importing those here shipped a
+  // function that rendered every card blank.
+  loader: { ".ttf": "binary" },
   sourcemap: true,
   logLevel: "info",
   // Express 5 and its middleware are CJS; this keeps esbuild's interop shim from
