@@ -271,8 +271,8 @@ the `RoomRepo` below implements.
 25s long-poll was never available on the tier we deploy to. Any polling fallback must
 therefore hold ≤ ~9s and re-issue (short long-poll), which strictly worsens the
 invocation/CPU math §3 flagged as the thing to measure. This is the trigger the "hosted
-WebSocket provider" alternative reserved: *"reconsider if polling cost or perceived lag
-measures badly."* It measures badly a priori, so we take that path — with the free-tier
+WebSocket provider" alternative reserved: _"reconsider if polling cost or perceived lag
+measures badly."_ It measures badly a priori, so we take that path — with the free-tier
 economics that made it "premature" in 2026-09-16 no longer holding.
 
 ### Decision — **Ably** is the opponent-notification hop
@@ -296,7 +296,7 @@ networks. Since state stays on Neon (below), the notify vendor is standalone eit
 there is no consolidation reason to prefer Supabase.
 
 Crucially this keeps the container-optional spirit of the ADR while dropping the container
-*and* the free-tier-impossible long-poll:
+_and_ the free-tier-impossible long-poll:
 
 - **State of record stays on Neon.** No new state vendor; Upstash Redis (considered as the
   MPG-067 alternative) is **not** adopted. The `RoomRepo` below is a ninth Postgres repo
@@ -320,17 +320,17 @@ baked in: `Seat.socketId` → `lastSeenAt`, `RematchState.proposedBy` → sorted
 ```ts
 export interface RoomRecord {
   readonly id: string;
-  readonly gameId: string;              // plain string — no @mpg/engine import
-  readonly status: string;              // "waiting" | "active" | "finished" | "abandoned"
-  readonly turn: number;                // 1-based slot
-  readonly seats: unknown;              // Seat[] w/ lastSeenAt instead of socketId, as JSONB
-  readonly state: unknown;              // opaque engine board, JSONB (engine is pure — safe to re-read)
-  readonly moveLog: unknown;            // MoveLogEntry[]
-  readonly rematch: unknown;            // { proposedBy: number[]; newRoomId?: string } | null
-  readonly runId: string;              // idempotency key for result persistence (existing pattern)
-  readonly version: number;             // monotonic — the optimistic-concurrency guard (§2)
+  readonly gameId: string; // plain string — no @mpg/engine import
+  readonly status: string; // "waiting" | "active" | "finished" | "abandoned"
+  readonly turn: number; // 1-based slot
+  readonly seats: unknown; // Seat[] w/ lastSeenAt instead of socketId, as JSONB
+  readonly state: unknown; // opaque engine board, JSONB (engine is pure — safe to re-read)
+  readonly moveLog: unknown; // MoveLogEntry[]
+  readonly rematch: unknown; // { proposedBy: number[]; newRoomId?: string } | null
+  readonly runId: string; // idempotency key for result persistence (existing pattern)
+  readonly version: number; // monotonic — the optimistic-concurrency guard (§2)
   readonly createdAt: Date;
-  readonly expiresAt: Date;             // checked lazily on read; sweeper is cleanup-only (§-context table)
+  readonly expiresAt: Date; // checked lazily on read; sweeper is cleanup-only (§-context table)
 }
 
 export interface NewRoomRecord {
@@ -396,7 +396,7 @@ export interface RoomRepo {
 - **A second auth surface** — a client needs an Ably token to subscribe. Our move/join
   function issues a short-lived token whose capability is scoped to exactly `room:<id>` for
   the seated player, so a client can't subscribe to a room it isn't seated in. This is the one
-  cost from the original "hosted provider" rejection that free-tier pricing does *not* erase,
+  cost from the original "hosted provider" rejection that free-tier pricing does _not_ erase,
   and it is accepted deliberately — token-capability scoping keeps the authorization decision
   in our function, beside the seat check.
 - **Two write targets in one request path** (Neon commit, then Ably publish) — ordering is

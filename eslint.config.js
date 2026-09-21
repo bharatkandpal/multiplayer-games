@@ -20,6 +20,10 @@ export default tseslint.config(
       // Generated function bundles (apps/*/scripts/bundle*.mjs output). Third-
       // party code we didn't write and can't fix, emitted fresh on every build.
       "**/api/_bundle/*.js",
+      // Throwaway validation spikes (e.g. spikes/ably-notify): dependency-free
+      // proof-of-concept scripts, not part of the shipping bar. Kept in the repo
+      // as reference, but not held to the production lint rules.
+      "spikes/**",
     ],
   },
   js.configs.recommended,
