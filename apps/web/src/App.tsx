@@ -13,6 +13,7 @@ import { UiGallery } from "./components/UiGallery";
 import { Button, ClaimHandlePrompt, ThemeSwitch, UsernamePrompt } from "./components/ui";
 import { cx } from "./components/ui/cx";
 import {
+  ChatScreen,
   ConnectFourOnlineRoute,
   ConnectFourRoute,
   ConnectFourWatchRoute,
@@ -98,7 +99,10 @@ type Route =
   // MPG-056: a durable share link (`/s/:token`) was opened. Unlike the room
   // invite above, this outlives every room — the token resolves to a finished
   // result, a replay, or a leaderboard view, and needs no session to read.
-  | { screen: "shared"; token: string };
+  | { screen: "shared"; token: string }
+  // CHAT-004: a standalone chat room, reached from Home or a deep link.
+  // `/chat` (no id) defaults to the shared "lobby" room.
+  | { screen: "chat"; roomId: string };
 
 /**
  * The screens that are a *game*, not a page: a top bar, the board or play
@@ -110,6 +114,18 @@ const IN_GAME_SCREENS = new Set<Route["screen"]>(["play", "realtime", "online-pl
 const ROOM_PATH_RE = /^\/([^/]+)\/room\/([^/]+)\/?$/;
 const SHARE_PATH_RE = /^\/s\/([^/]+)\/?$/;
 const GAME_SLUG_RE = /^\/([^/]+)\/?$/;
+const CHAT_PATH_RE = /^\/chat(?:\/([^/]+))?\/?$/;
+
+/** Default room a bare `/chat` link opens (CHAT-004). */
+const DEFAULT_CHAT_ROOM_ID = "lobby";
+
+/** Parses `/chat` or `/chat/:roomId` out of a pathname (CHAT-004). */
+function parseChatPath(pathname: string): { roomId: string } | undefined {
+  const match = CHAT_PATH_RE.exec(pathname);
+  if (!match) return undefined;
+  const roomId = match[1];
+  return { roomId: roomId ? decodeURIComponent(roomId) : DEFAULT_CHAT_ROOM_ID };
+}
 
 /** Parses `/s/:token` out of a pathname (MPG-056). */
 function parseSharePath(pathname: string): string | undefined {
@@ -189,6 +205,10 @@ function initialRoute(): Route {
     // entry point a stranger can arrive through.
     markColdArrival();
     return { screen: "shared", token: shareToken };
+  }
+  const chatPath = parseChatPath(window.location.pathname);
+  if (chatPath) {
+    return { screen: "chat", roomId: chatPath.roomId };
   }
   const parsed = parseRoomPath(window.location.pathname);
   if (!parsed) {
@@ -471,6 +491,11 @@ export default function App(): React.JSX.Element {
   // also produce one — keep the route in sync with the URL either way.
   useEffect(() => {
     const onPopState = (): void => {
+      const chatPath = parseChatPath(window.location.pathname);
+      if (chatPath) {
+        setRoute({ screen: "chat", roomId: chatPath.roomId });
+        return;
+      }
       const parsed = parseRoomPath(window.location.pathname);
       if (parsed) {
         setRoute({ screen: "join", gameId: parsed.gameId, roomId: parsed.roomId });
@@ -526,6 +551,10 @@ export default function App(): React.JSX.Element {
             onSelectGame={(gameId) => quickStart({ kind: "turn-based", id: gameId, title: gameId })}
             onSelectRealtimeGame={(gameId) => setRoute({ screen: "realtime", gameId })}
             onConfigureGame={(gameId) => setRoute({ screen: "setup", gameId })}
+            onOpenChat={() => {
+              setRoute({ screen: "chat", roomId: DEFAULT_CHAT_ROOM_ID });
+              if (typeof window !== "undefined") window.history.pushState({}, "", "/chat");
+            }}
             onShowGallery={() => setRoute({ screen: "gallery" })}
             devMode={isDevMode()}
           />
@@ -705,6 +734,16 @@ export default function App(): React.JSX.Element {
             onViewLeaderboard={(gameId) =>
               setRoute({ screen: "leaderboard", gameId: gameId as GameId | RealtimeGameId })
             }
+          />
+        ) : null}
+
+        {route.screen === "chat" ? (
+          <ChatScreen
+            key={route.roomId}
+            roomId={route.roomId}
+            onBack={() => {
+              goHome();
+            }}
           />
         ) : null}
 

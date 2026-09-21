@@ -29,6 +29,30 @@
   max-width: 34rem;
 }
 
+/* CHAT-004: the username badge and the Chat entry point share a row — both
+   are "who/where you are" controls, not the game catalogue itself. */
+.identityRow {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+/* The badge yields horizontal space (truncating its label) so the Chat button
+   never wraps to a second line — the wrap is what pushed Home past the frame at
+   320px (MPG-137, layout-frame.spec.ts). */
+.identityBadge {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* The Chat entry point keeps its full label; only the badge shrinks. */
+.chatButton {
+  flex: 0 0 auto;
+}
+
 /* ── Tag filter (MPG-112) ─────────────────────────────────────────────────
    The row sits between the tagline and the shelves: it is a lens on the
    catalogue, so it reads above the thing it filters. Chips borrow the card

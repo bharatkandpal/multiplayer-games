@@ -1,0 +1,285 @@
+/*
+ * ChatScreen (CHAT-006). A page screen, not an in-game frame — but it still
+ * follows the same viewport contract (UX_PRINCIPLES §9): the top bar and
+ * composer are fixed, and the message list is the one region that scrolls,
+ * so the "type a message" control is never lost off the bottom of a short
+ * phone screen.
+ */
+
+.main {
+  width: 100%;
+  max-width: var(--container-md);
+  margin: 0 auto;
+  padding: var(--space-4);
+
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.topBar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.homeIcons {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-300);
+}
+
+.homeLabel {
+  margin-left: var(--space-1);
+}
+
+.heading {
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-500);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-display);
+  margin: 0;
+}
+
+.unavailableSlot {
+  flex: 0 0 auto;
+}
+
+/* The one scrolling region (UX_PRINCIPLES §9). */
+.messageList {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--color-bg-subtle);
+  border: var(--border-width-hairline) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+}
+
+.empty {
+  color: var(--color-text-muted);
+  text-align: center;
+  margin: var(--space-6) 0;
+}
+
+.skeletonList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeletonBubble {
+  height: 2.5rem;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-inset) 25%,
+    var(--color-surface) 50%,
+    var(--color-bg-inset) 75%
+  );
+  background-size: 200% 100%;
+  animation: chat-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes chat-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.bubbles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.bubble {
+  max-width: 80%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  border: var(--border-width-thin) solid var(--color-border);
+  background: var(--color-surface);
+  /* Motion with meaning: a message arrives, it doesn't decorate — and it
+     respects prefers-reduced-motion via the global token override. */
+  animation: chat-bubble-in var(--duration-base) var(--ease-standard);
+}
+
+@keyframes chat-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Own vs. others' — alignment + a directional marker glyph, never color
+   alone (UX_PRINCIPLES §4). */
+.own {
+  align-self: flex-end;
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent);
+}
+
+.other {
+  align-self: flex-start;
+}
+
+.bubbleHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-100);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.bubbleMarker {
+  font-size: var(--font-size-200);
+  line-height: 1;
+}
+
+.bubbleName {
+  font-weight: var(--font-weight-medium);
+}
+
+.bubbleTime {
+  font-family: var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.muteButton {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-100);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: var(--space-1);
+  /* Small text control, but still a real target: padding brings the hit
+     area up toward the 44px floor without inflating the visible glyph. */
+  min-height: var(--size-touch-target);
+  min-width: var(--size-touch-target);
+}
+
+.muteButton:hover {
+  color: var(--color-text);
+}
+
+.bubbleText {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.composer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.composerLabel {
+  font-size: var(--font-size-200);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.nameEdit {
+  background: none;
+  border: none;
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  padding: var(--space-1);
+  min-height: var(--size-touch-target);
+}
+
+.composerRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.textarea {
+  flex: 1 1 auto;
+  resize: none;
+  min-height: var(--size-touch-target);
+  max-height: 6.5rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.textarea:disabled {
+  color: var(--color-text-disabled);
+  background: var(--color-bg-subtle);
+  cursor: not-allowed;
+}
+
+.textarea:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.composerFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 1.25rem;
+}
+
+.counter {
+  font-family: var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-100);
+  color: var(--color-text-muted);
+}
+
+.sendErrorSlot {
+  flex: 1 1 auto;
+  text-align: right;
+}
+
+.sendError {
+  color: var(--color-warning-text);
+  font-size: var(--font-size-100);
+}
+
+/* Mobile-first: stack the counter/error under the row on narrow screens so
+   nothing gets clipped at 320px. */
+@media (max-width: 22rem) {
+  .composerFooter {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sendErrorSlot {
+    text-align: left;
+  }
+}

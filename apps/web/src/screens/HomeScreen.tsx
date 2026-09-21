@@ -47,6 +47,8 @@ export interface HomeScreenProps {
   onSelectRealtimeGame?: (gameId: RealtimeGameId) => void;
   /** Opens the full seat setup for a turn-based game (play a friend, online, all-bot watch). */
   onConfigureGame?: (gameId: GameId) => void;
+  /** CHAT-004: opens the standalone chat lobby. Omit to hide the entry point entirely. */
+  onOpenChat?: () => void;
   onShowGallery: () => void;
   /**
    * Renders the build stamp and the design-system kit link. Off by default:
@@ -78,6 +80,7 @@ export function HomeScreen({
   onSelectGame,
   onSelectRealtimeGame,
   onConfigureGame,
+  onOpenChat,
   onShowGallery,
   devMode = false,
 }: HomeScreenProps): React.JSX.Element {
@@ -122,7 +125,18 @@ export function HomeScreen({
         Options on any game.
       </p>
 
-      <UsernameBadge />
+      <div className={styles.identityRow}>
+        <UsernameBadge compact className={styles.identityBadge} />
+        {/* CHAT-004: the one entry point into chat — a labelled button, not a
+            glyph a first-timer has to guess at (UX_PRINCIPLES §9). Pinned beside
+            the badge on one row; the badge truncates before this ever wraps, so
+            the header stays inside the frame at 320px (MPG-137). */}
+        {onOpenChat ? (
+          <Button variant="secondary" size="sm" className={styles.chatButton} onClick={onOpenChat}>
+            Chat
+          </Button>
+        ) : null}
+      </div>
 
       {/* The browse controls: narrow the shelf, or skip choosing entirely. Kept
           on one row because they answer the same question ("what do I play?")
