@@ -21,6 +21,13 @@
  * one-way import boundary (it never imports `@mpg/server`).
  */
 
+// Explicit, because this file reads `process.env` and Vercel's own build of it
+// does not auto-include @types/node the way `tsconfig.api.json` does — every
+// production build reported three `Cannot find name 'process'` errors here.
+// Declaring the dependency rather than inheriting it keeps the function
+// checkable under whatever `types` setting the builder happens to use.
+/// <reference types="node" />
+
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 // From the PRE-BUNDLED build output, not `../src/unfurl/meta` directly: Vercel

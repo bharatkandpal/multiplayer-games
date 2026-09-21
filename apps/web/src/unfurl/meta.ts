@@ -13,7 +13,7 @@
  * ADR 0009 for the full rationale.
  */
 
-import { gameTitle } from "./titles";
+import { gameTitle } from "./titles.js";
 
 /**
  * The public share record as returned by `GET /api/share/:token`. Parsed from
