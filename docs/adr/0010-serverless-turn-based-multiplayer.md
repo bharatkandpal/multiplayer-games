@@ -254,3 +254,159 @@ legality, which is the anti-cheat foundation the whole seat model rests on.
 2. Opponent-side latency on the long-poll path checked against the UX latency budget.
 3. A decision on whether the container stays deployed at all, or is kept only as a local
    development convenience.
+
+---
+
+## Amendment (2026-09-21) — push via Ably; state stays on Neon
+
+This amendment resolves two of the three open questions above by naming a concrete free-tier
+topology, and corrects one factual assumption §3 was built on. It supersedes the transport
+half of §3 and §5; the state/concurrency/bots halves (§1, §2, §4) are unchanged and are what
+the `RoomRepo` below implements.
+
+### Correction to §3 — the long-poll window §3 assumed does not exist on the free tier
+
+§3 proposed holding a subscription open **~25s** by "raising `maxDuration` from 15s." On
+**Vercel Hobby, function duration is hard-capped at 10s** — not a default, a ceiling. The
+25s long-poll was never available on the tier we deploy to. Any polling fallback must
+therefore hold ≤ ~9s and re-issue (short long-poll), which strictly worsens the
+invocation/CPU math §3 flagged as the thing to measure. This is the trigger the "hosted
+WebSocket provider" alternative reserved: *"reconsider if polling cost or perceived lag
+measures badly."* It measures badly a priori, so we take that path — with the free-tier
+economics that made it "premature" in 2026-09-16 no longer holding.
+
+### Decision — **Ably** is the opponent-notification hop
+
+The one behaviour §-context marked **No** ("opponent notification is the real loss") is
+filled by Ably, a browser-facing pub/sub with an HTTP publish endpoint. Free-tier headroom
+(checked 2026-09-21, confirm before scaling): **6M messages/mo, 200 peak concurrent
+connections, 200 concurrent channels, 500 msg/s.** A turn-based game is ~20 messages, so the
+binding limit is **200 concurrent connections (~100 simultaneous 2-player games)** — ample at
+hobby scale; the message cap is ~3× more headroom than needed and never close.
+
+Ably was chosen over Supabase Realtime (the first-drafted candidate) **not** for the larger
+message quota — both cap concurrent connections at 200, which is what actually binds us, so
+the message headroom is irrelevant to our workload. It was chosen for two reasons that do
+matter: (1) **token-capability auth** scopes a client's subscription to exactly `room:<id>`
+via a short-lived token our move function mints next to the seat check it already does —
+keeping the per-room authorization invariant in our code rather than re-expressing it as RLS
+in a separate system; and (2) **connection-state recovery** — Ably resumes a dropped
+connection and replays missed messages, which serves the reconnect story directly on flaky
+networks. Since state stays on Neon (below), the notify vendor is standalone either way, so
+there is no consolidation reason to prefer Supabase.
+
+Crucially this keeps the container-optional spirit of the ADR while dropping the container
+*and* the free-tier-impossible long-poll:
+
+- **State of record stays on Neon.** No new state vendor; Upstash Redis (considered as the
+  MPG-067 alternative) is **not** adopted. The `RoomRepo` below is a ninth Postgres repo
+  alongside the existing eight, so the contract-test harness and in-memory dev adapter cover
+  it for free (§1's requirement, unchanged).
+- **The push channel carries a notification, never authority.** See "ping-then-fetch" below.
+  This is what preserves the seat-model invariant §3 called non-negotiable.
+- **Degrade to short-poll, feature-detected at join** (§5's principle, retained): Ably
+  unreachable → client short-polls the `GET` endpoint → game still fully playable. This is
+  the offline/degradation pillar applied to the accelerator, exactly as the original §5 framed
+  the container.
+
+### `RoomRepo` — the ninth repo (implements §1)
+
+Honoring the store's "no engine types leak here" rule (`ports.ts:8`), the persisted record
+uses `gameId: string` / `state: unknown` and is distinct from the in-memory `Room`
+(`rooms/types.ts:61`); the room layer maps between them. The three reshapings §1 mandated are
+baked in: `Seat.socketId` → `lastSeenAt`, `RematchState.proposedBy` → sorted array,
+`state` → JSONB. Adds the `version` §2 requires.
+
+```ts
+export interface RoomRecord {
+  readonly id: string;
+  readonly gameId: string;              // plain string — no @mpg/engine import
+  readonly status: string;              // "waiting" | "active" | "finished" | "abandoned"
+  readonly turn: number;                // 1-based slot
+  readonly seats: unknown;              // Seat[] w/ lastSeenAt instead of socketId, as JSONB
+  readonly state: unknown;              // opaque engine board, JSONB (engine is pure — safe to re-read)
+  readonly moveLog: unknown;            // MoveLogEntry[]
+  readonly rematch: unknown;            // { proposedBy: number[]; newRoomId?: string } | null
+  readonly runId: string;              // idempotency key for result persistence (existing pattern)
+  readonly version: number;             // monotonic — the optimistic-concurrency guard (§2)
+  readonly createdAt: Date;
+  readonly expiresAt: Date;             // checked lazily on read; sweeper is cleanup-only (§-context table)
+}
+
+export interface NewRoomRecord {
+  readonly id: string;
+  readonly gameId: string;
+  readonly status: string;
+  readonly turn: number;
+  readonly seats: unknown;
+  readonly state: unknown;
+  readonly runId: string;
+}
+
+export interface RoomRepo {
+  /** Create a room at version 1. */
+  create(room: NewRoomRecord): Promise<RoomRecord>;
+
+  /** Load by id. Returns undefined if absent or already past `expiresAt` (lazy TTL). */
+  findById(id: string): Promise<RoomRecord | undefined>;
+
+  /**
+   * Compare-and-set the mutable room fields. Applies iff the stored version still
+   * equals `expectedVersion`, bumping it by one. Zero rows updated → someone moved
+   * first: the caller reloads and re-validates rather than retrying (§2). This is
+   * the invisible-mutex-made-explicit that §2 requires.
+   */
+  applyMove(
+    id: string,
+    expectedVersion: number,
+    next: Pick<RoomRecord, "status" | "turn" | "seats" | "state" | "moveLog" | "rematch">,
+  ): Promise<RoomRecord | undefined>;
+
+  /** Touch a seat's liveness (replaces socket presence; feeds the disconnect-grace rule). */
+  touchSeat(id: string, slot: number, lastSeenAt: Date): Promise<void>;
+
+  /** Best-effort cleanup of expired rooms. Correctness rests on lazy TTL, not this. */
+  deleteExpired(): Promise<number>;
+}
+```
+
+`RoomRepo` joins the `Store` bundle (`ports.ts:454`) as `readonly rooms: RoomRepo`.
+
+### The notify contract — ping-then-fetch (preserves server authority)
+
+1. `POST /api/rooms/:id/moves` — validate against the session's bound seat, `applyMove`
+   with the version guard, resolve any bot seat inline (§4). The **mover** gets the new
+   `PublicRoom` synchronously (the fast path §3 kept).
+2. On a successful move the function **publishes one message via Ably's REST endpoint** to
+   channel `room:<id>` with a minimal hint — `{ v: <newVersion> }`, nothing authoritative.
+   Fire-and-forget: no held connection server-side, so the 10s cap is irrelevant, and a
+   failed publish degrades to the opponent's poll — never blocks or fails the move (offline
+   pillar).
+3. The **opponent's** browser, subscribed to `room:<id>`, wakes on the ping and does an
+   **authenticated `GET /api/rooms/:id`** to fetch the server-derived `PublicRoom`. The
+   broadcast payload is never trusted as state; turn ownership stays server-derived from the
+   session token's bound seat (`gameState.ts:18`). A stale/duplicate/forged ping costs at most
+   one wasted GET.
+
+### Watch-outs this introduces
+
+- **200 concurrent connections is the real ceiling** — instrument it; it caps concurrent
+  live games well before messages or bandwidth do. The 6M-message quota is ~3× our need and
+  never the limiter.
+- **A second auth surface** — a client needs an Ably token to subscribe. Our move/join
+  function issues a short-lived token whose capability is scoped to exactly `room:<id>` for
+  the seated player, so a client can't subscribe to a room it isn't seated in. This is the one
+  cost from the original "hosted provider" rejection that free-tier pricing does *not* erase,
+  and it is accepted deliberately — token-capability scoping keeps the authorization decision
+  in our function, beside the seat check.
+- **Two write targets in one request path** (Neon commit, then Ably publish) — ordering is
+  commit-then-publish, and publish failure is swallowed, so Neon is always the source of truth
+  and Ably is only ever an accelerator.
+
+### What still stands from the original decision
+
+§1 (durable `RoomRepo`), §2 (optimistic `version` + idempotency key), §4 (bots resolve
+inline) are unchanged. What changes: §3's long-poll becomes Ably push with short-poll
+fallback, and §5's "container as accelerator" becomes "Ably as accelerator" — the container is
+no longer needed even as the fast path. Open question #3 (does the container stay deployed) is
+thereby answered: **no — local dev convenience only.**
