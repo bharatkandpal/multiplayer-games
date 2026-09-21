@@ -6,6 +6,22 @@
   margin-bottom: var(--space-4);
 }
 
+/* Compact placement (Home): one line that truncates instead of wrapping, so the
+   badge shares a row with a neighbour (the Chat entry point) inside the frame at
+   320px. The host row owns the spacing below, so drop the block margin here. */
+.compact {
+  flex-wrap: nowrap;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.compact .label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .label {
   color: var(--color-text-muted);
   font-size: var(--font-size-200);

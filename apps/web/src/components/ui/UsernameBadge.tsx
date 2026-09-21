@@ -14,7 +14,14 @@ import styles from "./UsernameBadge.module.css";
 
 export interface UsernameBadgeProps {
   /** Optional extra class for placement by the host screen. */
-  className?: string;
+  className?: string | undefined;
+  /**
+   * Collapse to a single, truncating line instead of wrapping. Home uses this so
+   * the badge and its neighbouring Chat entry point share one row inside the
+   * frame at 320px wide (MPG-137, `layout-frame.spec.ts`) rather than the badge
+   * spilling onto a second line and pushing the page past the frame.
+   */
+  compact?: boolean;
 }
 
 /**
@@ -34,11 +41,15 @@ export interface UsernameBadgeProps {
  * collision on an auto/re-rolled name is resolved silently upstream, so this
  * control never dead-ends.
  */
-export function UsernameBadge({ className }: UsernameBadgeProps): React.JSX.Element {
+export function UsernameBadge({ className, compact = false }: UsernameBadgeProps): React.JSX.Element {
   const [name, setName] = useState(ensureUsername);
   const [editing, setEditing] = useState(false);
 
   useEffect(() => onUsernameChange(setName), []);
+
+  const rootClass = [styles.badge, compact ? styles.compact : "", className]
+    .filter(Boolean)
+    .join(" ");
 
   const handleEditSubmit = (next: string): void => {
     // Optimistic + local-first: store as a *chosen* name (auto = false), reflect
@@ -50,7 +61,7 @@ export function UsernameBadge({ className }: UsernameBadgeProps): React.JSX.Elem
   };
 
   return (
-    <div className={className ? `${styles.badge} ${className}` : styles.badge}>
+    <div className={rootClass}>
       <span className={styles.label}>
         Playing as <span className={styles.name}>{name}</span>
       </span>
