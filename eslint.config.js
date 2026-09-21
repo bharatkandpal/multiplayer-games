@@ -53,7 +53,12 @@ export default tseslint.config(
     // compiler to defer to and flags `console`/`process`.
     files: ["**/scripts/**/*.mjs"],
     languageOptions: {
-      globals: { console: "readonly", process: "readonly" },
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        Buffer: "readonly",
+        URL: "readonly",
+      },
     },
   },
   // Keep ESLint out of formatting's lane; Prettier owns style.

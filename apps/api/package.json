@@ -12,7 +12,6 @@
     "build": "node scripts/bundle.mjs"
   },
   "dependencies": {
-    "@fontsource/nunito": "^5.3.0",
     "@mpg/engine": "workspace:*",
     "@mpg/server": "workspace:*",
     "@resvg/resvg-js": "^2.6.2"
