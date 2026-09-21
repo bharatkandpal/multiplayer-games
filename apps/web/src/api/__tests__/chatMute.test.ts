@@ -1,11 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  getMutedTokens,
-  isTokenMuted,
-  muteToken,
-  onMuteChange,
-  unmuteToken,
-} from "../chatMute";
+import { getMutedTokens, isTokenMuted, muteToken, onMuteChange, unmuteToken } from "../chatMute";
 
 describe("chatMute", () => {
   beforeEach(() => {
@@ -35,9 +29,9 @@ describe("chatMute", () => {
     muteToken("tok-persist");
     expect(getMutedTokens().has("tok-persist")).toBe(true);
     // A brand-new read (simulating a reload) still sees it.
-    expect(new Set(JSON.parse(window.localStorage.getItem("mpg_chat_muted_tokens") ?? "[]"))).toEqual(
-      new Set(["tok-persist"]),
-    );
+    expect(
+      new Set(JSON.parse(window.localStorage.getItem("mpg_chat_muted_tokens") ?? "[]")),
+    ).toEqual(new Set(["tok-persist"]));
   });
 
   it("notifies subscribers on mute/unmute", () => {

@@ -16,7 +16,12 @@ import {
 import { useChatChannel } from "../hooks/useChatChannel.js";
 import type { ChatMessage } from "../api/chat.js";
 import { getSessionToken } from "../api/session.js";
-import { ensureUsername, onUsernameChange, setStoredUsername, syncUsername } from "../api/username.js";
+import {
+  ensureUsername,
+  onUsernameChange,
+  setStoredUsername,
+  syncUsername,
+} from "../api/username.js";
 import { getMutedTokens, muteToken, onMuteChange } from "../api/chatMute.js";
 import styles from "./ChatScreen.module.css";
 
@@ -108,8 +113,10 @@ export function ChatScreen({ roomId, onBack }: ChatScreenProps): React.JSX.Eleme
     void syncUsername(next);
   };
 
-  const badgeStatus = status === "live" ? "success" : status === "connecting" ? "neutral" : "warning";
-  const badgeLabel = status === "live" ? "Live" : status === "connecting" ? "Connecting…" : "Unavailable";
+  const badgeStatus =
+    status === "live" ? "success" : status === "connecting" ? "neutral" : "warning";
+  const badgeLabel =
+    status === "live" ? "Live" : status === "connecting" ? "Connecting…" : "Unavailable";
 
   return (
     <div className={styles.main}>
@@ -172,11 +179,7 @@ export function ChatScreen({ roomId, onBack }: ChatScreenProps): React.JSX.Eleme
       <form className={styles.composer} onSubmit={handleSubmit}>
         <label className={styles.composerLabel} htmlFor="chat-input">
           Message — playing as <strong>{name}</strong>
-          <button
-            type="button"
-            className={styles.nameEdit}
-            onClick={() => setEditingName(true)}
-          >
+          <button type="button" className={styles.nameEdit} onClick={() => setEditingName(true)}>
             change
           </button>
         </label>

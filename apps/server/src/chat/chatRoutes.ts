@@ -20,7 +20,12 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 
 import { noopLimit, type RateLimitFor } from "../middleware/rateLimit.js";
-import { requestAblyToken, publishAblyMessage, getAblyApiKey, type AblyClientOptions } from "./ably.js";
+import {
+  requestAblyToken,
+  publishAblyMessage,
+  getAblyApiKey,
+  type AblyClientOptions,
+} from "./ably.js";
 import { maskProfanity } from "./profanityMask.js";
 
 /** Matches the "safe slug" a room id already is (see rooms/RoomManager.ts ids). */

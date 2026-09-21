@@ -23,10 +23,7 @@ interface FakeRealtimeInstance {
     emitChange: (current: string) => void;
   };
   close: ReturnType<typeof vi.fn>;
-  authCallback: (
-    params: unknown,
-    callback: (error: unknown, token: unknown) => void,
-  ) => void;
+  authCallback: (params: unknown, callback: (error: unknown, token: unknown) => void) => void;
 }
 
 vi.mock("ably", () => {

@@ -58,8 +58,7 @@ export async function fetchChatToken(roomId: string): Promise<ChatTokenResponse 
 }
 
 export type SendChatMessageResult =
-  | { ok: true; id: string; ts: number }
-  | { ok: false; reason: "rate_limited" | "unavailable" };
+  { ok: true; id: string; ts: number } | { ok: false; reason: "rate_limited" | "unavailable" };
 
 /**
  * Posts a chat message. Never throws. The message itself is not returned

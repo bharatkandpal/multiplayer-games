@@ -43,9 +43,7 @@ test.describe("Chat — degrades to absence when unconfigured", () => {
     await openChatFromHome(page);
 
     // The unavailable notice is present, in plain language — never a raw error.
-    await expect(
-      page.getByText(/chat is unavailable right now/i),
-    ).toBeVisible();
+    await expect(page.getByText(/chat is unavailable right now/i)).toBeVisible();
 
     // The composer is disabled outright — no dead-end "type into a box that
     // silently swallows your message".

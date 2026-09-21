@@ -25,26 +25,34 @@ describe("api/chat", () => {
       vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue(
-          jsonResponse({ tokenRequest: { token: "t" }, channelName: "chat:lobby", clientId: "c1" }),
+          jsonResponse({
+            tokenRequest: { token: "t" },
+            channelName: "chat:lobby",
+            clientId: "c1",
+          }),
         ),
       );
 
       const result = await fetchChatToken("lobby");
-      expect(result).toEqual({ tokenRequest: { token: "t" }, channelName: "chat:lobby", clientId: "c1" });
+      expect(result).toEqual({
+        tokenRequest: { token: "t" },
+        channelName: "chat:lobby",
+        clientId: "c1",
+      });
     });
 
     it("degrades to null on a 503 (chat_unavailable), never throwing", async () => {
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ error: "chat_unavailable" }, 503)));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(jsonResponse({ error: "chat_unavailable" }, 503)),
+      );
 
       const result = await fetchChatToken("lobby");
       expect(result).toBeNull();
     });
 
     it("degrades to null on a network error", async () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockRejectedValue(new Error("network down")),
-      );
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
 
       const result = await fetchChatToken("lobby");
       expect(result).toBeNull();

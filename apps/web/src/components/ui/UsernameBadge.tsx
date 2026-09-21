@@ -41,7 +41,10 @@ export interface UsernameBadgeProps {
  * collision on an auto/re-rolled name is resolved silently upstream, so this
  * control never dead-ends.
  */
-export function UsernameBadge({ className, compact = false }: UsernameBadgeProps): React.JSX.Element {
+export function UsernameBadge({
+  className,
+  compact = false,
+}: UsernameBadgeProps): React.JSX.Element {
   const [name, setName] = useState(ensureUsername);
   const [editing, setEditing] = useState(false);
 

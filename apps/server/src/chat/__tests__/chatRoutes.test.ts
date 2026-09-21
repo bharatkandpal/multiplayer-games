@@ -41,10 +41,12 @@ describe("chat routes (CHAT-002/003)", () => {
    * mocked `fetch`es for the rate limiter (external service) and Ably (so a
    * test can trip one without the other, and neither ever hits the network).
    */
-  async function mount(opts: {
-    limitFetch?: typeof fetch;
-    ablyOptions?: AblyClientOptions;
-  } = {}): Promise<{ call: (path: string, init?: RequestInit) => Promise<Response> }> {
+  async function mount(
+    opts: {
+      limitFetch?: typeof fetch;
+      ablyOptions?: AblyClientOptions;
+    } = {},
+  ): Promise<{ call: (path: string, init?: RequestInit) => Promise<Response> }> {
     store = createMemoryStore();
     const limiter = opts.limitFetch
       ? createRateLimiter({ url: "http://limiter.test", fetchImpl: opts.limitFetch })
@@ -99,9 +101,9 @@ describe("chat routes (CHAT-002/003)", () => {
     });
 
     it("mints a subscribe-only token scoped to exactly one channel", async () => {
-      const fetchImpl = vi.fn().mockResolvedValue(
-        jsonResponse({ token: "opaque-token", clientId: "tok-sender" }),
-      );
+      const fetchImpl = vi
+        .fn()
+        .mockResolvedValue(jsonResponse({ token: "opaque-token", clientId: "tok-sender" }));
       const { call } = await mount({
         ablyOptions: { apiKey: "keyName.abc:secret", fetchImpl },
       });
@@ -239,7 +241,13 @@ describe("chat routes (CHAT-002/003)", () => {
       );
       const sent = JSON.parse(String(init.body)) as {
         name: string;
-        data: { id: string; roomId: string; sender: { token: string; name: string }; text: string; ts: number };
+        data: {
+          id: string;
+          roomId: string;
+          sender: { token: string; name: string };
+          text: string;
+          ts: number;
+        };
       };
       expect(sent.name).toBe("message");
       expect(sent.data.roomId).toBe("room-1");

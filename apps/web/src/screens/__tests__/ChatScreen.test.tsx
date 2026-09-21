@@ -58,7 +58,13 @@ describe("ChatScreen", () => {
     state.status = "live";
     state.messages = [
       { id: "m1", roomId: "lobby", sender: { token: "tok-me", name: "me" }, text: "hi", ts: 1 },
-      { id: "m2", roomId: "lobby", sender: { token: "tok-other", name: "Ada" }, text: "hey", ts: 2 },
+      {
+        id: "m2",
+        roomId: "lobby",
+        sender: { token: "tok-other", name: "Ada" },
+        text: "hey",
+        ts: 2,
+      },
     ];
     render(<ChatScreen roomId="lobby" onBack={() => {}} />);
 
@@ -91,9 +97,7 @@ describe("ChatScreen", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() => expect(state.send).toHaveBeenCalledWith("hello there"));
-    await waitFor(() =>
-      expect(screen.getByText(/Slow down a little/)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/Slow down a little/)).toBeInTheDocument());
     expect(input).toHaveValue("hello there");
   });
 
