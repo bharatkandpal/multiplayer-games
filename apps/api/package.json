@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:fast": "vitest run",
-    "dev": "vercel dev",
+    "dev:vercel": "node scripts/bundle.mjs && vercel dev",
     "build": "node scripts/bundle.mjs"
   },
   "dependencies": {
