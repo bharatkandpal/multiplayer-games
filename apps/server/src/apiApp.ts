@@ -25,6 +25,7 @@ import { ENGINE_VERSION } from "@mpg/engine";
 import { createEventRouter } from "./analytics/eventRoutes.js";
 import { type EventSink } from "./analytics/sink.js";
 import { createCardRouter } from "./cards/cardRoutes.js";
+import { createChatRouter } from "./chat/chatRoutes.js";
 // Re-exported so a bundled deployment can inject the card fonts it embedded at
 // build time without reaching past this module's public surface — see
 // `cards/raster.ts` and `apps/api/scripts/bundle.mjs`.
@@ -86,6 +87,9 @@ export function createApiApp({
   app.use("/api", createShareRouter(store, eventSink, limit));
   app.use("/api", createVariantRouter(store, eventSink, limit));
   app.use("/api", createReportRouter(store, limit));
+  // Server-authoritative Ably chat (CHAT-002/003) — degrades to absence (503)
+  // when ABLY_API_KEY is unset, per the offline pillar (CLAUDE.md).
+  app.use("/api", createChatRouter(limit));
   // Public, session-free card image for unfurls (MPG-085-b) — the `og:image`
   // target ADR 0009's shim points at.
   app.use("/api", createCardRouter(store));

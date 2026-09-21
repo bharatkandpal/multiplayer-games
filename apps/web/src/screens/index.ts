@@ -1,3 +1,6 @@
+export { ChatScreen } from "./ChatScreen";
+export type { ChatScreenProps } from "./ChatScreen";
+
 export { HomeScreen, GAME_CATALOG, REALTIME_CATALOG } from "./HomeScreen";
 export type {
   HomeScreenProps,

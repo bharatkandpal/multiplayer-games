@@ -30,6 +30,19 @@ vi.mock("./api/leaderboard", () => ({
   })),
 }));
 
+// CHAT-004: routing tests only care that App reaches ChatScreen with the
+// right roomId — the hook's own behavior (Ably wiring, degrade-to-absence,
+// …) is covered by useChatChannel's own tests. Stubbed here so a routing
+// test never opens a real Ably connection.
+vi.mock("./hooks/useChatChannel.js", () => ({
+  useChatChannel: () => ({
+    status: "unavailable" as const,
+    messages: [],
+    send: vi.fn(),
+    connectionState: "unknown" as const,
+  }),
+}));
+
 const BOT_THINKING_STEP_MS = 600; // fallback in ./game/motion.ts (no CSS var in jsdom)
 
 /** Advances the paced bot-thinking timer and flushes the resulting React updates. */
@@ -339,5 +352,61 @@ describe("MPG-087: a bare /:gameId deep link opens the game (share fallback)", (
     render(<App />);
 
     expect(screen.getByRole("list", { name: "Featured games" })).toBeInTheDocument();
+  });
+});
+
+// CHAT-004: the standalone chat route.
+describe("CHAT-004: chat routing", () => {
+  afterEach(() => {
+    window.history.pushState({}, "", "/");
+    vi.restoreAllMocks();
+  });
+
+  it("opens `/chat` onto the chat screen, defaulting to the lobby room", () => {
+    window.history.pushState({}, "", "/chat");
+
+    render(<App />);
+
+    expect(screen.getByRole("heading", { name: "Chat" })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Featured games" })).not.toBeInTheDocument();
+  });
+
+  it("opens `/chat/:roomId` onto the chat screen for that room", () => {
+    window.history.pushState({}, "", "/chat/my-room");
+
+    render(<App />);
+
+    expect(screen.getByRole("heading", { name: "Chat" })).toBeInTheDocument();
+  });
+
+  it("Home offers a labelled entry point into chat that navigates and updates the URL", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Chat" }));
+
+    expect(screen.getByRole("heading", { name: "Chat" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/chat");
+  });
+
+  it("Home is reachable from chat via the labelled Home control", () => {
+    window.history.pushState({}, "", "/chat");
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Home" }));
+
+    expect(screen.getByRole("list", { name: "Featured games" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("back/forward navigation (popstate) re-parses a chat URL", () => {
+    render(<App />);
+    expect(screen.getByRole("list", { name: "Featured games" })).toBeInTheDocument();
+
+    act(() => {
+      window.history.pushState({}, "", "/chat");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(screen.getByRole("heading", { name: "Chat" })).toBeInTheDocument();
   });
 });
