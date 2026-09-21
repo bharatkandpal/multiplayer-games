@@ -11,7 +11,7 @@
  * catalog here instead of copying strings.
  */
 
-import { GAME_CATALOG, REALTIME_CATALOG } from "../screens/catalog";
+import { GAME_CATALOG, REALTIME_CATALOG } from "../screens/catalog.js";
 
 /**
  * The 2048 grid-size variants share one base title but distinct ids

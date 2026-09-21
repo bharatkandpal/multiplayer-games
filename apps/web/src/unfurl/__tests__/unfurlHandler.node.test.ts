@@ -17,7 +17,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import handler from "../../../api/unfurl";
+import handler from "../../../api/unfurl.js";
 
 const SHELL = [
   "<!doctype html>",
