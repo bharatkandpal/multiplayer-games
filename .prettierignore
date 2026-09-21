@@ -10,3 +10,6 @@ pnpm-lock.yaml
 playwright-report/
 test-results/
 .claude/settings.local.json
+# Throwaway validation spikes: reference proof-of-concept code, not held to the
+# repo's formatting bar (see eslint.config.js for the matching lint ignore).
+spikes/

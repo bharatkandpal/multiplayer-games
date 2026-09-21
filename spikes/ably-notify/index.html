@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ably notify spike — ping-then-fetch</title>
+    <!-- Throwaway spike: CDN SDK is fine here (production artifacts are CSP-locked; this is not one). -->
+    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+    <style>
+      :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
+      body { margin: 0; padding: 1.5rem; max-width: 60rem; margin-inline: auto; }
+      h1 { font-size: 1.15rem; }
+      p.lede { opacity: 0.75; font-size: 0.9rem; line-height: 1.5; }
+      .room { display: flex; gap: 0.5rem; align-items: center; margin: 1rem 0; }
+      .room input { padding: 0.4rem 0.6rem; font: inherit; }
+      .players { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+      @media (max-width: 40rem) { .players { grid-template-columns: 1fr; } }
+      .card { border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 0.6rem; padding: 1rem; }
+      .card h2 { font-size: 0.95rem; margin: 0 0 0.5rem; }
+      .state { font-variant-numeric: tabular-nums; }
+      .big { font-size: 2rem; font-weight: 700; }
+      button { font: inherit; padding: 0.5rem 0.9rem; border-radius: 0.5rem; cursor: pointer; margin-right: 0.4rem; }
+      .conn { font-size: 0.8rem; opacity: 0.7; }
+      .conn.ok { color: #16a34a; opacity: 1; }
+      .conn.err { color: #dc2626; opacity: 1; }
+      .metrics { font-size: 0.85rem; margin-top: 0.6rem; }
+      .metrics b { font-variant-numeric: tabular-nums; }
+      pre.log { font-size: 0.72rem; max-height: 12rem; overflow: auto; background: color-mix(in srgb, currentColor 8%, transparent); padding: 0.5rem; border-radius: 0.4rem; }
+      .scoping { margin-top: 1.5rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Ably notify spike — ping-then-fetch</h1>
+    <p class="lede">
+      Each panel subscribes to <code>room:&lt;id&gt;</code> with a token scoped to that one room.
+      "Make move" hits the server move endpoint (bumps the version, fire-and-forget publishes a
+      ping); the <em>other</em> panel wakes on the push and re-fetches the authoritative version.
+      The ping never carries state — only <code>{ v }</code> — so authority stays server-side.
+    </p>
+
+    <div class="room">
+      <label>Room <input id="roomId" value="spike-1" /></label>
+      <button id="connect">Connect both players</button>
+    </div>
+
+    <div class="players">
+      <section class="card" data-player="A">
+        <h2>Player A <span class="conn" data-conn>idle</span></h2>
+        <div class="state">version: <span class="big" data-v>—</span></div>
+        <button data-move>Make move</button>
+        <div class="metrics">
+          push latency (serverTs→recv): <b data-push>—</b> ms<br />
+          re-fetch: <b data-fetch>—</b> ms<br />
+          end-to-end (opponent move→my render): <b data-e2e>—</b> ms
+        </div>
+      </section>
+      <section class="card" data-player="B">
+        <h2>Player B <span class="conn" data-conn>idle</span></h2>
+        <div class="state">version: <span class="big" data-v>—</span></div>
+        <button data-move>Make move</button>
+        <div class="metrics">
+          push latency (serverTs→recv): <b data-push>—</b> ms<br />
+          re-fetch: <b data-fetch>—</b> ms<br />
+          end-to-end (opponent move→my render): <b data-e2e>—</b> ms
+        </div>
+      </section>
+    </div>
+
+    <div class="scoping card">
+      <h2>Auth scoping check</h2>
+      <p class="lede">
+        Requests a token for <code>room:&lt;id&gt;-OTHER</code> then tries to subscribe to the
+        current room with it. Ably must reject the attach — proving the capability is scoped.
+      </p>
+      <button id="scopeTest">Run scoping check</button>
+      <span id="scopeResult"></span>
+    </div>
+
+    <h2 style="font-size:0.9rem">Log</h2>
+    <pre class="log" id="log"></pre>
+
+    <script>
+      const $ = (sel, root = document) => root.querySelector(sel);
+      const logEl = $("#log");
+      const log = (msg) => {
+        const t = new Date().toISOString().slice(11, 23);
+        logEl.textContent += `[${t}] ${msg}\n`;
+        logEl.scrollTop = logEl.scrollHeight;
+      };
+      const roomId = () => $("#roomId").value.trim() || "spike-1";
+
+      // Shared clock for end-to-end: when either panel issues a move we stamp the
+      // click time keyed by room; the opponent reads it when its render completes.
+      const lastMoveClick = new Map();
+
+      class Player {
+        constructor(letter) {
+          this.letter = letter;
+          this.card = document.querySelector(`.card[data-player="${letter}"]`);
+          this.clientId = `player${letter}`;
+          this.card.querySelector("[data-move]").addEventListener("click", () => this.move());
+        }
+        setConn(text, cls) {
+          const el = this.card.querySelector("[data-conn]");
+          el.textContent = text;
+          el.className = "conn " + (cls ?? "");
+        }
+        async connect() {
+          const id = roomId();
+          this.realtime = new Ably.Realtime({
+            clientId: this.clientId,
+            authCallback: async (_params, cb) => {
+              try {
+                const r = await fetch("/token", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ roomId: id, clientId: this.clientId }),
+                });
+                cb(null, await r.json());
+              } catch (e) {
+                cb(e, null);
+              }
+            },
+          });
+          this.realtime.connection.on("connected", () => this.setConn("connected", "ok"));
+          this.realtime.connection.on("failed", (s) => this.setConn("failed: " + (s.reason?.message ?? ""), "err"));
+          this.channel = this.realtime.channels.get(`room:${id}`);
+          await this.channel.subscribe("update", (m) => this.onPing(m));
+          await this.channel.attach();
+          this.setConn("subscribed", "ok");
+          log(`${this.letter}: subscribed to room:${id}`);
+        }
+        async onPing(msg) {
+          const recv = Date.now();
+          const { v, serverTs } = msg.data;
+          const push = recv - serverTs;
+          this.card.querySelector("[data-push]").textContent = push;
+          log(`${this.letter}: ping v=${v} (push ${push}ms) → re-fetching authoritative state`);
+          // Ping-then-fetch: never trust the payload; GET the authoritative version.
+          const t0 = performance.now();
+          const r = await fetch(`/rooms/${encodeURIComponent(roomId())}`);
+          const body = await r.json();
+          const fetchMs = Math.round(performance.now() - t0);
+          this.card.querySelector("[data-v]").textContent = body.v;
+          this.card.querySelector("[data-fetch]").textContent = fetchMs;
+          const clickTs = lastMoveClick.get(roomId());
+          if (clickTs) this.card.querySelector("[data-e2e]").textContent = Date.now() - clickTs;
+          log(`${this.letter}: rendered v=${body.v} (re-fetch ${fetchMs}ms)`);
+        }
+        async move() {
+          const id = roomId();
+          lastMoveClick.set(id, Date.now());
+          const r = await fetch(`/rooms/${encodeURIComponent(id)}/moves`, { method: "POST" });
+          const body = await r.json();
+          // The mover gets the new version synchronously (fast path).
+          this.card.querySelector("[data-v]").textContent = body.v;
+          log(`${this.letter}: moved → server v=${body.v} (mover fast path)`);
+        }
+      }
+
+      const players = { A: new Player("A"), B: new Player("B") };
+
+      $("#connect").addEventListener("click", async () => {
+        logEl.textContent = "";
+        await Promise.all([players.A.connect(), players.B.connect()]);
+        log("both players connected — click Make move on one, watch the other");
+      });
+
+      $("#scopeTest").addEventListener("click", async () => {
+        const out = $("#scopeResult");
+        out.textContent = " running…";
+        const id = roomId();
+        // Token scoped to a DIFFERENT room, but we try to attach to the current one.
+        const r = await fetch("/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ roomId: id + "-OTHER", clientId: "attacker" }),
+        });
+        const token = await r.json();
+        const rt = new Ably.Realtime({ token });
+        const ch = rt.channels.get(`room:${id}`);
+        try {
+          await ch.attach();
+          out.textContent = " ❌ FAIL — attach succeeded with a wrong-room token";
+          log("scoping: FAIL — capability did not restrict the channel");
+        } catch (e) {
+          out.textContent = " ✅ PASS — Ably rejected the attach (" + (e.message ?? e.code) + ")";
+          log("scoping: PASS — wrong-room token was refused");
+        } finally {
+          rt.close();
+        }
+      });
+    </script>
+  </body>
+</html>
