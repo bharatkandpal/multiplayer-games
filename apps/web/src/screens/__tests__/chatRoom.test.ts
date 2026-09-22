@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_CHAT_ROOM_ID,
+  isPrivateRoomSearch,
   isValidRoomId,
   roomLabel,
   roomPath,
@@ -54,6 +55,25 @@ describe("chatRoom", () => {
       expect(roomShareUrl("my-room", "https://mpg.example")).toBe(
         "https://mpg.example/chat/my-room",
       );
+    });
+  });
+
+  describe("private-room links (CHAT-020)", () => {
+    it("marks a private path/url with ?p=1 and leaves public ones untouched", () => {
+      expect(roomPath("my-room", { private: true })).toBe("/chat/my-room?p=1");
+      expect(roomPath("my-room", { private: false })).toBe("/chat/my-room");
+      expect(roomPath(DEFAULT_CHAT_ROOM_ID, { private: true })).toBe("/chat?p=1");
+      expect(roomShareUrl("my-room", "https://mpg.example", { private: true })).toBe(
+        "https://mpg.example/chat/my-room?p=1",
+      );
+    });
+
+    it("reads the private marker off a search string", () => {
+      expect(isPrivateRoomSearch("?p=1")).toBe(true);
+      expect(isPrivateRoomSearch("?foo=bar&p=1")).toBe(true);
+      expect(isPrivateRoomSearch("")).toBe(false);
+      expect(isPrivateRoomSearch("?p=0")).toBe(false);
+      expect(isPrivateRoomSearch("?private=1")).toBe(false);
     });
   });
 });

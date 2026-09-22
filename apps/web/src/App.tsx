@@ -39,7 +39,7 @@ import { GAME_CATALOG, REALTIME_CATALOG } from "./screens/HomeScreen";
 import { SharedResultScreen } from "./screens/SharedResultScreen";
 import { buildGameItems, nextGame, prevGame, type GameItem } from "./screens/catalog";
 import { pickGameOfTheDay } from "./screens/gameOfTheDay";
-import { roomPath } from "./screens/chatRoom";
+import { isPrivateRoomSearch, roomPath } from "./screens/chatRoom";
 import { isAllBotRoom, publicRoomToSeats, toSeatConfigInput } from "./api/roomSeats";
 import { ensureUsername, getStoredUsername, reconcileUsername } from "./api/username";
 import { initSession } from "./api/session";
@@ -102,8 +102,9 @@ type Route =
   // result, a replay, or a leaderboard view, and needs no session to read.
   | { screen: "shared"; token: string }
   // CHAT-004: a standalone chat room, reached from Home or a deep link.
-  // `/chat` (no id) defaults to the shared "lobby" room.
-  | { screen: "chat"; roomId: string };
+  // `/chat` (no id) defaults to the shared "lobby" room. `private` (CHAT-020,
+  // set by a `?p=1` link) makes the room prompt for a shared secret first.
+  | { screen: "chat"; roomId: string; private?: boolean };
 
 /**
  * The screens that are a *game*, not a page: a top bar, the board or play
@@ -120,12 +121,21 @@ const CHAT_PATH_RE = /^\/chat(?:\/([^/]+))?\/?$/;
 /** Default room a bare `/chat` link opens (CHAT-004). */
 const DEFAULT_CHAT_ROOM_ID = "lobby";
 
-/** Parses `/chat` or `/chat/:roomId` out of a pathname (CHAT-004). */
-function parseChatPath(pathname: string): { roomId: string } | undefined {
+/**
+ * Parses `/chat` or `/chat/:roomId` out of a pathname (CHAT-004), reading the
+ * `?p=1` private-room marker (CHAT-020) off the search string when given.
+ */
+function parseChatPath(
+  pathname: string,
+  search = "",
+): { roomId: string; private: boolean } | undefined {
   const match = CHAT_PATH_RE.exec(pathname);
   if (!match) return undefined;
   const roomId = match[1];
-  return { roomId: roomId ? decodeURIComponent(roomId) : DEFAULT_CHAT_ROOM_ID };
+  return {
+    roomId: roomId ? decodeURIComponent(roomId) : DEFAULT_CHAT_ROOM_ID,
+    private: isPrivateRoomSearch(search),
+  };
 }
 
 /** Parses `/s/:token` out of a pathname (MPG-056). */
@@ -207,9 +217,9 @@ function initialRoute(): Route {
     markColdArrival();
     return { screen: "shared", token: shareToken };
   }
-  const chatPath = parseChatPath(window.location.pathname);
+  const chatPath = parseChatPath(window.location.pathname, window.location.search);
   if (chatPath) {
-    return { screen: "chat", roomId: chatPath.roomId };
+    return { screen: "chat", roomId: chatPath.roomId, private: chatPath.private };
   }
   const parsed = parseRoomPath(window.location.pathname);
   if (!parsed) {
@@ -492,9 +502,9 @@ export default function App(): React.JSX.Element {
   // also produce one — keep the route in sync with the URL either way.
   useEffect(() => {
     const onPopState = (): void => {
-      const chatPath = parseChatPath(window.location.pathname);
+      const chatPath = parseChatPath(window.location.pathname, window.location.search);
       if (chatPath) {
-        setRoute({ screen: "chat", roomId: chatPath.roomId });
+        setRoute({ screen: "chat", roomId: chatPath.roomId, private: chatPath.private });
         return;
       }
       const parsed = parseRoomPath(window.location.pathname);
@@ -740,15 +750,20 @@ export default function App(): React.JSX.Element {
 
         {route.screen === "chat" ? (
           <ChatScreen
-            key={route.roomId}
+            // Keep private/public variants of one room as distinct mounts, so a
+            // switch re-reads the stored secret (CHAT-020) rather than reusing
+            // stale locked/unlocked state.
+            key={`${route.roomId}:${route.private ? "private" : "public"}`}
             roomId={route.roomId}
+            isPrivate={route.private ?? false}
             onBack={() => {
               goHome();
             }}
-            onOpenRoom={(nextRoomId) => {
-              setRoute({ screen: "chat", roomId: nextRoomId });
+            onOpenRoom={(nextRoomId, opts) => {
+              const isPrivate = opts?.private ?? false;
+              setRoute({ screen: "chat", roomId: nextRoomId, private: isPrivate });
               if (typeof window !== "undefined") {
-                window.history.pushState({}, "", roomPath(nextRoomId));
+                window.history.pushState({}, "", roomPath(nextRoomId, { private: isPrivate }));
               }
             }}
           />

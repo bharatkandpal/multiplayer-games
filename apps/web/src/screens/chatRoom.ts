@@ -40,12 +40,31 @@ export function roomLabel(roomId: string): string {
   return roomId === DEFAULT_CHAT_ROOM_ID ? "Lobby" : roomId;
 }
 
+/**
+ * The query flag that marks a link as opening a *private* room (CHAT-020). It
+ * is only a hint — it tells the opener's client to prompt for the secret rather
+ * than joining a public room of the same name. It is never the secret itself
+ * (that is shared out-of-band); security is the secret, not this marker.
+ */
+export const PRIVATE_ROOM_QUERY = "p";
+
+/** True when a URL search string carries the private-room marker (`?p=1`). */
+export function isPrivateRoomSearch(search: string): boolean {
+  return new URLSearchParams(search).get(PRIVATE_ROOM_QUERY) === "1";
+}
+
+interface RoomLinkOptions {
+  /** Mark the link private, so opening it prompts for the room secret. */
+  readonly private?: boolean;
+}
+
 /** The in-app path for a room — the lobby is the bare `/chat`. */
-export function roomPath(roomId: string): string {
-  return roomId === DEFAULT_CHAT_ROOM_ID ? "/chat" : `/chat/${encodeURIComponent(roomId)}`;
+export function roomPath(roomId: string, opts: RoomLinkOptions = {}): string {
+  const base = roomId === DEFAULT_CHAT_ROOM_ID ? "/chat" : `/chat/${encodeURIComponent(roomId)}`;
+  return opts.private ? `${base}?${PRIVATE_ROOM_QUERY}=1` : base;
 }
 
 /** The absolute, shareable URL for a room, given an origin (e.g. `location.origin`). */
-export function roomShareUrl(roomId: string, origin: string): string {
-  return `${origin}${roomPath(roomId)}`;
+export function roomShareUrl(roomId: string, origin: string, opts: RoomLinkOptions = {}): string {
+  return `${origin}${roomPath(roomId, opts)}`;
 }
