@@ -13,7 +13,7 @@ import {
   listCatalogEntries,
   tagFilterNarrows,
 } from "./catalog";
-import type { CatalogEntry, GameTag, HomeShelf } from "./catalog";
+import type { CatalogEntry, GameTag, HomeShelf, ShelfDensity } from "./catalog";
 import { SurpriseMe } from "./SurpriseMe";
 import styles from "./HomeScreen.module.css";
 
@@ -65,7 +65,13 @@ export interface HomeScreenProps {
  * Structured as **discovery shelves** rather than one undifferentiated grid
  * (MPG-090 / PRD FR-25) — Featured carries the cold start, Trending appears
  * only once MPG-094 gives it honest signal, New surfaces recent additions, and
- * a catch-all shelf guarantees every listed game is still one tap from playable.
+ * the tail shelves guarantee every listed game is still one tap from playable.
+ *
+ * Since UI-17 the shelves also differ in **size**: one marquee, tiles for the
+ * shelves that recommend, compact rows for the long tail. A grid of identical
+ * cards is a list; three sizes is a room. Each shelf carries its own density
+ * (`HomeShelf.density`), so the hierarchy is decided with the grouping rather
+ * than in a lookup table here.
  *
  * One clear primary action per card (UX_PRINCIPLES §1.6): tapping a card
  * *starts the game* rather than opening seat setup. Setup is still reachable
@@ -140,13 +146,25 @@ export function HomeScreen({
 
       {/* The browse controls: narrow the shelf, or skip choosing entirely. Kept
           on one row because they answer the same question ("what do I play?")
-          from opposite ends. Either half can be absent without the other moving. */}
+          from opposite ends. Either half can be absent without the other moving.
+
+          UI-17: the row is a **sticky rail**. A catalogue this size is a long
+          scroll, and the controls that navigate it were only reachable by
+          scrolling back to the top. It sticks inside App's single scrolling
+          region (`App.module.css` `.screen`) rather than becoming new fixed
+          chrome — the page still scrolls in exactly one place (MPG-137). */}
       {showFilter || surpriseFrom.length > 0 ? (
-        <div className={styles.controlRow}>
-          {showFilter ? (
-            <TagFilter tags={tags} activeTag={activeTag} onChange={setActiveTag} />
-          ) : null}
-          <SurpriseMe entries={surpriseFrom} onPick={playEntry} />
+        <div className={styles.browseRail}>
+          <div className={styles.controlRow}>
+            {showFilter ? (
+              <TagFilter tags={tags} activeTag={activeTag} onChange={setActiveTag} />
+            ) : null}
+            {/* Pinned outside the chip scroller: a growing tag list scrolls,
+                it never pushes the dice off the edge of the rail. */}
+            <span className={styles.railAction}>
+              <SurpriseMe entries={surpriseFrom} onPick={playEntry} />
+            </span>
+          </div>
         </div>
       ) : null}
 
@@ -274,8 +292,9 @@ function FilteredResults({
         </h2>
         <p className={styles.shelfBlurb}>Tagged {TAG_LABEL[tag].toLowerCase()}.</p>
       </div>
-      <GameGrid
+      <GameList
         entries={matches}
+        density="tile"
         label={`Games tagged ${TAG_LABEL[tag]}`}
         onSelectGame={onSelectGame}
         onSelectRealtimeGame={onSelectRealtimeGame}
@@ -285,31 +304,54 @@ function FilteredResults({
   );
 }
 
-interface GameGridProps {
+interface GameListProps {
   entries: readonly CatalogEntry[];
+  /** How big these games draw — see `ShelfDensity`. */
+  density: ShelfDensity;
   label: string;
   onSelectGame: (gameId: GameId) => void;
   onSelectRealtimeGame: ((gameId: RealtimeGameId) => void) | undefined;
   onConfigureGame: ((gameId: GameId) => void) | undefined;
 }
 
+/** The container class for each density — the list is the same list either way. */
+const LIST_CLASS: Record<ShelfDensity, string | undefined> = {
+  marquee: styles.marqueeList,
+  tile: styles.gameGrid,
+  row: styles.rowList,
+};
+
+const CELL_CLASS: Record<ShelfDensity, string | undefined> = {
+  marquee: styles.gameCell,
+  tile: styles.gameCell,
+  row: styles.rowCell,
+};
+
 /**
- * The grid of cards, shared by a shelf and by the filtered result list, so the
- * two can never drift on card wiring or on the Options control.
+ * The list of cards, shared by every shelf and by the filtered result list, so
+ * they can never drift on card wiring or on the Options control.
+ *
+ * **One list, three sizes** (UI-17). The structure — a `ul` of cells, each a
+ * card plus an optional Options control — is identical at every density; only
+ * the geometry changes. That is what keeps a compact row as reachable, as
+ * routable and as announced as a marquee, rather than the long tail quietly
+ * becoming a second-class surface.
  */
-function GameGrid({
+function GameList({
   entries,
+  density,
   label,
   onSelectGame,
   onSelectRealtimeGame,
   onConfigureGame,
-}: GameGridProps): React.JSX.Element {
+}: GameListProps): React.JSX.Element {
   return (
-    <ul className={styles.gameGrid} aria-label={label}>
+    <ul className={LIST_CLASS[density]} aria-label={label}>
       {entries.map((entry) => (
-        <li key={`${entry.kind}:${entry.id}`} className={styles.gameCell}>
+        <li key={`${entry.kind}:${entry.id}`} className={CELL_CLASS[density]}>
           <GameCard
             entry={entry}
+            density={density}
             onSelectGame={onSelectGame}
             onSelectRealtimeGame={onSelectRealtimeGame}
           />
@@ -319,7 +361,10 @@ function GameGrid({
             <Button
               variant="ghost"
               size="sm"
-              className={styles.gameOptions}
+              // In a row Options is a sibling in the strip, not a corner
+              // overlay: a 48px row has no corner to hide it in, and the meta
+              // it would sit on top of is the row's only other content.
+              className={density === "row" ? styles.rowOptions : styles.gameOptions}
               onClick={() => onConfigureGame(entry.id)}
               aria-label={`Options for ${entry.title} — play a friend, online, or watch bots`}
             >
@@ -342,9 +387,21 @@ interface ShelfProps {
 }
 
 /**
- * One discovery shelf: a hairline rule, a mono micro-caps label, and its cards.
- * The rule is the quietest mark on the page by design (`DESIGN_LANGUAGE.md` §4)
- * — it states a fact about the grouping, it doesn't compete with the games.
+ * The `aria-label` for a shelf's list.
+ *
+ * The tail shelves are already noun phrases naming a set of games, so "The
+ * cabinet games" would only be clumsier than "The cabinet". Everything else
+ * reads as an adjective and takes the noun.
+ */
+function listLabel(shelf: HomeShelf): string {
+  return shelf.id === "cabinet" || shelf.id === "table" ? shelf.title : `${shelf.title} games`;
+}
+
+/**
+ * One discovery shelf: a hairline rule, a mono micro-caps label, a count, and
+ * its games at the shelf's own density. The rule is the quietest mark on the
+ * page by design (`DESIGN_LANGUAGE.md` §4) — it states a fact about the
+ * grouping, it doesn't compete with the games.
  */
 function Shelf({
   shelf,
@@ -353,14 +410,10 @@ function Shelf({
   onConfigureGame,
 }: ShelfProps): React.JSX.Element {
   // The Game-of-the-day shelf carries the same markup and card wiring as any
-  // other shelf — it's just dressed as a spotlight: an accent label and a card
-  // that spans the row (see `.spotlight` in the stylesheet).
-  const isSpotlight = shelf.id === "gotd";
+  // other shelf — it's just the one drawn at marquee size, with an accent label.
+  const isSpotlight = shelf.density === "marquee";
   return (
-    <section
-      className={isSpotlight ? `${styles.shelf} ${styles.spotlight}` : styles.shelf}
-      aria-labelledby={`shelf-${shelf.id}`}
-    >
+    <section className={styles.shelf} aria-labelledby={`shelf-${shelf.id}`}>
       <div className={styles.shelfHeader}>
         <h2
           className={
@@ -370,11 +423,21 @@ function Shelf({
         >
           {shelf.title}
         </h2>
-        <p className={styles.shelfBlurb}>{shelf.blurb}</p>
+        {/* The count answers what the blurbs mostly no longer do: how much is
+            under this heading. Hidden from AT — the list below announces its
+            own length, and "4" on its own is not a sentence. A marquee holds
+            exactly one game, so counting it would be noise. */}
+        {isSpotlight ? null : (
+          <span className={styles.shelfCount} aria-hidden="true">
+            {shelf.entries.length}
+          </span>
+        )}
       </div>
-      <GameGrid
+      {shelf.blurb ? <p className={styles.shelfBlurb}>{shelf.blurb}</p> : null}
+      <GameList
         entries={shelf.entries}
-        label={`${shelf.title} games`}
+        density={shelf.density}
+        label={listLabel(shelf)}
         onSelectGame={onSelectGame}
         onSelectRealtimeGame={onSelectRealtimeGame}
         onConfigureGame={onConfigureGame}
@@ -385,6 +448,7 @@ function Shelf({
 
 interface GameCardProps {
   entry: CatalogEntry;
+  density: ShelfDensity;
   onSelectGame: (gameId: GameId) => void;
   onSelectRealtimeGame: ((gameId: RealtimeGameId) => void) | undefined;
 }
@@ -419,7 +483,35 @@ function renderDescription(description: string, emphasis?: string): React.ReactN
   );
 }
 
-function GameCard({ entry, onSelectGame, onSelectRealtimeGame }: GameCardProps): React.JSX.Element {
+/**
+ * The one tag a compact row shows, out of the four or five a game carries.
+ *
+ * A row is a scanning surface, so it gets the tag that actually *distinguishes*
+ * this game from its neighbours on the same shelf. For a table game that's the
+ * seat count ("2 players"). For an arcade game it isn't "Solo" — the whole
+ * cabinet is solo, so a Solo chip on every row is a column of noise — it's the
+ * shape of the session: quick, or endless.
+ *
+ * The tags this drops are not lost: the row keeps the full list for assistive
+ * tech (see `GameCard`), so nobody is shown less than a tile shows.
+ */
+function rowTag(entry: CatalogEntry): GameTag {
+  const [seat, ...rest] = gameTags(entry);
+  if (entry.kind === "realtime") {
+    const shape = rest.find((tag) => tag === "quick" || tag === "endless");
+    if (shape !== undefined) return shape;
+  }
+  // `gameTags()` always yields the derived seat tag first, so this is never
+  // undefined — the assertion is for `noUncheckedIndexedAccess`, not a guess.
+  return seat as GameTag;
+}
+
+function GameCard({
+  entry,
+  density,
+  onSelectGame,
+  onSelectRealtimeGame,
+}: GameCardProps): React.JSX.Element {
   const baseId = useId();
   const titleId = `${baseId}-title`;
   const descriptionId = `${baseId}-desc`;
@@ -431,10 +523,117 @@ function GameCard({ entry, onSelectGame, onSelectRealtimeGame }: GameCardProps):
   // `game/personalBest` for why this deliberately isn't the leaderboard.
   const personalBest = entry.kind === "realtime" ? loadPersonalBest(entry.id) : undefined;
 
+  const ground = entry.kind === "realtime" ? styles.cabinetCard : styles.tableCard;
+  const size =
+    density === "marquee"
+      ? styles.marqueeCard
+      : density === "row"
+        ? styles.rowCard
+        : styles.tileCard;
+
+  const thumbnail = (
+    <span className={styles.gameThumbnail}>
+      <GameThumbnail gameId={entry.id} />
+    </span>
+  );
+  const title = (
+    <span className={styles.gameTitle} id={titleId}>
+      {entry.title}
+    </span>
+  );
+  const best =
+    personalBest === undefined ? null : (
+      <span className={styles.personalBest} id={bestId}>
+        Your best <span className={styles.personalBestValue}>{personalBest}</span>
+      </span>
+    );
+
+  // The chips, in full. `hidden` drops a chip from the page while leaving it in
+  // the accessible description — which is how a row shows one tag and still
+  // announces all of them.
+  const chips = (
+    <span className={styles.tagRow} id={tagsId}>
+      {/* The family marker. The cabinet treatment says "arcade" visually, but
+          a visual-only signal isn't a signal for everyone — this keeps it in
+          the text, where it was before the shelves split by discovery. */}
+      {entry.kind === "realtime" ? (
+        <span className={density === "row" ? styles.srOnly : styles.kindChip}>Solo arcade</span>
+      ) : null}
+      {gameTags(entry).map((tag, index) => (
+        <span
+          key={tag}
+          // The seat tag comes first out of `gameTags()` and is the only
+          // filled chip — it answers "can I play this with someone?" at a
+          // glance, and keeps the rest of the row from turning into confetti.
+          className={
+            density === "row" && tag !== rowTag(entry)
+              ? styles.srOnly
+              : index === 0
+                ? styles.seatChip
+                : styles.tagChip
+          }
+        >
+          {TAG_LABEL[tag]}
+        </span>
+      ))}
+    </span>
+  );
+
+  const body =
+    density === "row" ? (
+      // A dense strip: thumbnail, title, and the one distinguishing fact.
+      // The description is carried but not drawn — see `.srOnly`.
+      <>
+        {thumbnail}
+        {title}
+        <span className={styles.rowMeta}>
+          {chips}
+          {best}
+        </span>
+        <span className={styles.srOnly} id={descriptionId}>
+          {entry.description}
+        </span>
+      </>
+    ) : density === "marquee" ? (
+      <>
+        <span className={styles.marqueeTop}>
+          {thumbnail}
+          {title}
+        </span>
+        {/* The one place a description is shown in full rather than clamped:
+            the marquee is the page's single recommendation, so it gets to make
+            the case for itself (see the clamp note in the stylesheet). */}
+        <span className={styles.gameDescription} id={descriptionId}>
+          {renderDescription(entry.description, entry.emphasis)}
+        </span>
+        <span className={styles.marqueeFoot}>
+          {chips}
+          {best}
+          {/* A styled span, not a nested button — a button inside a button is
+              invalid, and the whole marquee is already the target. It names the
+              action the way the mock's Play control does without shrinking the
+              tap area to the size of the pill. */}
+          <span className={styles.playPill} aria-hidden="true">
+            Play
+          </span>
+        </span>
+      </>
+    ) : (
+      <>
+        {thumbnail}
+        {title}
+        <span className={styles.gameDescription} id={descriptionId}>
+          {renderDescription(entry.description, entry.emphasis)}
+        </span>
+        {chips}
+        {best}
+      </>
+    );
+
   return (
     <button
       type="button"
-      className={entry.kind === "realtime" ? styles.cabinetCard : styles.tableCard}
+      className={`${styles.card} ${ground} ${size}`}
       onClick={() =>
         entry.kind === "realtime" ? onSelectRealtimeGame?.(entry.id) : onSelectGame(entry.id)
       }
@@ -445,37 +644,7 @@ function GameCard({ entry, onSelectGame, onSelectRealtimeGame }: GameCardProps):
           : `${descriptionId} ${tagsId} ${bestId}`
       }
     >
-      <span className={styles.gameThumbnail}>
-        <GameThumbnail gameId={entry.id} />
-      </span>
-      <span className={styles.gameTitle} id={titleId}>
-        {entry.title}
-      </span>
-      <span className={styles.gameDescription} id={descriptionId}>
-        {renderDescription(entry.description, entry.emphasis)}
-      </span>
-      <span className={styles.tagRow} id={tagsId}>
-        {/* The family marker. The cabinet treatment says "arcade" visually, but
-            a visual-only signal isn't a signal for everyone — this keeps it in
-            the text, where it was before the shelves split by discovery. */}
-        {entry.kind === "realtime" ? <span className={styles.kindChip}>Solo arcade</span> : null}
-        {gameTags(entry).map((tag, index) => (
-          <span
-            key={tag}
-            // The seat tag comes first out of `gameTags()` and is the only
-            // filled chip — it answers "can I play this with someone?" at a
-            // glance, and keeps the rest of the row from turning into confetti.
-            className={index === 0 ? styles.seatChip : styles.tagChip}
-          >
-            {TAG_LABEL[tag]}
-          </span>
-        ))}
-      </span>
-      {personalBest === undefined ? null : (
-        <span className={styles.personalBest} id={bestId}>
-          Your best <span className={styles.personalBestValue}>{personalBest}</span>
-        </span>
-      )}
+      {body}
     </button>
   );
 }

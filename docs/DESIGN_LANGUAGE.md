@@ -189,6 +189,10 @@ screens.
 | UI-12 | MPG-119 | Drunk Walk detox: ~75 baked-in literals → scene ramp; tree sprites re-authored to take `currentColor`                                    | `DrunkWalkScene` · character · glyph · cosmetics                                     | L    | Backlog                 |
 | UI-13 | MPG-136 | §5 bezel, in-game: pinned bottom action bar (prev / vs Bot / next), labelled + enlarged Home, top bar reduced to exit + title            | `GamePlayScreen` · `GameSwitcher` · `OnlineGamePlay`/`WatchGamePlay` · `icons.tsx`   | M    | Backlog                 |
 | UI-14 | MPG-137 | §5 bezel, everywhere else: no page scroll at 320×568 / 390×844; overflow scoped to one region per screen                                 | `App.module.css` · Home · Setup · Leaderboard · Shared result                        | M    | Backlog                 |
+| UI-15 | MPG-144 | Two-state sun/moon theme switch replacing the three-way cycler; `"system"` survives as the stored default                                | `ThemeToggle` · `theme.ts`                                                           | S    | ✅ `6c0bfb9`            |
+| UI-16 | MPG-145 | Brand bar: mark, wordmark, promise line — the top of the app identifies the product instead of exposing a setting                        | `App.module.css` · brand components                                                  | S    | Backlog (needs a name)  |
+| UI-17 | MPG-146 | Tile hierarchy: marquee / tile / compact row; sticky browse rail; shelf headers with counts; tail split into The Table and The Cabinet   | `HomeScreen.tsx` + `.module.css` · `catalog.ts`                                      | M    | ✅ shipped              |
+| UI-18 | MPG-147 | Profile avatar + menu; global settings get a home; `UsernameBadge` retires from Home                                                     | `HomeScreen.tsx` · profile menu · `UsernameBadge`                                    | M    | Backlog                 |
 
 **Gate for every slice:** the UX Definition of Done in
 [UX_PRINCIPLES.md](UX_PRINCIPLES.md) §6 — all required states, AA contrast

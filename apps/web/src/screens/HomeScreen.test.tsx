@@ -547,4 +547,125 @@ describe("HomeScreen", () => {
       expect(screen.getByText(/No games are available right now/)).toBeInTheDocument();
     });
   });
+
+  // ── Tile hierarchy (MPG-146 / UI-17) ───────────────────────────────────
+  //
+  // "A grid of identical tiles is a list. Three tile sizes is a room." The
+  // rule these tests protect is that the three sizes are three *renderings of
+  // one card* — a compact row is as playable, as routable and as announced as
+  // a marquee. The moment the tail is cheaper to use than the top of the page,
+  // the hierarchy has stopped being hierarchy and started being neglect.
+  describe("tile hierarchy", () => {
+    const GAMES = ["tictactoe", "connect4", "tictactoe-move", "nim", "gomoku"] as const;
+    const ARCADE = [
+      "floppy-birds",
+      "drunk-walk",
+      "reflex-test",
+      "2048",
+      "breakout",
+      "aim-trainer",
+      "memory-sequence",
+      "lumberjack",
+      "snake",
+    ] as const;
+
+    function renderRoom(props: Record<string, unknown> = {}) {
+      const onSelectGame = vi.fn();
+      const onSelectRealtimeGame = vi.fn();
+      const onConfigureGame = vi.fn();
+      render(
+        <HomeScreen
+          games={[...GAMES]}
+          realtimeGames={[...ARCADE]}
+          onSelectGame={onSelectGame}
+          onSelectRealtimeGame={onSelectRealtimeGame}
+          onConfigureGame={onConfigureGame}
+          onShowGallery={vi.fn()}
+          {...props}
+        />,
+      );
+      return { onSelectGame, onSelectRealtimeGame, onConfigureGame };
+    }
+
+    it("splits the tail into the cabinet and the table instead of 'More games'", () => {
+      renderRoom();
+
+      expect(screen.getByRole("region", { name: "The cabinet" })).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "The table" })).toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "More games" })).not.toBeInTheDocument();
+    });
+
+    it("still draws every game exactly once across all three densities", () => {
+      renderRoom({ gameOfTheDay: "snake" });
+
+      const titles = allCards().map(cardTitle);
+      expect(titles).toHaveLength(GAMES.length + ARCADE.length);
+      expect(new Set(titles).size).toBe(titles.length);
+    });
+
+    it("plays a game from a compact row, exactly like a tile", async () => {
+      const user = userEvent.setup();
+      const { onSelectRealtimeGame } = renderRoom();
+
+      const cabinet = screen.getByRole("list", { name: "The cabinet" });
+      const row = within(cabinet).getByRole("button", { name: "Breakout" });
+      await user.click(row);
+      expect(onSelectRealtimeGame).toHaveBeenCalledExactlyOnceWith("breakout");
+    });
+
+    it("keeps Options on a table row — the tail is not a second-class surface", async () => {
+      const user = userEvent.setup();
+      const { onConfigureGame } = renderRoom();
+
+      const table = screen.getByRole("list", { name: "The table" });
+      await user.click(
+        within(table).getByRole("button", {
+          name: "Options for Gomoku — play a friend, online, or watch bots",
+        }),
+      );
+      expect(onConfigureGame).toHaveBeenCalledExactlyOnceWith("gomoku");
+    });
+
+    // The receipt for showing one chip and no description on a row: what the
+    // row drops, it drops *visually*. Nothing is dropped from the announcement.
+    it("announces a row's full description and every one of its tags", () => {
+      renderRoom();
+
+      const row = within(screen.getByRole("list", { name: "The cabinet" })).getByRole("button", {
+        name: "Breakout",
+      });
+      const description = row.getAttribute("aria-describedby");
+      expect(description).not.toBeNull();
+      expect(row).toHaveAccessibleDescription(/Bounce the ball off your paddle/);
+      // "Solo" and "Solo arcade" are not drawn on a row — the whole cabinet is
+      // solo — but they are still announced.
+      expect(row).toHaveAccessibleDescription(/Solo arcade/);
+      expect(row).toHaveAccessibleDescription(/Endless/);
+    });
+
+    it("draws exactly one marquee, and it shows its description in full", () => {
+      renderRoom({ gameOfTheDay: "snake" });
+
+      const spotlight = screen.getByRole("region", { name: "Game of the day" });
+      const marquee = within(spotlight).getByRole("button");
+      expect(cardTitle(marquee)).toBe("Snake");
+      // The marquee is the one card that renders its prose rather than
+      // clamping it, so the emphasis markup is on the page, not just in the
+      // accessible description.
+      expect(
+        within(marquee).getByText("the longer you get, the less room you have to turn").tagName,
+      ).toBe("STRONG");
+      expect(within(marquee).getByText("Play")).toBeInTheDocument();
+    });
+
+    it("heads each shelf with a count, hidden from assistive tech", () => {
+      renderRoom();
+
+      const featured = screen.getByRole("region", { name: "Featured" });
+      // Four curated entries — and the region's name is still just "Featured",
+      // because the count is not part of the heading.
+      const count = within(featured).getByText("4");
+      expect(count).toHaveAttribute("aria-hidden", "true");
+    });
+  });
 });
