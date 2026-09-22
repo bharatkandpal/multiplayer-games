@@ -112,6 +112,15 @@ if this doesn't work.
       ranking exists, which is the honest cold-start behaviour. _(FR-36 — MPG-094)_
 - [ ] Time-to-first-input from a cold shared link < 3 s on mid-range mobile — **measurable now**
       (`first_input` ships), **unmeasured until deployed**.
+- [ ] **Game of the day can only ever land on two games.** `pickGameOfTheDay` walks the
+      catalogue with `index = (dayOrdinal * 7) % items.length`. The stride and the catalogue
+      size have to be coprime for that to walk at all — with 14 listed games it yields only
+      index 0 or 7, so the spotlight alternates between two arcade entries forever and can
+      never reach a turn-based game. The file's own docstring promises it "walks the whole
+      catalog over time", which is the contract being broken. Fix the stride (or pick one
+      coprime with the current length at call time) and add a test that asserts coverage
+      across a year of days rather than just determinism-within-a-day. Found while building
+      the UI-17 marquee, which is the surface this feeds. _(MPG-149)_
 
 ### 3e. Identity — _the substrate under 3a–3d_ ✅
 
@@ -131,6 +140,13 @@ if this doesn't work.
 - [ ] Friendly expired-room + bad-invite screens — **rescoped down**: the durable share link
       already ships a full dead/expired state machine, so what remains is the lower-traffic
       live-room path. _(MPG-019)_
+- [ ] **`App.watch.test.tsx` is flaky under CI load.** "configuring every seat as a bot and
+      clicking the customize online action creates a watch room" failed one run and passed
+      another **on the identical commit** (PR #85), and passes locally. It is load-sensitive,
+      not a real break — but a suite that goes red at random teaches everyone to re-run
+      without reading, which is how a genuine failure gets waved through. Diagnose the race
+      (`fireEvent` + `waitFor` across a routing transition is the suspect) and make it
+      deterministic; do not paper over it with a longer timeout. _(MPG-150)_
 
 ---
 
