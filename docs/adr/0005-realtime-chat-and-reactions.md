@@ -145,8 +145,10 @@ Company/HR framing → anti-abuse is in-scope, sized POC-vs-later:
 
 1. **One socket, one authority** — chat/reactions ride the room channel; the server assigns
    order/timestamp; clients never define order (ADR 0002).
-2. **Ephemeral only** — no chat/reaction rows in the ADR-0003 store; `GameResult` carries no
-   transcript; the ring buffer is TTL'd room state.
+2. **Ephemeral by default** — reactions carry no durable rows and `GameResult` carries no
+   transcript. **Amended by CHAT-021:** chat _messages_ now persist to the ADR-0003 store
+   (masked text, keyed by derived channel, 30-day TTL) for history/replay; reactions remain
+   ephemeral.
 3. **Sender = session token** — every limit, mute, and (later) report keys off the token,
    not the display name.
 4. **Reactions are decorative** — `aria-hidden`, reduced-motion-aware, and bounded in render
@@ -176,6 +178,39 @@ not a stored password:
 
 The security boundary is the **token scoping**, not the channel name's secrecy: a client can
 never subscribe to a channel its token wasn't scoped to, however it learned the name.
+
+## Addendum (CHAT-021) — durable chat history
+
+This **reverses the load-bearing "ephemeral" decision above** for chat (reactions stay
+ephemeral). It is not a drift — it's the revisit trigger this ADR named ("a hard requirement
+to replay chat"): a room must be able to open with its recent conversation instead of blank,
+so messages now **persist to the ADR-0003 durable store**. Guardrail 2 is amended accordingly:
+_chat messages_ are durable; reactions and `GameResult` transcripts are not.
+
+- **What's stored.** A `chat_messages` row per message — the already-**profanity-masked** text
+  (never the raw text), the sender's ADR-0004 session token, the display name, and the
+  authoritative broadcast timestamp. Keyed by the **derived channel** (`chat:<roomId>` or the
+  private `chat:p-<hmac>`), so history and the live stream reconcile by the same message `id`.
+- **Private rooms persist too, without weakening CHAT-020.** A private room's messages are
+  keyed by its **opaque channel hash** — the room `secret` is **never** stored (the roomId is
+  not secret; it's already in the URL). An operator can read masked content but cannot map it
+  back to a room without the secret, and reads still derive the channel from the caller's
+  `(roomId, secret)` exactly as sends do, so the secret alone gates the history.
+- **Reads.** `POST /api/chat/:roomId/history` (POST so the secret rides the body, never the
+  URL) returns the newest page (default 10) oldest-first with a `hasMore` flag and a cursor;
+  the client lazy-loads on open and pages older on scroll-up. The `(created_at, id)` pair is
+  the total order, so paging never repeats or skips a same-millisecond message.
+- **30-day retention.** Chat prunes on a tighter clock than the 90-day game-results sweep — a
+  transcript is a bigger moderation/privacy liability on the HR surface, so it is a short-term
+  convenience, not an archive. "Forget me" and the session FK-cascade erase a sender's
+  messages from everyone's history.
+- **Offline pillar preserved.** Persistence is best-effort and **off the send's critical
+  path**: a delivered message is a 202 even if the store write fails (history just misses it),
+  and a history read that fails degrades to "live only" — never an error, never a block. The
+  live plane (ADR 0002/0005 pub-sub) is unchanged; the store is a side-channel for replay.
+- **Still deferred.** No delete/redact-a-message UI yet — a durable transcript reopens the
+  redaction question ("a deleted message must not resurrect"), now the next revisit for chat
+  moderation (see below), not a launch blocker.
 
 ## Revisit triggers
 

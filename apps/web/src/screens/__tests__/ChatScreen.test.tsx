@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { ChatScreen } from "../ChatScreen";
@@ -9,6 +9,9 @@ const state = vi.hoisted(() => ({
   status: "connecting" as "connecting" | "live" | "unavailable",
   messages: [] as ChatMessage[],
   send: vi.fn(),
+  hasMoreHistory: false,
+  loadingOlder: false,
+  loadOlder: vi.fn(),
 }));
 
 vi.mock("../../hooks/useChatChannel.js", () => ({
@@ -16,6 +19,9 @@ vi.mock("../../hooks/useChatChannel.js", () => ({
     status: state.status,
     messages: state.messages,
     send: state.send,
+    hasMoreHistory: state.hasMoreHistory,
+    loadingOlder: state.loadingOlder,
+    loadOlder: state.loadOlder,
     connectionState: "unknown",
   }),
 }));
@@ -31,6 +37,9 @@ describe("ChatScreen", () => {
     state.status = "connecting";
     state.messages = [];
     state.send = vi.fn().mockResolvedValue({ ok: true });
+    state.hasMoreHistory = false;
+    state.loadingOlder = false;
+    state.loadOlder = vi.fn();
   });
 
   afterEach(() => {
@@ -179,6 +188,38 @@ describe("ChatScreen", () => {
       await user.click(screen.getByRole("button", { name: "Back to the lobby" }));
 
       expect(onOpenRoom).toHaveBeenCalledWith("lobby", undefined);
+    });
+  });
+
+  describe("CHAT-021: history paging", () => {
+    it("shows a quiet 'loading earlier messages' marker while an older page loads", () => {
+      state.status = "live";
+      state.loadingOlder = true;
+      render(<ChatScreen roomId="lobby" onBack={() => {}} />);
+
+      expect(screen.getByText(/Loading earlier messages/)).toBeInTheDocument();
+    });
+
+    it("pulls the next older page when the list is scrolled to the top", () => {
+      state.status = "live";
+      state.hasMoreHistory = true;
+      state.messages = [
+        { id: "m1", roomId: "lobby", sender: { token: "tok-me", name: "me" }, text: "hi", ts: 1 },
+      ];
+      render(<ChatScreen roomId="lobby" onBack={() => {}} />);
+
+      // jsdom reports scrollTop 0, which is at/above the near-top threshold.
+      fireEvent.scroll(screen.getByRole("log", { name: "Chat messages" }));
+      expect(state.loadOlder).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not page when there is no more history to load", () => {
+      state.status = "live";
+      state.hasMoreHistory = false;
+      render(<ChatScreen roomId="lobby" onBack={() => {}} />);
+
+      fireEvent.scroll(screen.getByRole("log", { name: "Chat messages" }));
+      expect(state.loadOlder).not.toHaveBeenCalled();
     });
   });
 

@@ -37,6 +37,7 @@ const STORE_TABLES = [
   "analytics_events",
   "reports",
   "variants",
+  "chat_messages",
 ] as const;
 
 type Adapter = readonly [name: string, setup: () => Promise<Store>];
@@ -956,6 +957,120 @@ describe.each(adapters)("%s adapter", (_name, factory) => {
       expect(count).toBe(2);
       expect(await store.variants.findByOwner("tok-1")).toEqual([]);
       expect(await store.variants.findByOwner("tok-2")).toHaveLength(1);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // ChatMessageRepo (CHAT-021)
+  // -----------------------------------------------------------------------
+
+  describe("ChatMessageRepo", () => {
+    beforeEach(async () => {
+      await store.sessions.upsert("tok-1");
+      await store.sessions.upsert("tok-2");
+    });
+
+    const makeMsg = (overrides: { id: string; ts: number } & Record<string, unknown>) => ({
+      channel: "chat:room-1",
+      roomId: "room-1",
+      senderToken: "tok-1",
+      senderName: "Ann",
+      text: "hi",
+      ...overrides,
+    });
+
+    it("appends a message and reads it back", async () => {
+      await store.chat.append(makeMsg({ id: "m1", ts: 1000 }));
+      const page = await store.chat.page("chat:room-1", { limit: 10 });
+      expect(page).toHaveLength(1);
+      expect(page[0]).toEqual({
+        id: "m1",
+        channel: "chat:room-1",
+        roomId: "room-1",
+        senderToken: "tok-1",
+        senderName: "Ann",
+        text: "hi",
+        ts: 1000,
+      });
+    });
+
+    it("append is idempotent on id", async () => {
+      await store.chat.append(makeMsg({ id: "dup", ts: 1000, text: "first" }));
+      await store.chat.append(makeMsg({ id: "dup", ts: 2000, text: "second" }));
+      const page = await store.chat.page("chat:room-1", { limit: 10 });
+      expect(page).toHaveLength(1);
+      // The first write wins; the retried write is a no-op, not an overwrite.
+      expect(page[0]!.text).toBe("first");
+    });
+
+    it("page returns newest-first and scopes to the channel", async () => {
+      await store.chat.append(makeMsg({ id: "a", ts: 1000 }));
+      await store.chat.append(makeMsg({ id: "b", ts: 2000 }));
+      await store.chat.append(makeMsg({ id: "c", ts: 3000, channel: "chat:other" }));
+
+      const page = await store.chat.page("chat:room-1", { limit: 10 });
+      expect(page.map((m) => m.id)).toEqual(["b", "a"]);
+    });
+
+    it("page respects the limit", async () => {
+      for (let i = 0; i < 5; i++) {
+        await store.chat.append(makeMsg({ id: `m${i}`, ts: 1000 + i }));
+      }
+      const page = await store.chat.page("chat:room-1", { limit: 2 });
+      expect(page).toHaveLength(2);
+      expect(page.map((m) => m.id)).toEqual(["m4", "m3"]);
+    });
+
+    it("page returns only messages strictly older than the cursor", async () => {
+      await store.chat.append(makeMsg({ id: "a", ts: 1000 }));
+      await store.chat.append(makeMsg({ id: "b", ts: 2000 }));
+      await store.chat.append(makeMsg({ id: "c", ts: 3000 }));
+
+      // Older than c (ts 3000) → b then a; the cursor row itself is excluded.
+      const older = await store.chat.page("chat:room-1", {
+        before: { ts: 3000, id: "c" },
+        limit: 10,
+      });
+      expect(older.map((m) => m.id)).toEqual(["b", "a"]);
+    });
+
+    it("breaks a same-ts cursor tie by id so paging never repeats or skips", async () => {
+      // Three messages share a millisecond — the (ts, id) total order decides.
+      await store.chat.append(makeMsg({ id: "id-a", ts: 5000 }));
+      await store.chat.append(makeMsg({ id: "id-b", ts: 5000 }));
+      await store.chat.append(makeMsg({ id: "id-c", ts: 5000 }));
+
+      const first = await store.chat.page("chat:room-1", { limit: 2 });
+      expect(first.map((m) => m.id)).toEqual(["id-c", "id-b"]);
+
+      const oldestOfFirst = first[first.length - 1]!;
+      const next = await store.chat.page("chat:room-1", {
+        before: { ts: oldestOfFirst.ts, id: oldestOfFirst.id },
+        limit: 2,
+      });
+      // Strictly older in the (ts, id) order → just id-a, no overlap.
+      expect(next.map((m) => m.id)).toEqual(["id-a"]);
+    });
+
+    it("deleteByOwner removes all of a sender's messages", async () => {
+      await store.chat.append(makeMsg({ id: "a", ts: 1000, senderToken: "tok-1" }));
+      await store.chat.append(makeMsg({ id: "b", ts: 2000, senderToken: "tok-1" }));
+      await store.chat.append(makeMsg({ id: "c", ts: 3000, senderToken: "tok-2" }));
+
+      const count = await store.chat.deleteByOwner("tok-1");
+      expect(count).toBe(2);
+      const page = await store.chat.page("chat:room-1", { limit: 10 });
+      expect(page.map((m) => m.id)).toEqual(["c"]);
+    });
+
+    it("deleteOlderThan removes only messages before the cutoff", async () => {
+      await store.chat.append(makeMsg({ id: "old", ts: 1000 }));
+      await store.chat.append(makeMsg({ id: "new", ts: Date.now() }));
+
+      const count = await store.chat.deleteOlderThan(new Date(2000));
+      expect(count).toBe(1);
+      const page = await store.chat.page("chat:room-1", { limit: 10 });
+      expect(page.map((m) => m.id)).toEqual(["new"]);
     });
   });
 

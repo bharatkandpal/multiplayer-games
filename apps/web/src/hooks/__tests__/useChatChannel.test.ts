@@ -72,6 +72,7 @@ vi.mock("ably", () => {
 
 vi.mock("../../api/chat.js", () => ({
   fetchChatToken: vi.fn(),
+  fetchChatHistory: vi.fn(),
   sendChatMessage: vi.fn(),
 }));
 
@@ -93,9 +94,13 @@ async function firstInstance(): Promise<FakeRealtimeInstance> {
 }
 
 describe("useChatChannel", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     state.instances.length = 0;
     vi.resetAllMocks();
+    // History is an enhancement: default it to "nothing / unavailable" so every
+    // existing test behaves as before, and the history-specific tests opt in.
+    const { fetchChatHistory } = await import("../../api/chat.js");
+    vi.mocked(fetchChatHistory).mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -264,6 +269,117 @@ describe("useChatChannel", () => {
     });
     expect(sendResult).toEqual({ ok: false, reason: "unavailable" });
     expect(result.current.messages).toHaveLength(0);
+  });
+
+  it("seeds recent history on mount and merges it with live messages, ts-ordered (CHAT-021)", async () => {
+    const { fetchChatToken, fetchChatHistory } = await import("../../api/chat.js");
+    vi.mocked(fetchChatToken).mockResolvedValue({
+      tokenRequest: {},
+      channelName: "chat:lobby",
+      clientId: "c1",
+    });
+    vi.mocked(fetchChatHistory).mockResolvedValue({
+      messages: [
+        { id: "h1", roomId: "lobby", sender: { token: "t", name: "A" }, text: "old-1", ts: 10 },
+        { id: "h2", roomId: "lobby", sender: { token: "t", name: "A" }, text: "old-2", ts: 20 },
+      ],
+      hasMore: true,
+      cursor: { ts: 10, id: "h1" },
+    });
+
+    const { useChatChannel } = await import("../useChatChannel.js");
+    const { result } = renderHook(() => useChatChannel("lobby"));
+
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+    expect(result.current.messages.map((m) => m.id)).toEqual(["h1", "h2"]);
+    expect(result.current.hasMoreHistory).toBe(true);
+
+    // A live message lands after the history and sorts to the bottom by ts.
+    const instance = await firstInstance();
+    act(() =>
+      instance.channel.emitMessage({
+        id: "live-1",
+        roomId: "lobby",
+        sender: { token: "t", name: "A" },
+        text: "new",
+        ts: 30,
+      }),
+    );
+    await waitFor(() => expect(result.current.messages).toHaveLength(3));
+    expect(result.current.messages.map((m) => m.id)).toEqual(["h1", "h2", "live-1"]);
+  });
+
+  it("loadOlder pages the next older window and prepends it, updating hasMoreHistory", async () => {
+    const { fetchChatToken, fetchChatHistory } = await import("../../api/chat.js");
+    vi.mocked(fetchChatToken).mockResolvedValue({
+      tokenRequest: {},
+      channelName: "chat:lobby",
+      clientId: "c1",
+    });
+    // First call (mount seed) → the newest message, with an older page waiting.
+    vi.mocked(fetchChatHistory).mockResolvedValueOnce({
+      messages: [
+        { id: "h2", roomId: "lobby", sender: { token: "t", name: "A" }, text: "old-2", ts: 20 },
+      ],
+      hasMore: true,
+      cursor: { ts: 20, id: "h2" },
+    });
+    // Second call (loadOlder) → the older page, nothing beyond it.
+    vi.mocked(fetchChatHistory).mockResolvedValueOnce({
+      messages: [
+        { id: "h1", roomId: "lobby", sender: { token: "t", name: "A" }, text: "old-1", ts: 10 },
+      ],
+      hasMore: false,
+      cursor: { ts: 10, id: "h1" },
+    });
+
+    const { useChatChannel } = await import("../useChatChannel.js");
+    const { result } = renderHook(() => useChatChannel("lobby"));
+
+    await waitFor(() => expect(result.current.messages).toHaveLength(1));
+    expect(result.current.hasMoreHistory).toBe(true);
+
+    await act(async () => {
+      await result.current.loadOlder();
+    });
+
+    expect(result.current.messages.map((m) => m.id)).toEqual(["h1", "h2"]);
+    expect(result.current.hasMoreHistory).toBe(false);
+
+    // The loadOlder fetch used the seed's cursor as its `before`.
+    expect(vi.mocked(fetchChatHistory).mock.calls[1]?.[1]).toMatchObject({
+      before: { ts: 20, id: "h2" },
+    });
+  });
+
+  it("degrades to live-only when history is unavailable, without throwing", async () => {
+    const { fetchChatToken, fetchChatHistory } = await import("../../api/chat.js");
+    vi.mocked(fetchChatToken).mockResolvedValue({
+      tokenRequest: {},
+      channelName: "chat:lobby",
+      clientId: "c1",
+    });
+    vi.mocked(fetchChatHistory).mockResolvedValue(null);
+
+    const { useChatChannel } = await import("../useChatChannel.js");
+    const { result } = renderHook(() => useChatChannel("lobby"));
+
+    const instance = await firstInstance();
+    act(() => instance.connection.emitChange("connected"));
+    await waitFor(() => expect(result.current.status).toBe("live"));
+
+    // No history seeded, no "load older" offered — but live chat is unaffected.
+    expect(result.current.hasMoreHistory).toBe(false);
+    act(() =>
+      instance.channel.emitMessage({
+        id: "live-1",
+        roomId: "lobby",
+        sender: { token: "t", name: "A" },
+        text: "hi",
+        ts: 1,
+      }),
+    );
+    await waitFor(() => expect(result.current.messages).toHaveLength(1));
   });
 
   it("tears down the Ably connection on unmount", async () => {

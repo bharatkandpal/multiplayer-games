@@ -69,6 +69,51 @@ export async function fetchChatToken(
   }
 }
 
+/** A paging cursor into a room's history — everything strictly older than this. */
+export interface ChatHistoryCursor {
+  ts: number;
+  id: string;
+}
+
+export interface ChatHistoryPage {
+  /** Messages oldest-first, ready to render/prepend directly. */
+  messages: ChatMessage[];
+  /** Whether an older page exists beyond `cursor`. */
+  hasMore: boolean;
+  /** The `before` for the next scroll-up load; `null` when the page was empty. */
+  cursor: ChatHistoryCursor | null;
+}
+
+/**
+ * Loads a page of a room's recent history (CHAT-021) — the newest messages, or
+ * (with `before`) the page just older than a cursor for scroll-up paging.
+ * Resolves to `null` for ANY failure, exactly like {@link fetchChatToken}:
+ * history is an enhancement, so a caller degrades to "no history, live only"
+ * rather than surfacing an error. `secret` (a private room) routes the read to
+ * the same secret-derived channel the subscription is on; it rides the body,
+ * never the URL.
+ */
+export async function fetchChatHistory(
+  roomId: string,
+  opts: { before?: ChatHistoryCursor; limit?: number; secret?: string } = {},
+): Promise<ChatHistoryPage | null> {
+  try {
+    const res = await apiFetch(`/api/chat/${encodeURIComponent(roomId)}/history`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...(opts.before ? { before: opts.before } : {}),
+        ...(opts.limit === undefined ? {} : { limit: opts.limit }),
+        ...(opts.secret ? { secret: opts.secret } : {}),
+      }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as ChatHistoryPage;
+  } catch {
+    return null;
+  }
+}
+
 export type SendChatMessageResult =
   { ok: true; id: string; ts: number } | { ok: false; reason: "rate_limited" | "unavailable" };
 

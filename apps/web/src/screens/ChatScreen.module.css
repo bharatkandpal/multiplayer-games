@@ -220,6 +220,15 @@
   margin: var(--space-6) 0;
 }
 
+/* CHAT-021 — quiet "loading earlier messages" marker pinned at the top of the
+   list while a scroll-up history page is in flight. */
+.loadingOlder {
+  color: var(--color-text-muted);
+  text-align: center;
+  font-size: var(--font-size-300);
+  margin: var(--space-2) 0;
+}
+
 .skeletonList {
   list-style: none;
   margin: 0;

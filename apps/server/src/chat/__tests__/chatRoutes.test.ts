@@ -46,9 +46,25 @@ describe("chat routes (CHAT-002/003)", () => {
     opts: {
       limitFetch?: typeof fetch;
       ablyOptions?: AblyClientOptions;
+      /** Make the history store throw, to prove send/history degrade rather than 500. */
+      breakChatStore?: boolean;
     } = {},
   ): Promise<{ call: (path: string, init?: RequestInit) => Promise<Response> }> {
     store = createMemoryStore();
+    if (opts.breakChatStore) {
+      const boom = (): never => {
+        throw new Error("chat store down");
+      };
+      store = {
+        ...store,
+        chat: {
+          append: boom,
+          page: boom,
+          deleteByOwner: boom,
+          deleteOlderThan: boom,
+        },
+      };
+    }
     const limiter = opts.limitFetch
       ? createRateLimiter({ url: "http://limiter.test", fetchImpl: opts.limitFetch })
       : undefined;
@@ -58,7 +74,11 @@ describe("chat routes (CHAT-002/003)", () => {
     app.use(createSessionMiddleware(store));
     app.use(
       "/api",
-      createChatRouter(limiter ? limiter.limit.bind(limiter) : noopLimit, opts.ablyOptions ?? {}),
+      createChatRouter(
+        store,
+        limiter ? limiter.limit.bind(limiter) : noopLimit,
+        opts.ablyOptions ?? {},
+      ),
     );
 
     server = await new Promise<Server>((resolve) => {
@@ -409,6 +429,204 @@ describe("chat routes (CHAT-002/003)", () => {
         dimension: "session",
         id: "tok-sender",
       });
+    });
+
+    it("persists a delivered message for history, keyed by the derived channel", async () => {
+      const { call } = await mount({ ablyOptions: { apiKey: "k:s", fetchImpl: publishOk() } });
+
+      const res = await call("/api/chat/room-1/messages", {
+        method: "POST",
+        body: JSON.stringify({ text: "hi", displayName: "Ann" }),
+      });
+      expect(res.status).toBe(202);
+      const body = (await res.json()) as { id: string; ts: number };
+
+      const stored = await store.chat.page("chat:room-1", { limit: 10 });
+      expect(stored).toHaveLength(1);
+      expect(stored[0]).toMatchObject({
+        id: body.id,
+        channel: "chat:room-1",
+        roomId: "room-1",
+        senderToken: "tok-sender",
+        senderName: "Ann",
+        text: "hi",
+        ts: body.ts,
+      });
+    });
+
+    it("persists a private-room message under its opaque channel, never the secret", async () => {
+      const { call } = await mount({
+        ablyOptions: { apiKey: "keyName.abc:secret", fetchImpl: publishOk() },
+      });
+
+      await call("/api/chat/room-1/messages", {
+        method: "POST",
+        body: JSON.stringify({ text: "psst", displayName: "Ann", secret: "royal" }),
+      });
+
+      const channel = channelNameFor("room-1", "royal", "keyName.abc:secret");
+      const stored = await store.chat.page(channel, { limit: 10 });
+      expect(stored).toHaveLength(1);
+      expect(stored[0]?.channel).toBe(channel);
+      // The public channel and a wrong-secret channel both stay empty.
+      expect(await store.chat.page("chat:room-1", { limit: 10 })).toHaveLength(0);
+      expect(
+        await store.chat.page(channelNameFor("room-1", "wrong", "keyName.abc:secret"), {
+          limit: 10,
+        }),
+      ).toHaveLength(0);
+    });
+
+    it("still delivers (202) when persistence throws — history degrades, the message doesn't", async () => {
+      const fetchImpl = publishOk();
+      const { call } = await mount({
+        ablyOptions: { apiKey: "k:s", fetchImpl },
+        breakChatStore: true,
+      });
+
+      const res = await call("/api/chat/room-1/messages", {
+        method: "POST",
+        body: JSON.stringify({ text: "hi", displayName: "Ann" }),
+      });
+      // The publish (live delivery) succeeded, so the send is a 202 even though
+      // the store blew up — a downed history store must never fail a send.
+      expect(res.status).toBe(202);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("POST /api/chat/:roomId/history (CHAT-021)", () => {
+    function publishOk() {
+      return vi.fn().mockResolvedValue(new Response("", { status: 201 }));
+    }
+
+    /** Seed `count` messages into `room` (optionally private) via the send endpoint. */
+    async function seed(
+      call: (path: string, init?: RequestInit) => Promise<Response>,
+      room: string,
+      count: number,
+      secret?: string,
+    ): Promise<void> {
+      for (let i = 0; i < count; i++) {
+        const res = await call(`/api/chat/${room}/messages`, {
+          method: "POST",
+          body: JSON.stringify({
+            text: `m${i}`,
+            displayName: "Ann",
+            ...(secret ? { secret } : {}),
+          }),
+        });
+        expect(res.status).toBe(202);
+      }
+    }
+
+    it("degrades to 503 when ABLY_API_KEY is unset", async () => {
+      const { call } = await mount();
+      const res = await call("/api/chat/room-1/history", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(503);
+    });
+
+    it("returns the newest page oldest-first, with hasMore and a cursor", async () => {
+      const { call } = await mount({ ablyOptions: { apiKey: "k:s", fetchImpl: publishOk() } });
+      await seed(call, "room-1", 12);
+
+      const res = await call("/api/chat/room-1/history", {
+        method: "POST",
+        body: JSON.stringify({ limit: 10 }),
+      });
+      expect(res.status).toBe(200);
+      const page = (await res.json()) as {
+        messages: { text: string; ts: number }[];
+        hasMore: boolean;
+        cursor: { ts: number; id: string } | null;
+      };
+      expect(page.messages).toHaveLength(10);
+      // Oldest-first within the page: ascending ts.
+      const times = page.messages.map((m) => m.ts);
+      expect([...times].sort((a, b) => a - b)).toEqual(times);
+      // 12 seeded, 10 returned → an older page exists.
+      expect(page.hasMore).toBe(true);
+      expect(page.cursor).not.toBeNull();
+    });
+
+    it("pages strictly older than the cursor on scroll-up", async () => {
+      const { call } = await mount({ ablyOptions: { apiKey: "k:s", fetchImpl: publishOk() } });
+      await seed(call, "room-1", 12);
+
+      const first = (await (
+        await call("/api/chat/room-1/history", {
+          method: "POST",
+          body: JSON.stringify({ limit: 10 }),
+        })
+      ).json()) as { messages: { id: string }[]; cursor: { ts: number; id: string } };
+
+      const older = (await (
+        await call("/api/chat/room-1/history", {
+          method: "POST",
+          body: JSON.stringify({ limit: 10, before: first.cursor }),
+        })
+      ).json()) as { messages: { id: string }[]; hasMore: boolean };
+
+      // The remaining 2 older messages, and no overlap with the first page.
+      expect(older.messages).toHaveLength(2);
+      expect(older.hasMore).toBe(false);
+      const firstIds = new Set(first.messages.map((m) => m.id));
+      expect(older.messages.every((m) => !firstIds.has(m.id))).toBe(true);
+    });
+
+    it("isolates a private room's history by secret", async () => {
+      const { call } = await mount({
+        ablyOptions: { apiKey: "keyName.abc:secret", fetchImpl: publishOk() },
+      });
+      await seed(call, "room-1", 3, "royal");
+
+      const right = (await (
+        await call("/api/chat/room-1/history", {
+          method: "POST",
+          body: JSON.stringify({ secret: "royal" }),
+        })
+      ).json()) as { messages: unknown[] };
+      expect(right.messages).toHaveLength(3);
+
+      // The public room and a wrong secret both see an empty, different channel.
+      const publicView = (await (
+        await call("/api/chat/room-1/history", { method: "POST", body: JSON.stringify({}) })
+      ).json()) as { messages: unknown[] };
+      expect(publicView.messages).toHaveLength(0);
+
+      const wrong = (await (
+        await call("/api/chat/room-1/history", {
+          method: "POST",
+          body: JSON.stringify({ secret: "flush" }),
+        })
+      ).json()) as { messages: unknown[] };
+      expect(wrong.messages).toHaveLength(0);
+    });
+
+    it("rejects a malformed secret", async () => {
+      const { call } = await mount({ ablyOptions: { apiKey: "k:s", fetchImpl: publishOk() } });
+      const res = await call("/api/chat/room-1/history", {
+        method: "POST",
+        body: JSON.stringify({ secret: "x".repeat(129) }),
+      });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "INVALID_SECRET" });
+    });
+
+    it("degrades to 503 when the history store throws", async () => {
+      const { call } = await mount({
+        ablyOptions: { apiKey: "k:s", fetchImpl: publishOk() },
+        breakChatStore: true,
+      });
+      const res = await call("/api/chat/room-1/history", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ error: "chat_unavailable" });
     });
   });
 });
