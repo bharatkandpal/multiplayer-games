@@ -121,4 +121,63 @@ describe("ChatScreen", () => {
     await user.click(screen.getByRole("button", { name: "Home" }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
+
+  describe("CHAT-019: room switching", () => {
+    it("hides the room bar entirely when room switching isn't wired", () => {
+      render(<ChatScreen roomId="lobby" onBack={() => {}} />);
+      expect(screen.queryByRole("button", { name: "Rooms" })).not.toBeInTheDocument();
+    });
+
+    it("names the current room and opens the create/join dialog", async () => {
+      state.status = "live";
+      const user = userEvent.setup();
+      render(<ChatScreen roomId="lobby" onBack={() => {}} onOpenRoom={() => {}} />);
+
+      // The room bar names the current room.
+      expect(screen.getByText("Lobby")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Rooms" }));
+      expect(screen.getByRole("dialog", { name: "Rooms" })).toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "Room name" })).toBeInTheDocument();
+    });
+
+    it("navigates to a slugified room when a name is submitted", async () => {
+      state.status = "live";
+      const onOpenRoom = vi.fn();
+      const user = userEvent.setup();
+      render(<ChatScreen roomId="lobby" onBack={() => {}} onOpenRoom={onOpenRoom} />);
+
+      await user.click(screen.getByRole("button", { name: "Rooms" }));
+      await user.type(screen.getByRole("textbox", { name: "Room name" }), "Weekend Games!");
+      await user.click(screen.getByRole("button", { name: "Go" }));
+
+      expect(onOpenRoom).toHaveBeenCalledWith("weekend-games");
+    });
+
+    it("rejects a name that slugifies to nothing, without navigating", async () => {
+      state.status = "live";
+      const onOpenRoom = vi.fn();
+      const user = userEvent.setup();
+      render(<ChatScreen roomId="lobby" onBack={() => {}} onOpenRoom={onOpenRoom} />);
+
+      await user.click(screen.getByRole("button", { name: "Rooms" }));
+      await user.type(screen.getByRole("textbox", { name: "Room name" }), "!!!");
+      await user.click(screen.getByRole("button", { name: "Go" }));
+
+      expect(onOpenRoom).not.toHaveBeenCalled();
+      expect(screen.getByText(/Use letters or numbers/)).toBeInTheDocument();
+    });
+
+    it("offers a back-to-lobby jump only when not already in the lobby", async () => {
+      state.status = "live";
+      const onOpenRoom = vi.fn();
+      const user = userEvent.setup();
+      render(<ChatScreen roomId="my-room" onBack={() => {}} onOpenRoom={onOpenRoom} />);
+
+      await user.click(screen.getByRole("button", { name: "Rooms" }));
+      await user.click(screen.getByRole("button", { name: "Back to the lobby" }));
+
+      expect(onOpenRoom).toHaveBeenCalledWith("lobby");
+    });
+  });
 });

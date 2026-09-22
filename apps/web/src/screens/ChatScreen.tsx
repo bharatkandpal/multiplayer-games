@@ -9,6 +9,8 @@ import {
   BackArrowIcon,
   Button,
   HomeIcon,
+  Modal,
+  ShareAction,
   StatusBadge,
   Toast,
   UsernamePrompt,
@@ -16,6 +18,7 @@ import {
 import { useChatChannel } from "../hooks/useChatChannel.js";
 import type { ChatMessage } from "../api/chat.js";
 import { getSessionToken } from "../api/session.js";
+import { DEFAULT_CHAT_ROOM_ID, roomLabel, roomShareUrl, slugifyRoomName } from "./chatRoom.js";
 import {
   ensureUsername,
   onUsernameChange,
@@ -29,6 +32,12 @@ export interface ChatScreenProps {
   /** The chat room to join — `"lobby"` for the default, un-scoped room. */
   roomId: string;
   onBack: () => void;
+  /**
+   * Navigate to another room (CHAT-019). When provided, the screen shows a
+   * room bar that can create/join a room by name and share the current one.
+   * Omit to hide room switching entirely (the lobby-only entry point).
+   */
+  onOpenRoom?: (roomId: string) => void;
 }
 
 const MAX_LENGTH = 500;
@@ -40,7 +49,7 @@ const MAX_LENGTH = 500;
  */
 const AUTO_SCROLL_THRESHOLD = 120;
 
-export function ChatScreen({ roomId, onBack }: ChatScreenProps): React.JSX.Element {
+export function ChatScreen({ roomId, onBack, onOpenRoom }: ChatScreenProps): React.JSX.Element {
   const { messages, status, send } = useChatChannel(roomId);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -48,6 +57,7 @@ export function ChatScreen({ roomId, onBack }: ChatScreenProps): React.JSX.Eleme
   const [muted, setMuted] = useState<Set<string>>(() => getMutedTokens());
   const [name, setName] = useState(ensureUsername);
   const [editingName, setEditingName] = useState(false);
+  const [roomDialogOpen, setRoomDialogOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const errorId = useId();
@@ -133,6 +143,23 @@ export function ChatScreen({ roomId, onBack }: ChatScreenProps): React.JSX.Eleme
           {badgeLabel}
         </StatusBadge>
       </div>
+
+      {onOpenRoom ? (
+        <div className={styles.roomBar}>
+          <span className={styles.roomName}>
+            Room · <strong>{roomLabel(roomId)}</strong>
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={styles.roomButton}
+            onClick={() => setRoomDialogOpen(true)}
+            aria-haspopup="dialog"
+          >
+            Rooms
+          </Button>
+        </div>
+      ) : null}
 
       {status === "unavailable" ? (
         <div className={styles.unavailableSlot}>
@@ -226,7 +253,119 @@ export function ChatScreen({ roomId, onBack }: ChatScreenProps): React.JSX.Eleme
         onSubmit={handleNameSubmit}
         onCancel={() => setEditingName(false)}
       />
+
+      {onOpenRoom ? (
+        <RoomSwitchPrompt
+          isOpen={roomDialogOpen}
+          roomId={roomId}
+          onClose={() => setRoomDialogOpen(false)}
+          onOpenRoom={(next) => {
+            setRoomDialogOpen(false);
+            onOpenRoom(next);
+          }}
+        />
+      ) : null}
     </div>
+  );
+}
+
+interface RoomSwitchPromptProps {
+  isOpen: boolean;
+  roomId: string;
+  onClose: () => void;
+  onOpenRoom: (roomId: string) => void;
+}
+
+/**
+ * Create-or-join-a-room dialog (CHAT-019). Rooms are just slugs, so this is
+ * pure client: type a name, it slugifies to a valid id and navigates there;
+ * the current room's link is shareable via the standard share ladder (which
+ * degrades to a selectable field, never a dead end). Nothing here talks to the
+ * network, so it works whether or not chat itself is reachable.
+ */
+function RoomSwitchPrompt({
+  isOpen,
+  roomId,
+  onClose,
+  onOpenRoom,
+}: RoomSwitchPromptProps): React.JSX.Element {
+  const [roomDraft, setRoomDraft] = useState("");
+  const [roomError, setRoomError] = useState<string | undefined>(undefined);
+  const shareUrl =
+    typeof window !== "undefined" ? roomShareUrl(roomId, window.location.origin) : "";
+
+  const handleRoomSubmit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    const slug = slugifyRoomName(roomDraft);
+    if (!slug) {
+      setRoomError("Use letters or numbers for the room name.");
+      return;
+    }
+    if (slug === roomId) {
+      // Already here — just close, rather than a no-op navigation.
+      onClose();
+      return;
+    }
+    setRoomDraft("");
+    setRoomError(undefined);
+    onOpenRoom(slug);
+  };
+
+  return (
+    <Modal isOpen={isOpen} title="Rooms" onClose={onClose}>
+      <div className={styles.roomDialog}>
+        <section className={styles.roomSection}>
+          <h3 className={styles.roomSectionTitle}>Share this room</h3>
+          <p className={styles.roomHint}>
+            Anyone with the link joins <strong>{roomLabel(roomId)}</strong>.
+          </p>
+          {shareUrl ? (
+            <ShareAction url={shareUrl} title="Join my chat room" shareLabel="Share room" />
+          ) : null}
+        </section>
+
+        <form className={styles.roomSection} onSubmit={handleRoomSubmit}>
+          <h3 className={styles.roomSectionTitle}>Create or join a room</h3>
+          <p className={styles.roomHint}>
+            Type a name — anyone who opens the same name lands in the same room.
+          </p>
+          <div className={styles.roomRow}>
+            <input
+              type="text"
+              className={styles.roomInput}
+              value={roomDraft}
+              onChange={(event) => setRoomDraft(event.target.value)}
+              placeholder="e.g. weekend-games"
+              aria-label="Room name"
+              aria-invalid={roomError ? true : undefined}
+              maxLength={64}
+            />
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              disabled={roomDraft.trim().length === 0}
+            >
+              Go
+            </Button>
+          </div>
+          <div role="alert" aria-live="assertive" className={styles.roomErrorSlot}>
+            {roomError ? <span className={styles.roomError}>{roomError}</span> : null}
+          </div>
+          {roomId !== DEFAULT_CHAT_ROOM_ID ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={styles.roomLobbyLink}
+              onClick={() => onOpenRoom(DEFAULT_CHAT_ROOM_ID)}
+            >
+              Back to the lobby
+            </Button>
+          ) : null}
+        </form>
+      </div>
+    </Modal>
   );
 }
 
