@@ -349,9 +349,14 @@ jobs:
           # against a deploy that is in fact fine. That false negative fired on
           # a real production deploy (2026-09-21). Retry until the alias catches
           # up before concluding the origin is missing.
+          # ~3min budget (12 x 15s): the alias repoint measurably outran a 60s
+          # budget on the 2026-09-22 production run — probe 1 exhausted six 10s
+          # tries while the unfurl check right after it (so, later) passed on
+          # its first try, i.e. propagation landed just past the 60s mark. Give
+          # this real headroom so a slow-but-fine repoint is not read as broken.
           echo "Checking the shipped bundle references $API_ORIGIN"
           wired=0
-          for attempt in 1 2 3 4 5 6; do
+          for attempt in $(seq 1 12); do
             shell_html=$(curl "${curl_args[@]}" "$WEB_URL/")
             bundle=$(printf '%s' "$shell_html" \
                      | sed -n 's|.*<script[^>]*src="\([^"]*\.js\)".*|\1|p' | head -1)
@@ -361,9 +366,9 @@ jobs:
               echo "  OK — the bundle ($bundle) targets $API_ORIGIN"
               break
             fi
-            if [ "$attempt" -lt 6 ]; then
-              echo "attempt $attempt: bundle not serving $API_ORIGIN yet (alias may still be propagating) — retrying in 10s"
-              sleep 10
+            if [ "$attempt" -lt 12 ]; then
+              echo "attempt $attempt: bundle not serving $API_ORIGIN yet (alias may still be propagating) — retrying in 15s"
+              sleep 15
             fi
           done
           if [ "$wired" -ne 1 ]; then
@@ -411,7 +416,7 @@ jobs:
             # yet. Mint the link once (above) and only re-fetch the unfurl here.
             echo "Unfurling $WEB_URL/s/$token"
             unfurled=0
-            for attempt in 1 2 3 4 5 6; do
+            for attempt in $(seq 1 12); do
               body=$(curl "${curl_args[@]}" "$WEB_URL/s/$token")
               # og:image too, not just og:title: it is the half that has to carry
               # the API origin into the markup, so it is what proves the shim was
@@ -422,9 +427,9 @@ jobs:
                 echo "  OK — the shim resolved the token and injected og:* tags"
                 break
               fi
-              if [ "$attempt" -lt 6 ]; then
-                echo "attempt $attempt: /s/:token not unfurling yet (alias may still be propagating) — retrying in 10s"
-                sleep 10
+              if [ "$attempt" -lt 12 ]; then
+                echo "attempt $attempt: /s/:token not unfurling yet (alias may still be propagating) — retrying in 15s"
+                sleep 15
               fi
             done
             if [ "$unfurled" -ne 1 ]; then
