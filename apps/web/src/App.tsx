@@ -39,6 +39,7 @@ import { GAME_CATALOG, REALTIME_CATALOG } from "./screens/HomeScreen";
 import { SharedResultScreen } from "./screens/SharedResultScreen";
 import { buildGameItems, nextGame, prevGame, type GameItem } from "./screens/catalog";
 import { pickGameOfTheDay } from "./screens/gameOfTheDay";
+import { roomPath } from "./screens/chatRoom";
 import { isAllBotRoom, publicRoomToSeats, toSeatConfigInput } from "./api/roomSeats";
 import { ensureUsername, getStoredUsername, reconcileUsername } from "./api/username";
 import { initSession } from "./api/session";
@@ -743,6 +744,12 @@ export default function App(): React.JSX.Element {
             roomId={route.roomId}
             onBack={() => {
               goHome();
+            }}
+            onOpenRoom={(nextRoomId) => {
+              setRoute({ screen: "chat", roomId: nextRoomId });
+              if (typeof window !== "undefined") {
+                window.history.pushState({}, "", roomPath(nextRoomId));
+              }
             }}
           />
         ) : null}
