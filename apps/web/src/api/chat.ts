@@ -28,6 +28,13 @@ export interface ChatMessage {
   text: string;
   /** Epoch milliseconds. Messages are ordered by this, not arrival order. */
   ts: number;
+  /**
+   * Client-only delivery marker for the sender's own optimistic bubble
+   * (CHAT-018). `"pending"` while the POST is in flight; absent on every
+   * message that arrived over the wire and on a confirmed send. Never sent to
+   * or received from the server.
+   */
+  delivery?: "pending" | undefined;
 }
 
 export interface ChatTokenResponse {
@@ -63,20 +70,24 @@ export type SendChatMessageResult =
 /**
  * Posts a chat message. Never throws. The message itself is not returned
  * here — it arrives back over the Ably subscription once the server
- * broadcasts it, same as everyone else's messages (so the sender's own
- * bubble reconciles the same way as any other, rather than trusting a
- * locally-composed echo).
+ * broadcasts it, same as everyone else's messages.
+ *
+ * `id`, when given, is the client-minted message id the caller has already
+ * rendered optimistically (CHAT-018): the server broadcasts under that same
+ * id, so the echo reconciles the optimistic bubble instead of appending a
+ * duplicate. Omit it and the server mints its own.
  */
 export async function sendChatMessage(
   roomId: string,
   text: string,
   displayName: string,
+  id?: string,
 ): Promise<SendChatMessageResult> {
   try {
     const res = await apiFetch(`/api/chat/${encodeURIComponent(roomId)}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, displayName }),
+      body: JSON.stringify(id === undefined ? { text, displayName } : { id, text, displayName }),
     });
     if (res.status === 202) {
       const body = (await res.json()) as { id: string; ts: number };

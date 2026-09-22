@@ -184,6 +184,85 @@ describe("useChatChannel", () => {
     expect(second).toEqual({ ok: false, reason: "rate_limited" });
   });
 
+  it("optimistically shows the sender's own message instantly, then reconciles it on send success", async () => {
+    const { fetchChatToken, sendChatMessage } = await import("../../api/chat.js");
+    vi.mocked(fetchChatToken).mockResolvedValue({
+      tokenRequest: {},
+      channelName: "chat:lobby",
+      clientId: "c1",
+    });
+    let resolveSend: (value: { ok: true; id: string; ts: number }) => void = () => {};
+    vi.mocked(sendChatMessage).mockReturnValue(
+      new Promise((resolve) => {
+        resolveSend = resolve;
+      }),
+    );
+
+    const { useChatChannel } = await import("../useChatChannel.js");
+    const { result } = renderHook(() => useChatChannel("lobby"));
+
+    const instance = state.instances[0];
+    if (!instance) throw new Error("no fake Realtime instance created");
+    act(() => instance.connection.emitChange("connected"));
+    await waitFor(() => expect(result.current.status).toBe("live"));
+
+    // The bubble appears the instant send() is called, before the POST resolves.
+    let sendPromise: Promise<unknown> = Promise.resolve();
+    act(() => {
+      sendPromise = result.current.send("hi");
+    });
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]?.text).toBe("hi");
+    expect(result.current.messages[0]?.delivery).toBe("pending");
+
+    // On a successful POST the pending marker clears (no stranded "sending…").
+    await act(async () => {
+      resolveSend({ ok: true, id: "ignored", ts: 1 });
+      await sendPromise;
+    });
+    expect(result.current.messages[0]?.delivery).toBeUndefined();
+
+    // The server broadcast (same client-minted id) reconciles in place — the
+    // authoritative copy replaces the optimistic one rather than duplicating it.
+    const ownId = result.current.messages[0]!.id;
+    act(() =>
+      instance.channel.emitMessage({
+        id: ownId,
+        roomId: "lobby",
+        sender: { token: "tok-me", name: "tester" },
+        text: "hi (from server)",
+        ts: 9,
+      }),
+    );
+    await waitFor(() => expect(result.current.messages[0]?.text).toBe("hi (from server)"));
+    expect(result.current.messages).toHaveLength(1);
+  });
+
+  it("removes the optimistic bubble when the send fails, so the draft can be restored", async () => {
+    const { fetchChatToken, sendChatMessage } = await import("../../api/chat.js");
+    vi.mocked(fetchChatToken).mockResolvedValue({
+      tokenRequest: {},
+      channelName: "chat:lobby",
+      clientId: "c1",
+    });
+    vi.mocked(sendChatMessage).mockResolvedValue({ ok: false, reason: "unavailable" });
+
+    const { useChatChannel } = await import("../useChatChannel.js");
+    const { result } = renderHook(() => useChatChannel("lobby"));
+
+    const instance = state.instances[0];
+    if (!instance) throw new Error("no fake Realtime instance created");
+    act(() => instance.connection.emitChange("connected"));
+    await waitFor(() => expect(result.current.status).toBe("live"));
+
+    let sendResult: unknown;
+    await act(async () => {
+      sendResult = await result.current.send("hi");
+    });
+    expect(sendResult).toEqual({ ok: false, reason: "unavailable" });
+    expect(result.current.messages).toHaveLength(0);
+  });
+
   it("tears down the Ably connection on unmount", async () => {
     const { fetchChatToken } = await import("../../api/chat.js");
     vi.mocked(fetchChatToken).mockResolvedValue({

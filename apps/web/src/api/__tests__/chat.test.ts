@@ -67,6 +67,26 @@ describe("api/chat", () => {
       expect(result).toEqual({ ok: true, id: "m1", ts: 123 });
     });
 
+    it("includes a client-minted id in the request body when given", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: "abc", ts: 1 }, 202));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await sendChatMessage("lobby", "hi", "Ada", "abc");
+
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(JSON.parse(String(init.body))).toEqual({ id: "abc", text: "hi", displayName: "Ada" });
+    });
+
+    it("omits id from the body when not given", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: "m1", ts: 1 }, 202));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await sendChatMessage("lobby", "hi", "Ada");
+
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(JSON.parse(String(init.body))).toEqual({ text: "hi", displayName: "Ada" });
+    });
+
     it("maps a 429 to rate_limited", async () => {
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({}, 429)));
 

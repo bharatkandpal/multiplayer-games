@@ -142,6 +142,13 @@
   align-self: flex-start;
 }
 
+/* An own message still in flight (CHAT-018): shown immediately, dimmed until
+   the server broadcast confirms it. Colour is not the only signal — the header
+   also reads "Sending…" — so this stays legible for colour-blind readers. */
+.pending {
+  opacity: 0.65;
+}
+
 .bubbleHeader {
   display: flex;
   align-items: center;
