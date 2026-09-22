@@ -53,33 +53,71 @@
   flex: 0 0 auto;
 }
 
-/* ── Tag filter (MPG-112) ─────────────────────────────────────────────────
+/* ── Tag filter (MPG-112) in its sticky rail (UI-17) ──────────────────────
    The row sits between the tagline and the shelves: it is a lens on the
    catalogue, so it reads above the thing it filters. Chips borrow the card
    tag-chip vocabulary (mono micro-caps, hairline outline) because they name
    the same tags — the difference is that these are pressable, which the fill
-   in the pressed state is what says. */
+   in the pressed state is what says.
+   The controls that navigate a long catalogue have to stay reachable at the
+   bottom of it. This sticks inside App's ONE scrolling region rather than
+   becoming a second piece of fixed chrome (`App.module.css`, MPG-137).
+
+   It bleeds to the container edges (negative margins cancelling `.main`'s
+   padding) so the rule under it reads as a full-width division of the page,
+   and it carries an opaque ground — cards must pass *under* it, not show
+   through. No `backdrop-filter`: this screen sits on a flat page colour, and
+   blurring a solid colour returns that solid colour (DESIGN_LANGUAGE §3). */
+.browseRail {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 calc(var(--space-4) * -1) var(--space-5);
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--color-bg);
+  border-bottom: var(--border-width-hairline) solid var(--color-table-line);
+}
+
 /* Browse controls: the tag filter on the left, "Surprise me" pushed to the far
    end. They answer the same question from opposite ends — narrow the shelf, or
    skip choosing altogether — so they share a row, but the gap between them says
-   they are not the same kind of control. On a narrow screen the row wraps and
-   the dice drops below the chips rather than squeezing them. */
+   they are not the same kind of control.
+
+   The row no longer wraps: a wrapping filter row grows the sticky rail, and a
+   rail that eats a third of a 568px frame is worse than no rail. The chips
+   scroll sideways instead (`.filterRow`) and the dice is pinned outside that
+   scroller, so a growing tag list can never push it off the edge. */
 .controlRow {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
-  margin-bottom: var(--space-6);
 }
 
 .filterRow {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--space-2);
+  /* The chips are their own horizontal scroller. `overflow-y` is pinned to
+     `hidden` explicitly: leaving it `visible` makes the browser compute it to
+     `auto`, which would register this as a second vertical scrolling region on
+     Home and break the layout law's one-region rule (e2e/layout-frame.spec.ts). */
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Room for a focus ring on a chip scrolled to the edge, which `overflow`
+     would otherwise clip. */
+  padding: var(--space-1) 2px;
+  scrollbar-width: none;
+}
+
+.filterRow::-webkit-scrollbar {
+  display: none;
 }
 
 .filterChip {
+  flex: 0 0 auto;
   /* Comfortably tappable on a phone without making eight chips shout: the
      44px floor is met on the axis a thumb actually misses on. */
   min-height: var(--size-touch-target);
@@ -129,7 +167,7 @@
 }
 
 /* ── Shelves ──────────────────────────────────────────────────────────────
-   One discovery grouping (Featured / Trending / New / More). The rule that
+   One discovery grouping (Featured / Trending / New / the tail). The rule that
    separates them is the quietest mark on the page by design — a hairline and
    a mono micro-caps label, stating a fact without competing with the cards
    (DESIGN_LANGUAGE §4). The first shelf gets no rule: there is nothing above
@@ -140,8 +178,13 @@
   border-top: var(--border-width-hairline) solid var(--color-table-line);
 }
 
+/* The heading and its count share a baseline; the count is pushed to the far
+   end, where a scanning eye finds it without it competing with the label. */
 .shelfHeader {
-  margin-bottom: var(--space-4);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .shelfTitle {
@@ -154,22 +197,96 @@
   margin: 0;
 }
 
+/* How many games are under this heading — the one thing the blurbs answered
+   that the labels don't. Data voice, like every other figure on the platform
+   (DESIGN_LANGUAGE §3). */
+.shelfCount {
+  margin-left: auto;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-100);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+/* Kept only where the heading doesn't explain itself — which since UI-17 means
+   the two tail shelves, whose names are brand words rather than plain ones. */
 .shelfBlurb {
-  margin: var(--space-1) 0 0;
+  margin: 0 0 var(--space-3);
   color: var(--color-text-muted);
   font-size: var(--font-size-200);
 }
 
+/* ── Density 2 of 3: the tile grid ────────────────────────────────────────
+   Two-up on a 320px phone rather than one card per screen. The old 16rem floor
+   meant a single column on every phone, which is how an eight-game catalogue
+   turned into an eight-screen scroll. */
 .gameGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
   /* Every row shares the tallest card's height, so tiles read as one uniform
      set regardless of description length or an optional personal-best chip. */
   grid-auto-rows: 1fr;
-  gap: var(--space-4);
+  gap: var(--space-3);
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+/* ── Density 1 of 3: the marquee ──────────────────────────────────────────
+   One game, full width. Structurally an ordinary list (same cell, same card
+   wiring, same Options control) holding exactly one entry. */
+.marqueeList {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Density 3 of 3: compact rows ─────────────────────────────────────────
+   The long tail as a dense list you can scan in one screen. The container
+   carries the border and the rounding; the rows inside it are divided by
+   hairlines, so a shelf reads as one block rather than a stack of cards. */
+.rowList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: var(--border-width-hairline) solid var(--color-table-line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.rowCell {
+  display: flex;
+  align-items: stretch;
+}
+
+.rowCell + .rowCell {
+  border-top: var(--border-width-hairline) solid var(--color-table-line);
+}
+
+/* Options sits in the strip rather than over it — see the note in HomeScreen. */
+.rowOptions {
+  flex: 0 0 auto;
+  align-self: center;
+  margin-right: var(--space-2);
+}
+
+/* Visually hidden, still announced. Used for the chips a compact row drops and
+   for its description: clipped rather than `display: none`, because the text of
+   a `display: none` descendant is dropped from the accessible description its
+   container is referenced for. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Stretch the list item and its card to fill the equal-height grid row. The
@@ -191,13 +308,17 @@
   z-index: 1;
 }
 
-/* ── Cards: two temperatures, one system ──────────────────────────────────
-   Shared geometry and behaviour; the two grounds differ only in colour.
+/* ── Cards: two temperatures, three sizes, one system ─────────────────────
+   `.card` is the shared geometry and behaviour; `.tableCard` / `.cabinetCard`
+   are the two grounds; `.tileCard` / `.marqueeCard` / `.rowCard` are the three
+   densities (UI-17). A card is always exactly one of each — which is what keeps
+   a compact row in the same system as a marquee instead of being a different
+   component that happens to look related.
+
    NOTE: no `backdrop-filter` anywhere on this screen. These cards sit over a
    flat page ground, and blurring a solid colour returns that solid colour —
    cost paid, effect absent (DESIGN_LANGUAGE §3, glass rule). */
-.tableCard,
-.cabinetCard {
+.card {
   position: relative;
   display: flex;
   width: 100%;
@@ -205,8 +326,6 @@
   align-items: flex-start;
   gap: var(--space-2);
   min-height: var(--size-touch-target);
-  padding: var(--space-5);
-  border-radius: var(--radius-lg);
   text-align: left;
   cursor: pointer;
   font-family: inherit;
@@ -232,32 +351,48 @@
   color: var(--color-on-cabinet);
 }
 
-.tableCard:hover,
-.cabinetCard:hover {
+/* Denser than the old card's `--space-5`: two tiles per 320px screen leaves
+   about 136px of track, and a 20px gutter on each side of that is most of the
+   tile. */
+.tileCard {
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+}
+
+.marqueeCard {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+}
+
+.card:hover {
   border-color: var(--color-accent);
   transform: translateY(-2px);
 }
 
-.tableCard:active,
-.cabinetCard:active {
+.card:active {
   transform: translateY(0);
 }
 
-.tableCard:focus-visible,
-.cabinetCard:focus-visible {
+.card:focus-visible {
   outline: var(--border-width-thick) solid var(--color-focus-ring);
+  /* Inside the row list's `overflow: hidden` a negative offset is the only ring
+     that survives at the block's rounded corners. */
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.tileCard:focus-visible,
+.marqueeCard:focus-visible {
   outline-offset: 2px;
 }
 
 /* Motion is an accent, never the message (UX_PRINCIPLES §4). */
 @media (prefers-reduced-motion: reduce) {
-  .tableCard,
-  .cabinetCard {
+  .card {
     transition: none;
   }
 
-  .tableCard:hover,
-  .cabinetCard:hover {
+  .card:hover {
     transform: none;
   }
 }
@@ -291,16 +426,27 @@
 }
 
 /* The line every game already had written and nobody ever saw (DESIGN_LANGUAGE
-   §1). Clamped so one long description can't stretch a whole grid row. */
+   §1). Clamped so one long description can't stretch a whole grid row.
+
+   UI-17 tightens the tile clamp from three lines to two, which walks part of
+   MPG-090 back — so it's done with the receipt: the tile clamps *visually*, the
+   full sentence still reaches assistive tech through `aria-describedby`, and
+   the marquee (below) shows it in full. Nobody loses the prose; the grid stops
+   being a wall of paragraphs. */
 .gameDescription {
   font-size: var(--font-size-200);
   line-height: var(--line-height-base);
   color: var(--color-text-muted);
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
+}
+
+.marqueeCard .gameDescription {
+  -webkit-line-clamp: none;
+  line-clamp: none;
 }
 
 .cabinetCard .gameDescription {
@@ -423,28 +569,163 @@
   margin-top: var(--space-2);
 }
 
-/* ── Game of the day ───────────────────────────────────────────────────────
+/* ── Game of the day: the marquee ─────────────────────────────────────────
    The spotlight shelf. Structurally an ordinary shelf (same header, same card,
-   same routing and a11y wiring), dressed up: an accent label and a single card
-   that spans the row as a wide hero. It stays first, above Featured, so the
-   day's pick is the first thing a returning player sees. */
+   same routing and a11y wiring), drawn at marquee size: an accent label and one
+   card spanning the page. It stays first, above Featured, so the day's pick is
+   the first thing a returning player sees.
+
+   It is NOT a 3:2 banner. A full-width hero image on a 568px frame is a game
+   you can't see (MPG-137) — the marquee earns its size with a thumbnail beside
+   the title, the description in full, and a named action, not with acreage. */
 .spotlightTitle {
   color: var(--color-accent);
 }
 
-/* One full-width column — the shelf holds exactly one game, so the card spans
-   the row as a hero rather than sitting in a grid track. The card keeps its
-   normal stacked structure (thumbnail over copy); we just cap the thumbnail so
-   a full-width banner doesn't blow it up to a 3:2 wall, and enlarge the title. */
-.spotlight .gameGrid {
-  grid-template-columns: 1fr;
+.marqueeTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
 }
 
-.spotlight .gameThumbnail {
-  aspect-ratio: auto;
-  height: 10rem;
+/* Only a turn-based marquee carries the Options overlay in its corner. On a
+   tile that overlay lands on the thumbnail; here the top row carries the title,
+   and a title running under a control is worse than a slightly short measure.
+   The arcade marquee has no Options and so pays nothing for this. */
+.tableCard .marqueeTop {
+  padding-right: var(--space-10);
 }
 
-.spotlight .gameTitle {
+.marqueeCard .gameThumbnail {
+  width: 3.5rem;
+  flex: 0 0 auto;
+  aspect-ratio: 1;
+  padding: var(--space-1);
+}
+
+.marqueeCard .gameTitle {
   font-size: var(--font-size-500);
+}
+
+.marqueeFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.marqueeFoot .tagRow {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+/* Names the action the marquee's size promises. A span, not a button: the whole
+   card is the target (see HomeScreen), and a real button here would both nest
+   inside one and shrink the thing you have to hit. */
+.playPill {
+  margin-left: auto;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-100);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* On the cabinet the accent is the page's plum, which in the light theme is a
+   dark ink on a dark panel. Take the panel's own ink instead — the same fix the
+   emphasis phrase needed. */
+.cabinetCard .playPill {
+  background-color: var(--color-on-cabinet);
+  color: var(--color-cabinet);
+}
+
+/* ── Compact rows ─────────────────────────────────────────────────────────
+   A strip, not a card: no border of its own (the list carries it), no lift on
+   hover (rows in a block don't levitate), and a floor well past the 44px touch
+   target — a dense list is still a list of touch targets. */
+.rowCard {
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3rem;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: 0;
+}
+
+.rowCard:hover {
+  transform: none;
+  background-color: var(--color-surface-raised);
+}
+
+.cabinetCard.rowCard:hover {
+  background-color: var(--color-cabinet-raised);
+}
+
+.rowCard .gameThumbnail {
+  width: 2.25rem;
+  flex: 0 0 auto;
+  aspect-ratio: 1;
+  padding: var(--space-1);
+}
+
+.rowCard .gameTitle {
+  font-size: var(--font-size-300);
+  /* Takes the slack, and truncates only as a last resort rather than wrapping
+     the strip to two lines. */
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The right-hand column: the one distinguishing tag, and a score if there is
+   one. Pushed to the far end, where it lines up down the whole shelf. */
+.rowMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.rowMeta .tagRow {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+/* On the narrowest frame a strip cannot carry a thumbnail, a title, a chip and
+   an Options control — at 320px that arithmetic left "Move-Mod…" and a chip.
+   The title wins: the chip is *clipped* rather than `display: none`, so it is
+   still announced, exactly like the tags a row already drops. */
+@media (max-width: 26rem) {
+  .rowMeta .tagRow {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
+/* The dice, pinned outside the chip scroller in the sticky rail. */
+.railAction {
+  display: inline-flex;
+  flex: 0 0 auto;
 }

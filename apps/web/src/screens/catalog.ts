@@ -384,15 +384,42 @@ export function listCatalogEntries(
   ];
 }
 
-/** The discovery shelves Home is built from, in render order (PRD FR-25). */
-export type HomeShelfId = "gotd" | "featured" | "trending" | "new" | "all";
+/**
+ * The discovery shelves Home is built from, in render order (PRD FR-25).
+ *
+ * The tail is **two** shelves, split by family — "More games" was a shrug, and
+ * once the catalogue outgrows a screen the table/cabinet cut is the one that
+ * actually tells a player what they're looking at (UI-17).
+ */
+export type HomeShelfId = "gotd" | "featured" | "trending" | "new" | "cabinet" | "table";
+
+/**
+ * How big a shelf draws its games (UI-17). A grid of identical tiles is a list;
+ * three sizes is a room.
+ *
+ * - `marquee` — one game, full width, description in full and a Play affordance.
+ * - `tile` — the standard card, two-up on a phone. Shelves that recommend.
+ * - `row` — a dense list you can scan in one screen. The long tail.
+ *
+ * This is shelf metadata rather than a Home-side lookup so the rendering
+ * hierarchy is decided in the same place the grouping is, and a new shelf
+ * can't be added without saying how big it draws.
+ */
+export type ShelfDensity = "marquee" | "tile" | "row";
 
 export interface HomeShelf {
   readonly id: HomeShelfId;
   /** Shelf heading as the player reads it. */
   readonly title: string;
-  /** One quiet line under the heading explaining why these games are here. */
-  readonly blurb: string;
+  /**
+   * One quiet line under the heading explaining why these games are here —
+   * **only where the reason isn't self-evident** (UI-17). "New" explains
+   * itself; "The cabinet" does not. A blurb per shelf was five lines of prose
+   * glossing labels that already read, and the count in the header answers the
+   * one thing they didn't.
+   */
+  readonly blurb?: string;
+  readonly density: ShelfDensity;
   readonly entries: readonly CatalogEntry[];
 }
 
@@ -425,9 +452,9 @@ export interface HomeShelfOptions {
  *
  * **Every listed game appears exactly once.** A game is placed on the first
  * shelf that claims it (Featured → Trending → New) and otherwise falls to the
- * catch-all shelf, so curating a shelf can never make a game unreachable and no
- * card is ever rendered twice on one page. Empty shelves are dropped, which is
- * what lets Trending simply not exist before MPG-094 lands.
+ * tail shelf for its family, so curating a shelf can never make a game
+ * unreachable and no card is ever rendered twice on one page. Empty shelves are
+ * dropped, which is what lets Trending simply not exist before MPG-094 lands.
  */
 export function buildHomeShelves(
   games: GameId[],
@@ -467,27 +494,46 @@ export function buildHomeShelves(
       .slice(0, NEW_SHELF_LIMIT),
   );
 
+  // The tail, split by family rather than swept into "More games" (UI-17).
+  // Arcade first, matching `listCatalogEntries`' ordering everywhere else.
+  const tail = unclaimed();
+  const cabinet = tail.filter((entry) => entry.kind === "realtime");
+  const table = tail.filter((entry) => entry.kind === "turn-based");
+
   const shelves: HomeShelf[] = [
     {
       id: "gotd",
       title: "Game of the day",
-      blurb: "Today's pick — a new one every day.",
+      density: "marquee",
       entries: gotd,
     },
     {
       id: "featured",
       title: "Featured",
-      blurb: "Hand-picked places to start.",
+      density: "tile",
       entries: featured,
     },
     {
       id: "trending",
       title: "Trending",
-      blurb: "What people are playing right now.",
+      density: "tile",
       entries: trending,
     },
-    { id: "new", title: "New", blurb: "Just added to the shelf.", entries: recent },
-    { id: "all", title: "More games", blurb: "The rest of the catalogue.", entries: unclaimed() },
+    { id: "new", title: "New", density: "tile", entries: recent },
+    {
+      id: "cabinet",
+      title: "The cabinet",
+      blurb: "Solo arcade — one player, chasing a score.",
+      density: "row",
+      entries: cabinet,
+    },
+    {
+      id: "table",
+      title: "The table",
+      blurb: "Board games, played in turns.",
+      density: "row",
+      entries: table,
+    },
   ];
 
   return shelves.filter((shelf) => shelf.entries.length > 0);

@@ -164,6 +164,16 @@ describe("catalog — prev/next navigation", () => {
 describe("catalog — buildHomeShelves", () => {
   const ALL_GAMES: GameId[] = ["tictactoe", "connect4", "tictactoe-move", "nim", "gomoku"];
   const ALL_REALTIME: RealtimeGameId[] = ["floppy-birds", "drunk-walk", "reflex-test"];
+  /** The whole arcade — enough entries that the tail is genuinely populated. */
+  const FULL_ARCADE: RealtimeGameId[] = [
+    ...ALL_REALTIME,
+    "2048",
+    "breakout",
+    "aim-trainer",
+    "memory-sequence",
+    "lumberjack",
+    "snake",
+  ];
 
   function shelf(shelves: HomeShelf[], id: string): HomeShelf | undefined {
     return shelves.find((s) => s.id === id);
@@ -218,13 +228,66 @@ describe("catalog — buildHomeShelves", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("falls everything through to the catch-all shelf when nothing is curated", () => {
+  it("falls everything through to the tail shelves when nothing is curated", () => {
     const shelves = buildHomeShelves(["nim", "gomoku"], []);
     expect(shelf(shelves, "featured")).toBeUndefined();
-    // `nim` and `gomoku` are the only two entries, so New takes both and the
-    // catch-all is correctly dropped rather than rendered empty.
+    // `nim` and `gomoku` are the only two entries, so New takes both and both
+    // tail shelves are correctly dropped rather than rendered empty.
     expect(idsOn(shelves, "new")).toEqual(["gomoku", "nim"]);
+    expect(shelf(shelves, "table")).toBeUndefined();
+    expect(shelf(shelves, "cabinet")).toBeUndefined();
+  });
+
+  // UI-17: "More games" was a shrug. Once the catalogue outgrows a screen the
+  // family split is the cut that tells a player what they're looking at.
+  it("splits the tail by family — the cabinet and the table, never a catch-all", () => {
+    const shelves = buildHomeShelves(ALL_GAMES, FULL_ARCADE);
+
     expect(shelf(shelves, "all")).toBeUndefined();
+    expect(idsOn(shelves, "cabinet")).not.toHaveLength(0);
+    expect(idsOn(shelves, "table")).not.toHaveLength(0);
+    // Whatever lands in the tail is sorted by family, and nothing else.
+    for (const entry of shelf(shelves, "cabinet")?.entries ?? []) {
+      expect(entry.kind).toBe("realtime");
+    }
+    for (const entry of shelf(shelves, "table")?.entries ?? []) {
+      expect(entry.kind).toBe("turn-based");
+    }
+    // The cabinet leads, matching arcade-first ordering everywhere else.
+    const ids = shelves.map((s) => s.id);
+    expect(ids.indexOf("cabinet")).toBeLessThan(ids.indexOf("table"));
+  });
+
+  // The hierarchy itself (UI-17): one marquee, tiles for the recommendations,
+  // rows for the tail. Decided with the grouping so a new shelf can't be added
+  // without saying how big it draws.
+  it("gives every shelf a density — marquee for the spotlight, rows for the tail", () => {
+    const shelves = buildHomeShelves(ALL_GAMES, FULL_ARCADE, {
+      gameOfTheDay: "nim",
+      // Not a curated id, so Featured can't claim it before Trending does.
+      trending: ["gomoku"],
+    });
+    const densityOf = (id: string) => shelf(shelves, id)?.density;
+
+    expect(densityOf("gotd")).toBe("marquee");
+    expect(densityOf("featured")).toBe("tile");
+    expect(densityOf("trending")).toBe("tile");
+    expect(densityOf("new")).toBe("tile");
+    expect(densityOf("cabinet")).toBe("row");
+    expect(densityOf("table")).toBe("row");
+
+    // Exactly one marquee on the page, ever — that is what makes it one.
+    expect(shelves.filter((s) => s.density === "marquee")).toHaveLength(1);
+  });
+
+  // Blurbs were five lines of prose glossing labels that already read.
+  it("keeps a blurb only where the heading doesn't explain itself", () => {
+    const shelves = buildHomeShelves(ALL_GAMES, FULL_ARCADE);
+
+    expect(shelf(shelves, "featured")?.blurb).toBeUndefined();
+    expect(shelf(shelves, "new")?.blurb).toBeUndefined();
+    // "The cabinet" is a brand word, not a plain one — it gets a line.
+    expect(shelf(shelves, "cabinet")?.blurb).toBeDefined();
   });
 
   it("returns no shelves at all when no game is listed", () => {
