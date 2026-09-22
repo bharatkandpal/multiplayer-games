@@ -8,6 +8,7 @@ import { createMemoryStore } from "../../store/memory/index.js";
 import { SESSION_HEADER, createSessionMiddleware } from "../../sessions/sessionMiddleware.js";
 import type { Store } from "../../store/ports.js";
 import { createChatRouter } from "../chatRoutes.js";
+import { channelNameFor } from "../privateChannel.js";
 import type { AblyClientOptions } from "../ably.js";
 
 /** Build a fetch-compatible `Response` for a mocked `fetch`. */
@@ -132,6 +133,41 @@ describe("chat routes (CHAT-002/003)", () => {
       const sent = JSON.parse(String(init.body)) as { capability: string; clientId: string };
       expect(JSON.parse(sent.capability)).toEqual({ "chat:room-1": ["subscribe"] });
       expect(sent.clientId).toBe("tok-sender");
+    });
+
+    it("scopes a private room's token to an opaque, secret-derived channel", async () => {
+      const fetchImpl = vi
+        .fn()
+        .mockResolvedValue(jsonResponse({ token: "opaque-token", clientId: "tok-sender" }));
+      const { call } = await mount({
+        ablyOptions: { apiKey: "keyName.abc:secret", fetchImpl },
+      });
+
+      const res = await call("/api/chat/token", {
+        method: "POST",
+        body: JSON.stringify({ roomId: "room-1", secret: "royal" }),
+      });
+      expect(res.status).toBe(200);
+
+      const body = (await res.json()) as { channelName: string };
+      // Not the public `chat:room-1` — a private hash the secret alone unlocks.
+      expect(body.channelName).toMatch(/^chat:p-[0-9a-f]{32}$/);
+      expect(body.channelName).not.toBe("chat:room-1");
+
+      const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+      const sent = JSON.parse(String(init.body)) as { capability: string };
+      // The token grants subscribe on exactly (and only) that private channel.
+      expect(JSON.parse(sent.capability)).toEqual({ [body.channelName]: ["subscribe"] });
+    });
+
+    it("rejects a malformed secret", async () => {
+      const { call } = await mount({ ablyOptions: { apiKey: "keyName.abc:secret" } });
+      const res = await call("/api/chat/token", {
+        method: "POST",
+        body: JSON.stringify({ roomId: "room-1", secret: "x".repeat(129) }),
+      });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "INVALID_SECRET" });
     });
 
     it("degrades to 503 when Ably itself errors", async () => {
@@ -301,6 +337,36 @@ describe("chat routes (CHAT-002/003)", () => {
       const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
       const sent = JSON.parse(String(init.body)) as { data: { text: string } };
       expect(sent.data.text).toBe("you are a ****");
+    });
+
+    it("publishes a private-room message to the same secret-derived channel the token was scoped to", async () => {
+      const fetchImpl = publishOk();
+      const { call } = await mount({ ablyOptions: { apiKey: "keyName.abc:secret", fetchImpl } });
+
+      const res = await call("/api/chat/room-1/messages", {
+        method: "POST",
+        body: JSON.stringify({ text: "hi", displayName: "Ann", secret: "royal" }),
+      });
+      expect(res.status).toBe(202);
+
+      // The publish target must match the channel the token endpoint scopes a
+      // token to for the same (roomId, secret) — both derive it identically, or
+      // a sender would publish where no subscriber is listening. With no
+      // `CHAT_PRIVATE_ROOM_KEY` set, the HMAC key is the resolved Ably key.
+      const expected = channelNameFor("room-1", "royal", "keyName.abc:secret");
+      expect(expected).toMatch(/^chat:p-[0-9a-f]{32}$/);
+      const [url] = fetchImpl.mock.calls[0] as [string];
+      expect(url).toBe(`https://rest.ably.io/channels/${encodeURIComponent(expected)}/messages`);
+    });
+
+    it("rejects a malformed secret", async () => {
+      const { call } = await mount({ ablyOptions: { apiKey: "k:s", fetchImpl: publishOk() } });
+      const res = await call("/api/chat/room-1/messages", {
+        method: "POST",
+        body: JSON.stringify({ text: "hi", displayName: "Ann", secret: "x".repeat(129) }),
+      });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "INVALID_SECRET" });
     });
 
     it("degrades to 503 when Ably publish fails", async () => {

@@ -79,6 +79,19 @@ vi.mock("../../api/username.js", () => ({
   getStoredUsername: vi.fn(() => "tester"),
 }));
 
+/**
+ * The hook now learns the channel name from an initial token fetch *before*
+ * constructing the Ably client (a private room's channel is secret-derived, so
+ * it can't be reconstructed client-side), so the fake Realtime instance appears
+ * a microtask after render rather than synchronously — wait for it.
+ */
+async function firstInstance(): Promise<FakeRealtimeInstance> {
+  await waitFor(() => expect(state.instances.length).toBeGreaterThan(0));
+  const instance = state.instances[0];
+  if (!instance) throw new Error("no fake Realtime instance created");
+  return instance;
+}
+
 describe("useChatChannel", () => {
   beforeEach(() => {
     state.instances.length = 0;
@@ -102,8 +115,7 @@ describe("useChatChannel", () => {
 
     expect(result.current.status).toBe("connecting");
 
-    const instance = state.instances[0];
-    if (!instance) throw new Error("no fake Realtime instance created");
+    const instance = await firstInstance();
 
     act(() => instance.connection.emitChange("connected"));
     await waitFor(() => expect(result.current.status).toBe("live"));
@@ -144,18 +156,11 @@ describe("useChatChannel", () => {
     const { useChatChannel } = await import("../useChatChannel.js");
     const { result } = renderHook(() => useChatChannel("lobby"));
 
-    const instance = state.instances[0];
-    if (!instance) throw new Error("no fake Realtime instance created");
-
-    let receivedError: unknown = "unset";
-    instance.authCallback({}, (error) => {
-      receivedError = error;
-    });
-
-    await waitFor(() => expect(receivedError).toBeTruthy());
-
-    act(() => instance.connection.emitChange("failed"));
+    // The initial token fetch is what learns the channel name; when it fails we
+    // never even construct an Ably client — we degrade straight to absence, so
+    // there is no connection quietly retrying behind the scenes.
     await waitFor(() => expect(result.current.status).toBe("unavailable"));
+    expect(state.instances.length).toBe(0);
   });
 
   it("send() posts through the REST endpoint and reports rate-limit/unavailable reasons", async () => {
@@ -201,8 +206,7 @@ describe("useChatChannel", () => {
     const { useChatChannel } = await import("../useChatChannel.js");
     const { result } = renderHook(() => useChatChannel("lobby"));
 
-    const instance = state.instances[0];
-    if (!instance) throw new Error("no fake Realtime instance created");
+    const instance = await firstInstance();
     act(() => instance.connection.emitChange("connected"));
     await waitFor(() => expect(result.current.status).toBe("live"));
 
@@ -250,8 +254,7 @@ describe("useChatChannel", () => {
     const { useChatChannel } = await import("../useChatChannel.js");
     const { result } = renderHook(() => useChatChannel("lobby"));
 
-    const instance = state.instances[0];
-    if (!instance) throw new Error("no fake Realtime instance created");
+    const instance = await firstInstance();
     act(() => instance.connection.emitChange("connected"));
     await waitFor(() => expect(result.current.status).toBe("live"));
 
@@ -274,8 +277,7 @@ describe("useChatChannel", () => {
     const { useChatChannel } = await import("../useChatChannel.js");
     const { unmount } = renderHook(() => useChatChannel("lobby"));
 
-    const instance = state.instances[0];
-    if (!instance) throw new Error("no fake Realtime instance created");
+    const instance = await firstInstance();
 
     unmount();
 

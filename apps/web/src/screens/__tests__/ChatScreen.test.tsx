@@ -151,7 +151,8 @@ describe("ChatScreen", () => {
       await user.type(screen.getByRole("textbox", { name: "Room name" }), "Weekend Games!");
       await user.click(screen.getByRole("button", { name: "Go" }));
 
-      expect(onOpenRoom).toHaveBeenCalledWith("weekend-games");
+      // A public room (no secret) navigates with no private options.
+      expect(onOpenRoom).toHaveBeenCalledWith("weekend-games", undefined);
     });
 
     it("rejects a name that slugifies to nothing, without navigating", async () => {
@@ -177,7 +178,52 @@ describe("ChatScreen", () => {
       await user.click(screen.getByRole("button", { name: "Rooms" }));
       await user.click(screen.getByRole("button", { name: "Back to the lobby" }));
 
-      expect(onOpenRoom).toHaveBeenCalledWith("lobby");
+      expect(onOpenRoom).toHaveBeenCalledWith("lobby", undefined);
+    });
+  });
+
+  describe("CHAT-020: private rooms", () => {
+    afterEach(() => {
+      window.sessionStorage.clear();
+    });
+
+    it("gates a private room behind a secret prompt, hiding the chat body", () => {
+      state.status = "live";
+      window.sessionStorage.clear();
+      render(<ChatScreen roomId="poker" isPrivate onBack={() => {}} onOpenRoom={() => {}} />);
+
+      // The lock gate stands in for the whole chat surface — no composer.
+      expect(screen.getByText(/is private/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Join" })).toBeInTheDocument();
+      expect(screen.queryByRole("textbox", { name: /Message/ })).not.toBeInTheDocument();
+      // The room bar flags it as private for assistive tech, not colour alone.
+      expect(screen.getByText("(private)")).toBeInTheDocument();
+    });
+
+    it("reveals the chat body once the secret is entered, and remembers it for the tab", async () => {
+      state.status = "live";
+      window.sessionStorage.clear();
+      const user = userEvent.setup();
+      render(<ChatScreen roomId="poker" isPrivate onBack={() => {}} onOpenRoom={() => {}} />);
+
+      // A password field has no "textbox" role — query it by its label.
+      await user.type(screen.getByLabelText("Room secret"), "royal");
+      await user.click(screen.getByRole("button", { name: "Join" }));
+
+      // Gate gone, composer back.
+      expect(screen.queryByRole("button", { name: "Join" })).not.toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: /Message/ })).toBeInTheDocument();
+      // Persisted for the tab so a reload doesn't re-prompt.
+      expect(window.sessionStorage.getItem("chat.secret.poker")).toBe("royal");
+    });
+
+    it("skips the gate when a secret is already held for the tab", () => {
+      state.status = "live";
+      window.sessionStorage.setItem("chat.secret.poker", "royal");
+      render(<ChatScreen roomId="poker" isPrivate onBack={() => {}} onOpenRoom={() => {}} />);
+
+      expect(screen.queryByRole("button", { name: "Join" })).not.toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: /Message/ })).toBeInTheDocument();
     });
   });
 });

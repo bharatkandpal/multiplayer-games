@@ -50,12 +50,17 @@ export interface ChatTokenResponse {
  * outage) — callers must treat `null` as "chat is unavailable right now" and
  * degrade to absence, never surface a raw error.
  */
-export async function fetchChatToken(roomId: string): Promise<ChatTokenResponse | null> {
+export async function fetchChatToken(
+  roomId: string,
+  secret?: string,
+): Promise<ChatTokenResponse | null> {
   try {
     const res = await apiFetch("/api/chat/token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roomId }),
+      // A private room carries a shared secret; the server folds it into the
+      // channel name it scopes the token to (and returns as `channelName`).
+      body: JSON.stringify(secret ? { roomId, secret } : { roomId }),
     });
     if (!res.ok) return null;
     return (await res.json()) as ChatTokenResponse;
@@ -82,12 +87,20 @@ export async function sendChatMessage(
   text: string,
   displayName: string,
   id?: string,
+  secret?: string,
 ): Promise<SendChatMessageResult> {
   try {
     const res = await apiFetch(`/api/chat/${encodeURIComponent(roomId)}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(id === undefined ? { text, displayName } : { id, text, displayName }),
+      // `secret` (a private room) routes the publish to the same secret-derived
+      // channel the subscription is on; omit it and it's the public channel.
+      body: JSON.stringify({
+        ...(id === undefined ? {} : { id }),
+        ...(secret ? { secret } : {}),
+        text,
+        displayName,
+      }),
     });
     if (res.status === 202) {
       const body = (await res.json()) as { id: string; ts: number };

@@ -13,7 +13,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Realtime } from "ably";
 import type * as Ably from "ably";
-import { fetchChatToken, sendChatMessage, type ChatMessage } from "../api/chat.js";
+import {
+  fetchChatToken,
+  sendChatMessage,
+  type ChatMessage,
+  type ChatTokenResponse,
+} from "../api/chat.js";
 import { getStoredUsername } from "../api/username.js";
 import { getSessionToken } from "../api/session.js";
 
@@ -33,11 +38,26 @@ export interface UseChatChannelResult {
 const TERMINAL_STATES = new Set<Ably.ConnectionState>(["failed", "suspended", "closed"]);
 
 /**
- * Subscribes to `chat:<roomId>` for the lifetime of the hook, tearing the
- * Ably connection down and rebuilding it whenever `roomId` changes or the
- * component unmounts.
+ * Subscribes to a room's chat channel for the lifetime of the hook, tearing the
+ * Ably connection down and rebuilding it whenever `roomId` (or `secret`)
+ * changes or the component unmounts.
+ *
+ * `secret`, when given, joins the *private* variant of the room: the server
+ * derives an opaque channel from `(roomId, secret)` and scopes the token to it,
+ * so only callers who supply the same secret share a channel. The client never
+ * derives that channel itself — it subscribes to whatever `channelName` the
+ * token endpoint returns (public `chat:<roomId>` or the private hash).
+ *
+ * `enabled` (default `true`) gates the connection: a private room whose secret
+ * hasn't been entered yet passes `false` so the hook stays idle — it must not
+ * quietly connect to the *public* `chat:<roomId>` channel behind the lock
+ * screen. Flip it to `true` (with the secret) once the room is unlocked.
  */
-export function useChatChannel(roomId: string): UseChatChannelResult {
+export function useChatChannel(
+  roomId: string,
+  secret?: string,
+  enabled = true,
+): UseChatChannelResult {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<ChatStatus>("connecting");
   const [connectionState, setConnectionState] = useState<Ably.ConnectionState | "unknown">(
@@ -50,7 +70,12 @@ export function useChatChannel(roomId: string): UseChatChannelResult {
     setStatus("connecting");
     setConnectionState("unknown");
 
-    let client: Ably.Realtime;
+    // A locked private room stays idle — no token, no connection — until it is
+    // unlocked (the UI shows a secret gate, never this hook's status).
+    if (!enabled) return undefined;
+
+    let client: Ably.Realtime | undefined;
+    let channel: Ably.RealtimeChannel | undefined;
 
     // No token means chat is down (a 503, a network failure, …). We degrade to
     // absence *immediately* rather than waiting on Ably's connection state
@@ -65,42 +90,12 @@ export function useChatChannel(roomId: string): UseChatChannelResult {
       if (cancelled) return;
       setStatus("unavailable");
       try {
-        client.close();
+        client?.close();
       } catch {
         // Closing a client that never finished connecting can throw; the UI is
         // already degraded, which is all that matters.
       }
     };
-
-    try {
-      client = new Realtime({
-        autoConnect: true,
-        authCallback: (_params, callback) => {
-          fetchChatToken(roomId)
-            .then((token) => {
-              if (cancelled) return;
-              if (!token) {
-                callback("chat_unavailable", null);
-                degrade();
-                return;
-              }
-              callback(null, token.tokenRequest as Ably.TokenDetails);
-            })
-            .catch(() => {
-              if (cancelled) return;
-              callback("chat_unavailable", null);
-              degrade();
-            });
-        },
-      });
-    } catch {
-      // Ably threw synchronously constructing the client (malformed options,
-      // an environment without the APIs it needs, …) — degrade, don't throw.
-      setStatus("unavailable");
-      return undefined;
-    }
-
-    const channel = client.channels.get(`chat:${roomId}`);
 
     const handleConnectionChange = (change: Ably.ConnectionStateChange): void => {
       if (cancelled) return;
@@ -116,7 +111,6 @@ export function useChatChannel(roomId: string): UseChatChannelResult {
         setStatus((prev) => (prev === "unavailable" ? prev : "connecting"));
       }
     };
-    client.connection.on(handleConnectionChange);
 
     const handleMessage = (msg: Ably.InboundMessage): void => {
       if (cancelled) return;
@@ -136,20 +130,74 @@ export function useChatChannel(roomId: string): UseChatChannelResult {
         return next;
       });
     };
-    channel.subscribe("message", handleMessage).catch(() => {
-      // A subscribe failure (e.g. the channel itself is denied) also degrades
-      // rather than throwing — the connection-state handler above will also
-      // move to "unavailable" as the underlying connection settles.
-      if (!cancelled) setStatus("unavailable");
-    });
+
+    // Learn the channel name from the server before connecting — a private
+    // room's channel is a secret-derived hash the client can't compute itself.
+    // `primed` feeds this first token to Ably's initial auth so we don't mint a
+    // second one on connect; later renewals re-fetch (same room+secret → same
+    // channel, fresh token).
+    let primed: ChatTokenResponse | null = null;
+
+    fetchChatToken(roomId, secret)
+      .then((initial) => {
+        if (cancelled) return;
+        if (!initial) {
+          degrade();
+          return;
+        }
+        primed = initial;
+
+        try {
+          client = new Realtime({
+            autoConnect: true,
+            authCallback: (_params, callback) => {
+              const first = primed;
+              primed = null;
+              const source = first ? Promise.resolve(first) : fetchChatToken(roomId, secret);
+              source
+                .then((token) => {
+                  if (cancelled) return;
+                  if (!token) {
+                    callback("chat_unavailable", null);
+                    degrade();
+                    return;
+                  }
+                  callback(null, token.tokenRequest as Ably.TokenDetails);
+                })
+                .catch(() => {
+                  if (cancelled) return;
+                  callback("chat_unavailable", null);
+                  degrade();
+                });
+            },
+          });
+        } catch {
+          // Ably threw synchronously constructing the client (malformed
+          // options, an environment without the APIs it needs, …) — degrade.
+          setStatus("unavailable");
+          return;
+        }
+
+        channel = client.channels.get(initial.channelName);
+        client.connection.on(handleConnectionChange);
+        channel.subscribe("message", handleMessage).catch(() => {
+          // A subscribe failure (e.g. the channel itself is denied) also
+          // degrades rather than throwing — the connection-state handler will
+          // also move to "unavailable" as the underlying connection settles.
+          if (!cancelled) setStatus("unavailable");
+        });
+      })
+      .catch(() => {
+        degrade();
+      });
 
     return () => {
       cancelled = true;
-      client.connection.off(handleConnectionChange);
-      channel.unsubscribe("message", handleMessage);
-      client.close();
+      if (client) client.connection.off(handleConnectionChange);
+      if (channel) channel.unsubscribe("message", handleMessage);
+      if (client) client.close();
     };
-  }, [roomId]);
+  }, [roomId, secret, enabled]);
 
   const send = useCallback(
     async (text: string): Promise<SendChatResult> => {
@@ -175,7 +223,7 @@ export function useChatChannel(roomId: string): UseChatChannelResult {
         return next;
       });
 
-      const result = await sendChatMessage(roomId, text, displayName, id);
+      const result = await sendChatMessage(roomId, text, displayName, id, secret);
       if (result.ok) {
         // Clear the pending marker so a dropped broadcast echo can't strand the
         // bubble as "sending…" forever; if the echo does arrive it replaces the
@@ -188,7 +236,7 @@ export function useChatChannel(roomId: string): UseChatChannelResult {
       setMessages((prev) => prev.filter((m) => m.id !== id));
       return { ok: false, reason: result.reason };
     },
-    [roomId],
+    [roomId, secret],
   );
 
   return { messages, status, send, connectionState };

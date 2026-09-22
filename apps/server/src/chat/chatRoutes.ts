@@ -26,6 +26,7 @@ import {
   getAblyApiKey,
   type AblyClientOptions,
 } from "./ably.js";
+import { channelNameFor, normalizeRoomSecret } from "./privateChannel.js";
 import { maskProfanity } from "./profanityMask.js";
 
 /** Matches the "safe slug" a room id already is (see rooms/RoomManager.ts ids). */
@@ -42,22 +43,31 @@ const CLIENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 const MAX_TEXT_LENGTH = 500;
 const MAX_DISPLAY_NAME_LENGTH = 40;
 
-function channelNameFor(roomId: string): string {
-  return `chat:${roomId}`;
-}
-
 function isValidRoomId(value: unknown): value is string {
   return typeof value === "string" && ROOM_ID_RE.test(value);
 }
 
+/**
+ * The key the private-room channel HMAC is derived under. A dedicated env wins
+ * so it can be rotated independently, but it falls back to the resolved Ably
+ * key — always present when chat is enabled, stable per deployment, and secret
+ * — so private rooms work out of the box with no extra configuration.
+ */
+function privateRoomKey(resolvedApiKey: string): string {
+  const dedicated = process.env["CHAT_PRIVATE_ROOM_KEY"];
+  return typeof dedicated === "string" && dedicated.length > 0 ? dedicated : resolvedApiKey;
+}
+
 interface TokenRequestBody {
   readonly roomId?: unknown;
+  readonly secret?: unknown;
 }
 
 interface SendMessageBody {
   readonly id?: unknown;
   readonly text?: unknown;
   readonly displayName?: unknown;
+  readonly secret?: unknown;
 }
 
 /**
@@ -79,7 +89,8 @@ export function createChatRouter(
       return;
     }
 
-    if (!getAblyApiKey() && !ablyOptions.apiKey) {
+    const apiKey = ablyOptions.apiKey ?? getAblyApiKey();
+    if (!apiKey) {
       res.status(503).json({ error: "chat_unavailable" });
       return;
     }
@@ -91,7 +102,15 @@ export function createChatRouter(
       return;
     }
 
-    const channelName = channelNameFor(roomId);
+    // A private room folds a shared secret into the channel name; a public room
+    // (no secret) keeps the plain `chat:<roomId>` channel.
+    const secret = normalizeRoomSecret(body?.secret);
+    if (!secret.ok) {
+      res.status(400).json({ error: "INVALID_SECRET" });
+      return;
+    }
+
+    const channelName = channelNameFor(roomId, secret.secret, privateRoomKey(apiKey));
 
     try {
       // Subscribe-only, scoped to exactly this one channel — never "*", never publish.
@@ -118,7 +137,8 @@ export function createChatRouter(
         return;
       }
 
-      if (!getAblyApiKey() && !ablyOptions.apiKey) {
+      const apiKey = ablyOptions.apiKey ?? getAblyApiKey();
+      if (!apiKey) {
         res.status(503).json({ error: "chat_unavailable" });
         return;
       }
@@ -130,6 +150,15 @@ export function createChatRouter(
       }
 
       const body = req.body as SendMessageBody | undefined;
+
+      // Publish to the same secret-derived channel the sender's token was
+      // scoped to; a wrong/missing secret just publishes to a different channel.
+      const secret = normalizeRoomSecret(body?.secret);
+      if (!secret.ok) {
+        res.status(400).json({ error: "INVALID_SECRET" });
+        return;
+      }
+
       const rawText = body?.text;
       const rawDisplayName = body?.displayName;
 
@@ -161,8 +190,10 @@ export function createChatRouter(
         ts: Date.now(),
       };
 
+      const channelName = channelNameFor(roomId, secret.secret, privateRoomKey(apiKey));
+
       try {
-        await publishAblyMessage(channelNameFor(roomId), message, ablyOptions);
+        await publishAblyMessage(channelName, message, ablyOptions);
       } catch (err) {
         console.error("[chat] publish failed", err);
         res.status(503).json({ error: "chat_unavailable" });

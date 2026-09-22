@@ -78,6 +78,68 @@
   flex: 0 0 auto;
 }
 
+/* CHAT-020: private-room marker in the room bar. The lock glyph is decorative;
+   the room stays readable without it, and a screen-reader-only "(private)"
+   carries the meaning that colour/emoji alone can't (UX_PRINCIPLES §4). */
+.roomLock {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* CHAT-020: the secret gate that stands in for the whole chat body until a
+   private room is unlocked. It occupies the scrolling region's slot so the
+   screen keeps its shape — top bar, room bar, then this instead of messages. */
+.lockGate {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+.lockCard {
+  width: 100%;
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  text-align: center;
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.lockCard .roomRow {
+  text-align: left;
+}
+
+.lockIcon {
+  font-size: var(--font-size-600);
+  line-height: 1;
+}
+
+.lockTitle {
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-400);
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+
 /* Room dialog (rendered in the Modal portal, so it never scrolls the page). */
 .roomDialog {
   display: flex;

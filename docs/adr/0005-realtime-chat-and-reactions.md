@@ -153,6 +153,30 @@ Company/HR framing → anti-abuse is in-scope, sized POC-vs-later:
    count regardless of aggregated magnitude.
 5. **Reuse MPG-021** for rate limiting; do not build a limiter.
 
+## Addendum (CHAT-020) — private rooms via secret-derived channels
+
+Private chat rooms must not add durable state (guardrail 2 above) or a service that
+gameplay could come to depend on (CLAUDE.md offline pillar). So privacy is a **capability**,
+not a stored password:
+
+- A private room's real Ably channel is `chat:p-<hmac>`, where `<hmac>` is a keyed
+  `HMAC-SHA256(serverKey, roomId + "\n" + secret)` (32 hex chars). The `serverKey` is
+  `CHAT_PRIVATE_ROOM_KEY`, falling back to the resolved Ably API key. Public rooms keep the
+  plain `chat:<roomId>` channel, so existing links are unaffected.
+- Both chat endpoints derive the channel from the `(roomId, secret)` the caller supplies and
+  **only ever scope the subscribe-only token to that one channel.** A right secret → the same
+  channel everyone else got; a wrong/absent secret → a _different_, empty channel. There is no
+  server-side secret check, hence no store, no membership registry, nothing to be "down."
+- The secret rides in the request body only. It never enters the URL — a share link carries at
+  most a `?p=1` hint that tells the opener to prompt for the secret (shared out-of-band). The
+  client holds it in `sessionStorage` for the tab.
+- **Tradeoff:** because the server can't distinguish a wrong secret from an empty room, a
+  mistyped secret silently isolates you rather than erroring. This is the accepted price of a
+  stateless private room, surfaced in the UI ("if it looks empty, re-check the secret").
+
+The security boundary is the **token scoping**, not the channel name's secrecy: a client can
+never subscribe to a channel its token wasn't scoped to, however it learned the name.
+
 ## Revisit triggers
 
 - A hard requirement to **replay chat/reactions inside a shared game** (MPG-056) → reopens
