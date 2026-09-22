@@ -50,6 +50,96 @@
   flex: 0 0 auto;
 }
 
+/* CHAT-019: the room bar sits under the top bar — a slim, non-scrolling row
+   naming the current room and opening the create/join/share dialog. */
+.roomBar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.roomName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-200);
+  color: var(--color-text-muted);
+}
+
+.roomName strong {
+  color: var(--color-text);
+}
+
+.roomButton {
+  flex: 0 0 auto;
+}
+
+/* Room dialog (rendered in the Modal portal, so it never scrolls the page). */
+.roomDialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.roomSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.roomSectionTitle {
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-300);
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+
+.roomHint {
+  margin: 0;
+  font-size: var(--font-size-200);
+  color: var(--color-text-muted);
+}
+
+.roomRow {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.roomInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--size-touch-target);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.roomInput:focus-visible {
+  outline: var(--border-width-thin) solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.roomErrorSlot {
+  min-height: var(--space-4);
+}
+
+.roomError {
+  font-size: var(--font-size-200);
+  color: var(--color-danger-text);
+}
+
+.roomLobbyLink {
+  align-self: flex-start;
+}
+
 /* The one scrolling region (UX_PRINCIPLES §9). */
 .messageList {
   flex: 1 1 auto;
