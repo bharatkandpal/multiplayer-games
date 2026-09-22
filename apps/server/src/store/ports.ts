@@ -448,6 +448,72 @@ export interface VariantRepo {
 }
 
 // ---------------------------------------------------------------------------
+// Chat Message (CHAT-021 — durable chat history)
+// ---------------------------------------------------------------------------
+
+/**
+ * A persisted chat message. Keyed by the **derived channel** it was published
+ * to (`chat:<roomId>` or the private `chat:p-<hmac>`), never by the room secret
+ * — a private room's history groups by its opaque hash. `text` is already
+ * profanity-masked (the store never holds raw text); `ts` is the message's
+ * authoritative broadcast timestamp (epoch ms), the same one the live Ably
+ * message carried, so history and live reconcile by `id` and sort on one clock.
+ */
+export interface ChatStoredMessage {
+  readonly id: string;
+  readonly channel: string;
+  readonly roomId: string;
+  readonly senderToken: string;
+  readonly senderName: string;
+  readonly text: string;
+  readonly ts: number;
+}
+
+export interface NewChatMessage {
+  readonly id: string;
+  readonly channel: string;
+  readonly roomId: string;
+  readonly senderToken: string;
+  readonly senderName: string;
+  readonly text: string;
+  readonly ts: number;
+}
+
+/** A paging cursor into a channel's history: everything strictly older than this. */
+export interface ChatCursor {
+  readonly ts: number;
+  readonly id: string;
+}
+
+export interface ChatPageOpts {
+  /** Return only messages strictly older than this `(ts, id)`. Omit for the newest page. */
+  readonly before?: ChatCursor;
+  /** Max messages to return. */
+  readonly limit: number;
+}
+
+export interface ChatMessageRepo {
+  /**
+   * Persist a message. Idempotent on `id` — a retried write (or the same id
+   * arriving twice) is a no-op, never a duplicate row or an error.
+   */
+  append(message: NewChatMessage): Promise<void>;
+
+  /**
+   * A page of a channel's messages, **newest first**, strictly older than
+   * `before` when given. `(ts, id)` is the total order — ties on `ts` break by
+   * `id`, so paging never skips or repeats a same-millisecond message.
+   */
+  page(channel: string, opts: ChatPageOpts): Promise<ChatStoredMessage[]>;
+
+  /** Delete all messages sent by a token ("forget me"). Returns count deleted. */
+  deleteByOwner(senderToken: string): Promise<number>;
+
+  /** Delete messages older than `cutoff`. Returns count deleted. */
+  deleteOlderThan(cutoff: Date): Promise<number>;
+}
+
+// ---------------------------------------------------------------------------
 // Store (bundle of all repos)
 // ---------------------------------------------------------------------------
 
@@ -460,4 +526,5 @@ export interface Store {
   readonly events: EventRepo;
   readonly reports: ReportRepo;
   readonly variants: VariantRepo;
+  readonly chat: ChatMessageRepo;
 }

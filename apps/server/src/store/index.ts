@@ -35,6 +35,11 @@ export type {
   Variant,
   NewVariant,
   VariantRepo,
+  ChatStoredMessage,
+  NewChatMessage,
+  ChatCursor,
+  ChatPageOpts,
+  ChatMessageRepo,
   PaginationOpts,
 } from "./ports.js";
 

@@ -3,8 +3,8 @@
 // unreachable chat service just disables the composer and shows a quiet
 // note, never an error banner or a dead end.
 
-import { useEffect, useId, useRef, useState } from "react";
-import type { FormEvent, KeyboardEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import type { FormEvent, KeyboardEvent, UIEvent } from "react";
 import {
   BackArrowIcon,
   Button,
@@ -62,6 +62,13 @@ const MAX_LENGTH = 500;
  */
 const AUTO_SCROLL_THRESHOLD = 120;
 
+/**
+ * How close to the top (px) the reader has to scroll before we fetch the next
+ * older page of history (CHAT-021). A little slack so the load starts just
+ * before they hit the very top, not only once they're stuck against it.
+ */
+const NEAR_TOP_THRESHOLD = 80;
+
 export function ChatScreen({
   roomId,
   isPrivate = false,
@@ -76,7 +83,11 @@ export function ChatScreen({
   );
   const locked = isPrivate && secret === null;
 
-  const { messages, status, send } = useChatChannel(roomId, secret ?? undefined, !locked);
+  const { messages, status, send, hasMoreHistory, loadingOlder, loadOlder } = useChatChannel(
+    roomId,
+    secret ?? undefined,
+    !locked,
+  );
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | undefined>(undefined);
@@ -86,6 +97,10 @@ export function ChatScreen({
   const [roomDialogOpen, setRoomDialogOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // When we prepend an older page, this holds the pre-load distance from the
+  // bottom of the scroll content. Restoring it after the prepend keeps the
+  // reader looking at the same messages instead of being thrown to the top.
+  const prependAnchorRef = useRef<number | null>(null);
   const errorId = useId();
   const counterId = useId();
 
@@ -100,16 +115,39 @@ export function ChatScreen({
     if (status === "live") inputRef.current?.focus();
   }, [status]);
 
-  // Auto-scroll to the newest message, but only when the reader was already
-  // near the bottom (see AUTO_SCROLL_THRESHOLD above).
-  useEffect(() => {
+  // Keep the viewport sensible as the message list changes. A prepended older
+  // page (CHAT-021) restores the reader's prior position; otherwise we
+  // auto-scroll to the newest message, but only when they were already near the
+  // bottom (see AUTO_SCROLL_THRESHOLD). useLayoutEffect so the adjustment lands
+  // before paint — no visible jump. Runs before the aria-live announce settles.
+  useLayoutEffect(() => {
     const list = listRef.current;
     if (!list) return;
+    if (prependAnchorRef.current !== null) {
+      // Older messages were added at the top: hold the same distance from the
+      // bottom, so the messages under the reader's eye don't move.
+      list.scrollTop = list.scrollHeight - prependAnchorRef.current;
+      prependAnchorRef.current = null;
+      return;
+    }
     const distanceFromBottom = list.scrollHeight - list.scrollTop - list.clientHeight;
     if (distanceFromBottom < AUTO_SCROLL_THRESHOLD) {
       list.scrollTop = list.scrollHeight;
     }
   }, [messages]);
+
+  // Scroll-up paging: near the top, pull the next older page. We record the
+  // distance from the bottom first so the layout effect above can restore it
+  // once the page prepends. Guarded on `hasMoreHistory`/`loadingOlder` so it
+  // fires once per page, and a history outage simply stops offering more (the
+  // hook degrades to absence) — never an error.
+  const handleListScroll = (event: UIEvent<HTMLDivElement>): void => {
+    const list = event.currentTarget;
+    if (list.scrollTop <= NEAR_TOP_THRESHOLD && hasMoreHistory && !loadingOlder) {
+      prependAnchorRef.current = list.scrollHeight - list.scrollTop;
+      void loadOlder();
+    }
+  };
 
   const visibleMessages = messages.filter((message) => !muted.has(message.sender.token));
 
@@ -225,7 +263,17 @@ export function ChatScreen({
             role="log"
             aria-live="polite"
             aria-label="Chat messages"
+            onScroll={handleListScroll}
           >
+            {/* Earlier-history affordance (CHAT-021): a quiet marker at the top
+                while an older page loads, so scroll-up paging is legible without
+                a spinner that outlives its request. */}
+            {loadingOlder ? (
+              <p className={styles.loadingOlder} aria-live="polite">
+                Loading earlier messages…
+              </p>
+            ) : null}
+
             {status === "connecting" && messages.length === 0 ? (
               <ul className={styles.skeletonList} aria-hidden="true">
                 <li className={styles.skeletonBubble} />

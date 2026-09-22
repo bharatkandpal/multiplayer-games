@@ -10,12 +10,14 @@
  * `status` to decide what to render; this hook never surfaces a raw error.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Realtime } from "ably";
 import type * as Ably from "ably";
 import {
+  fetchChatHistory,
   fetchChatToken,
   sendChatMessage,
+  type ChatHistoryCursor,
   type ChatMessage,
   type ChatTokenResponse,
 } from "../api/chat.js";
@@ -26,16 +28,42 @@ export type ChatStatus = "connecting" | "live" | "unavailable";
 
 export type SendChatResult = { ok: true } | { ok: false; reason: "rate_limited" | "unavailable" };
 
+/** How many messages a first load / each scroll-up page fetches (CHAT-021). */
+const HISTORY_PAGE_SIZE = 10;
+
 export interface UseChatChannelResult {
   messages: ChatMessage[];
   status: ChatStatus;
   /** Posts a message via the REST endpoint. Resolves once accepted or rejected — the message itself arrives later, over the subscription. */
   send: (text: string) => Promise<SendChatResult>;
+  /** Whether an older page of history exists to load (CHAT-021). */
+  hasMoreHistory: boolean;
+  /** True while an older page is in flight — the UI shows a subtle affordance and shouldn't re-trigger. */
+  loadingOlder: boolean;
+  /** Loads the next older page and prepends it. No-op when nothing older exists or a load is already running. */
+  loadOlder: () => Promise<void>;
   /** The raw Ably connection state, for diagnostics; `"unknown"` before a client exists. */
   connectionState: Ably.ConnectionState | "unknown";
 }
 
 const TERMINAL_STATES = new Set<Ably.ConnectionState>(["failed", "suspended", "closed"]);
+
+/**
+ * Merge messages by `id` into an existing, ts-ordered list. A message with a
+ * known id replaces the existing copy in place (the authoritative server echo
+ * supersedes the sender's optimistic bubble, CHAT-018, and a re-delivery
+ * supersedes itself); an unknown id is added. The result is re-sorted by `ts`,
+ * so history seeded at the top, live appends at the bottom, and older pages
+ * prepended on scroll all land in one correctly-ordered list.
+ */
+function mergeMessages(prev: ChatMessage[], incoming: readonly ChatMessage[]): ChatMessage[] {
+  if (incoming.length === 0) return prev;
+  const byId = new Map(prev.map((m) => [m.id, m]));
+  for (const msg of incoming) byId.set(msg.id, msg);
+  const next = [...byId.values()];
+  next.sort((a, b) => a.ts - b.ts);
+  return next;
+}
 
 /**
  * Subscribes to a room's chat channel for the lifetime of the hook, tearing the
@@ -63,16 +91,47 @@ export function useChatChannel(
   const [connectionState, setConnectionState] = useState<Ably.ConnectionState | "unknown">(
     "unknown",
   );
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+
+  // History paging state that must survive renders and be reset on room/secret
+  // change: the cursor for the next older page, a re-entrancy guard, and a
+  // generation counter so an in-flight `loadOlder` from a previous room can't
+  // apply its page to a new one.
+  const oldestCursorRef = useRef<ChatHistoryCursor | null>(null);
+  const loadingOlderRef = useRef(false);
+  const generationRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
+    const generation = ++generationRef.current;
     setMessages([]);
     setStatus("connecting");
     setConnectionState("unknown");
+    setHasMoreHistory(false);
+    setLoadingOlder(false);
+    oldestCursorRef.current = null;
+    loadingOlderRef.current = false;
 
     // A locked private room stays idle — no token, no connection — until it is
     // unlocked (the UI shows a secret gate, never this hook's status).
     if (!enabled) return undefined;
+
+    // Seed the newest page of history so the room opens with recent context
+    // instead of blank (CHAT-021). Best-effort and independent of the live
+    // connection: a null page (history down, or simply nothing stored yet)
+    // just leaves the room to fill from live messages — never an error, never a
+    // block (offline pillar). Live messages that race this seed reconcile by id
+    // through `mergeMessages`.
+    void fetchChatHistory(roomId, {
+      limit: HISTORY_PAGE_SIZE,
+      ...(secret ? { secret } : {}),
+    }).then((page) => {
+      if (cancelled || generation !== generationRef.current || !page) return;
+      setMessages((prev) => mergeMessages(prev, page.messages));
+      oldestCursorRef.current = page.cursor;
+      setHasMoreHistory(page.hasMore);
+    });
 
     let client: Ably.Realtime | undefined;
     let channel: Ably.RealtimeChannel | undefined;
@@ -117,18 +176,11 @@ export function useChatChannel(
       const data = msg.data as Partial<ChatMessage> | undefined;
       if (!data || typeof data.id !== "string") return;
       const incoming = data as ChatMessage;
-      setMessages((prev) => {
-        // Reconcile by id: this broadcast either confirms the sender's own
-        // optimistic bubble (CHAT-018) or is a duplicate re-delivery — in both
-        // cases replace in place with this authoritative server copy (masked
-        // text, server ts, no `delivery` marker). Otherwise it's someone
-        // else's message: append it.
-        const idx = prev.findIndex((m) => m.id === incoming.id);
-        const next =
-          idx >= 0 ? prev.map((m, i) => (i === idx ? incoming : m)) : [...prev, incoming];
-        next.sort((a, b) => a.ts - b.ts);
-        return next;
-      });
+      // Reconcile by id: this broadcast either confirms the sender's own
+      // optimistic bubble (CHAT-018), duplicates a re-delivery, or is someone
+      // else's new message — `mergeMessages` handles all three (replace in
+      // place with the authoritative server copy, or append), then re-sorts.
+      setMessages((prev) => mergeMessages(prev, [incoming]));
     };
 
     // Learn the channel name from the server before connecting — a private
@@ -239,5 +291,39 @@ export function useChatChannel(
     [roomId, secret],
   );
 
-  return { messages, status, send, connectionState };
+  const loadOlder = useCallback(async (): Promise<void> => {
+    // Nothing older to load, or a load is already running — no-op (the UI
+    // guards too, but scroll handlers fire fast, so guard here as well).
+    const cursor = oldestCursorRef.current;
+    if (!cursor || loadingOlderRef.current) return;
+
+    const generation = generationRef.current;
+    loadingOlderRef.current = true;
+    setLoadingOlder(true);
+    try {
+      const page = await fetchChatHistory(roomId, {
+        before: cursor,
+        limit: HISTORY_PAGE_SIZE,
+        ...(secret ? { secret } : {}),
+      });
+      // Bail if the room/secret changed while we were fetching, so a stale page
+      // can't land in the wrong room. A null page (history down) degrades to
+      // absence: we simply stop offering "load older" for now.
+      if (generation !== generationRef.current) return;
+      if (!page) {
+        setHasMoreHistory(false);
+        return;
+      }
+      setMessages((prev) => mergeMessages(prev, page.messages));
+      // Only advance the cursor when the page actually had messages; an empty
+      // page leaves the cursor put and just closes off further loading.
+      if (page.cursor) oldestCursorRef.current = page.cursor;
+      setHasMoreHistory(page.hasMore);
+    } finally {
+      loadingOlderRef.current = false;
+      if (generation === generationRef.current) setLoadingOlder(false);
+    }
+  }, [roomId, secret]);
+
+  return { messages, status, send, hasMoreHistory, loadingOlder, loadOlder, connectionState };
 }

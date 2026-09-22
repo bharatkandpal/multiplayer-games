@@ -46,6 +46,35 @@ describe("retention", () => {
       const stats = await rollingRetention(store);
       expect(stats.shareLinks).toBe(1);
     });
+
+    it("prunes chat messages older than 30 days but keeps recent ones (CHAT-021)", async () => {
+      await store.sessions.upsert("tok-1");
+      const thirtyOneDaysAgo = Date.now() - 31 * 24 * 60 * 60 * 1000;
+      await store.chat.append({
+        id: "old-msg",
+        channel: "chat:room-1",
+        roomId: "room-1",
+        senderToken: "tok-1",
+        senderName: "Ann",
+        text: "ancient",
+        ts: thirtyOneDaysAgo,
+      });
+      await store.chat.append({
+        id: "fresh-msg",
+        channel: "chat:room-1",
+        roomId: "room-1",
+        senderToken: "tok-1",
+        senderName: "Ann",
+        text: "recent",
+        ts: Date.now(),
+      });
+
+      const stats = await rollingRetention(store);
+      expect(stats.chat).toBe(1);
+
+      const remaining = await store.chat.page("chat:room-1", { limit: 10 });
+      expect(remaining.map((m) => m.id)).toEqual(["fresh-msg"]);
+    });
   });
 
   describe("purgeEvent", () => {
@@ -114,6 +143,15 @@ describe("retention", () => {
         baseGameId: "nim",
         cosmetics: { theme: "neon" },
       });
+      await store.chat.append({
+        id: "msg-doom",
+        channel: "chat:room-1",
+        roomId: "room-1",
+        senderToken: "tok-doom",
+        senderName: "Ann",
+        text: "hi",
+        ts: Date.now(),
+      });
 
       // Keep data
       await store.results.save({
@@ -131,12 +169,14 @@ describe("retention", () => {
         shareLinks: 1,
         reports: 1,
         variants: 1,
+        chat: 1,
         sessions: 1,
       });
 
       // All gone
       expect(await store.sessions.findByToken("tok-doom")).toBeUndefined();
       expect(await store.results.findByOwner("tok-doom")).toHaveLength(0);
+      expect(await store.chat.page("chat:room-1", { limit: 10 })).toHaveLength(0);
 
       // Other user untouched
       expect(await store.sessions.findByToken("tok-keep")).toBeTruthy();

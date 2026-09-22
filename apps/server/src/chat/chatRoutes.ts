@@ -20,6 +20,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 
 import { noopLimit, type RateLimitFor } from "../middleware/rateLimit.js";
+import type { ChatCursor, ChatStoredMessage, Store } from "../store/ports.js";
 import {
   requestAblyToken,
   publishAblyMessage,
@@ -43,8 +44,41 @@ const CLIENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 const MAX_TEXT_LENGTH = 500;
 const MAX_DISPLAY_NAME_LENGTH = 40;
 
+/** Default and ceiling for a single history page (CHAT-021). */
+const DEFAULT_HISTORY_LIMIT = 10;
+const MAX_HISTORY_LIMIT = 50;
+
 function isValidRoomId(value: unknown): value is string {
   return typeof value === "string" && ROOM_ID_RE.test(value);
+}
+
+/**
+ * The `chat:new`-shaped message the wire (Ably broadcast and history reads)
+ * both speak — the client reconciles the two by `id`, so their shapes must
+ * match exactly.
+ */
+function toWireMessage(row: ChatStoredMessage): {
+  id: string;
+  roomId: string;
+  sender: { token: string; name: string };
+  text: string;
+  ts: number;
+} {
+  return {
+    id: row.id,
+    roomId: row.roomId,
+    sender: { token: row.senderToken, name: row.senderName },
+    text: row.text,
+    ts: row.ts,
+  };
+}
+
+/** Parse a client-supplied history cursor; anything malformed pages from newest. */
+function parseCursor(raw: unknown): ChatCursor | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const { ts, id } = raw as { ts?: unknown; id?: unknown };
+  if (typeof ts !== "number" || !Number.isFinite(ts) || typeof id !== "string") return undefined;
+  return { ts, id };
 }
 
 /**
@@ -70,12 +104,19 @@ interface SendMessageBody {
   readonly secret?: unknown;
 }
 
+interface HistoryRequestBody {
+  readonly secret?: unknown;
+  readonly before?: unknown;
+  readonly limit?: unknown;
+}
+
 /**
  * `ablyOptions` exists purely so tests can inject a fake `fetch` and/or a
  * fake API key without touching `process.env` — production call sites
  * (`apiApp.ts`) never pass it, so the real endpoints/env are used.
  */
 export function createChatRouter(
+  store: Store,
   limit: RateLimitFor = noopLimit,
   ablyOptions: AblyClientOptions = {},
 ): Router {
@@ -200,7 +241,98 @@ export function createChatRouter(
         return;
       }
 
+      // Persist for history (CHAT-021) — strictly best-effort and off the
+      // critical path: the message is already delivered live, so a store outage
+      // must degrade history to absence, never turn a delivered message into a
+      // 503. Keyed by the derived channel (a private room groups by its opaque
+      // hash); the secret is never stored.
+      try {
+        await store.chat.append({
+          id: message.id,
+          channel: channelName,
+          roomId,
+          senderToken: message.sender.token,
+          senderName: message.sender.name,
+          text: message.text,
+          ts: message.ts,
+        });
+      } catch (err) {
+        console.error("[chat] history persist failed (message still delivered)", err);
+      }
+
       res.status(202).json({ id: message.id, ts: message.ts });
+    },
+  );
+
+  // POST /api/chat/:roomId/history — a page of a room's recent messages, newest
+  // first, for lazy-loading + scroll-up paging (CHAT-021). POST (not GET) so the
+  // private-room `secret` rides the body, never the URL — same rule as sending.
+  router.post(
+    "/chat/:roomId/history",
+    limit("chat_history"),
+    async (req: Request, res: Response) => {
+      const token = req.sessionToken;
+      if (!token) {
+        res.status(400).json({ error: "no_session" });
+        return;
+      }
+
+      const apiKey = ablyOptions.apiKey ?? getAblyApiKey();
+      if (!apiKey) {
+        res.status(503).json({ error: "chat_unavailable" });
+        return;
+      }
+
+      const roomId = req.params["roomId"];
+      if (!isValidRoomId(roomId)) {
+        res.status(400).json({ error: "INVALID_ROOM_ID" });
+        return;
+      }
+
+      const body = req.body as HistoryRequestBody | undefined;
+
+      const secret = normalizeRoomSecret(body?.secret);
+      if (!secret.ok) {
+        res.status(400).json({ error: "INVALID_SECRET" });
+        return;
+      }
+
+      const before = parseCursor(body?.before);
+      const rawLimit = body?.limit;
+      const limitReq =
+        typeof rawLimit === "number" && Number.isFinite(rawLimit) && rawLimit > 0
+          ? Math.min(Math.floor(rawLimit), MAX_HISTORY_LIMIT)
+          : DEFAULT_HISTORY_LIMIT;
+
+      const channelName = channelNameFor(roomId, secret.secret, privateRoomKey(apiKey));
+
+      try {
+        // Fetch one extra to know whether an older page exists without a second query.
+        const rows = await store.chat.page(channelName, {
+          ...(before ? { before } : {}),
+          limit: limitReq + 1,
+        });
+        const hasMore = rows.length > limitReq;
+        const pageRows = hasMore ? rows.slice(0, limitReq) : rows;
+
+        // The store returns newest-first (natural for "older than a cursor"); the
+        // client renders oldest-at-top, so hand back ascending. The cursor is the
+        // oldest message in this page — the `before` for the next scroll-up load.
+        const ascending = [...pageRows].reverse();
+        const oldest = pageRows[pageRows.length - 1];
+        const cursor = oldest ? { ts: oldest.ts, id: oldest.id } : null;
+
+        res.status(200).json({
+          messages: ascending.map(toWireMessage),
+          hasMore,
+          cursor,
+        });
+      } catch (err) {
+        // History is an enhancement — a store outage degrades to "no history"
+        // (the client shows live-only), never an error over the game.
+        console.error("[chat] history read failed", err);
+        res.status(503).json({ error: "chat_unavailable" });
+      }
     },
   );
 

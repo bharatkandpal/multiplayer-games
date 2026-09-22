@@ -320,3 +320,56 @@ export const variants = pgTable(
     index("variants_forked_from_idx").on(t.forkedFrom),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// chat_messages (CHAT-021 — durable chat history)
+// ---------------------------------------------------------------------------
+
+/**
+ * A single chat message, persisted so a room can load its recent history
+ * instead of always opening blank. This deliberately reverses ADR 0005's
+ * original "chat is ephemeral, no durable store" call (guardrail 2) — the ADR
+ * lists exactly this ("replay chat") as its revisit trigger. See the ADR
+ * addendum "CHAT-021 — durable chat history".
+ *
+ *  - `id` is the message id itself (a client-minted or server-minted uuid),
+ *    already unique per message, so it doubles as the idempotency key: a retried
+ *    persist is a no-op (`onConflictDoNothing`), and the stored id matches the
+ *    one the live Ably broadcast carried, so history and live reconcile by id.
+ *  - `channel` is the **derived** channel name the message was published to —
+ *    `chat:<roomId>` for a public room, the opaque `chat:p-<hmac>` for a private
+ *    one. Reads group by `channel`, so a private room's history is keyed by its
+ *    hash: the shared secret is **never** stored (privacy is still the token
+ *    scoping, not a stored password). `roomId` is the plain, non-secret slug
+ *    (it is already in the URL), kept only for diagnostics.
+ *  - `sender_token` is the ADR-0004 session token, owner-scoped and FK-cascaded
+ *    like every other aggregate, so "forget me" and a session delete both erase
+ *    a sender's messages from everyone's history.
+ *  - `text` is stored already profanity-masked (the same value that was
+ *    broadcast) — the store never holds the raw text.
+ *  - `created_at` is set to the message's authoritative broadcast timestamp (not
+ *    the write moment), so history sorts and pages on the exact same clock the
+ *    live stream used, and the 30-day retention sweep prunes on it.
+ */
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: text("id").primaryKey(),
+    channel: text("channel").notNull(),
+    roomId: text("room_id").notNull(),
+    senderToken: text("sender_token")
+      .notNull()
+      .references(() => sessions.token, { onDelete: "cascade" }),
+    senderName: text("sender_name").notNull(),
+    text: text("text").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    // Paged reads are always "newest messages on this channel, older than a
+    // cursor" — a compound (channel, created_at desc, id desc) serves both the
+    // first page and every scroll-up page, ties broken by id.
+    index("chat_messages_channel_idx").on(t.channel, t.createdAt, t.id),
+    // Per-sender erasure ("forget me") scans by sender token.
+    index("chat_messages_sender_idx").on(t.senderToken),
+  ],
+);
