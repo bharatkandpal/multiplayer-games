@@ -1,12 +1,26 @@
-name: CI
+name: Verify
 
+# MANUAL ONLY. As of 2026-09-22 this no longer runs on push or pull_request —
+# verification moved to local git hooks (.husky/pre-commit + .husky/pre-push).
+# See docs/DEVELOPER_GUIDE.md "Local verification".
+#
+# It is kept, and kept dispatchable, for the two things a local hook cannot do:
+#
+#   1. Run the FULL suite including packages/engine/src/ai/difficulty.test.ts —
+#      a depth-7 minimax sweep that `test:fast` excludes, so pre-push never sees
+#      it. Without this workflow that test has no home at all (MPG-151).
+#   2. Verify a MERGED result. Hooks only ever see one developer's working tree;
+#      they cannot catch two independently-green branches that conflict once
+#      combined.
+#
+# Costs nothing while idle — workflow_dispatch consumes minutes only when you
+# actually trigger it, from the Actions tab or `gh workflow run ci.yml`.
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   verify:
-    name: typecheck · lint · format · test
+    name: typecheck · lint · format · test (full)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -14,6 +14,7 @@
     "build": "echo \"[@mpg/server] bundling configured later\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "test:fast": "vitest run",
     "dev": "tsx watch --env-file-if-exists=../../.env.local src/index.ts",
     "db:generate": "node --env-file-if-exists=../../.env.local ./node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file-if-exists=../../.env.local ./node_modules/drizzle-kit/bin.cjs migrate",

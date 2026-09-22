@@ -1,0 +1,26 @@
+# The real gate (~30s). This is what CI's "typecheck · lint · format · test" job
+# used to run on every push; it now runs here instead (2026-09-22).
+#
+# Ordered cheapest-first so a failure reports as early as possible:
+#   typecheck  ~4s   tsc across every package. Vitest does NOT typecheck, and the
+#                    web tsconfig includes its tests — so a change can pass the
+#                    tests below and still be broken. This is why it runs first.
+#   lint       ~2s   eslint over the whole tree (CI linted the whole tree too).
+#   format     ~3s   prettier --check; pre-commit only formatted STAGED files, so
+#                    anything written by a tool or merged in still needs checking.
+#   test:fast  ~30s  every package's suite except the slow compute-bound
+#                    difficulty sweep — see the note below.
+#
+# NOT covered here: packages/engine/src/ai/difficulty.test.ts, a depth-7 minimax
+# sweep excluded from `test:fast` because it alone takes ~45s and times out on
+# loaded machines. Run the FULL suite with `pnpm test` before opening a PR, or
+# trigger the manual "Verify" workflow on GitHub. See MPG-151.
+#
+# Escape hatch: `git push --no-verify` skips all of this. That is the tradeoff of
+# a local gate over a server-side one — nothing stops an unverified push.
+set -e
+
+pnpm typecheck
+pnpm lint
+pnpm format:check
+pnpm -r run test:fast
