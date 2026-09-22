@@ -257,6 +257,38 @@ describe("chat routes (CHAT-002/003)", () => {
       expect(sent.data.ts).toBe(body.ts);
     });
 
+    it("honors a well-formed client-minted id, so the sender's optimistic bubble reconciles", async () => {
+      const fetchImpl = publishOk();
+      const { call } = await mount({ ablyOptions: { apiKey: "k:s", fetchImpl } });
+
+      const clientId = "123e4567-e89b-42d3-a456-426614174000";
+      const res = await call("/api/chat/room-1/messages", {
+        method: "POST",
+        body: JSON.stringify({ id: clientId, text: "hello there", displayName: "Ann" }),
+      });
+      expect(res.status).toBe(202);
+      const body = (await res.json()) as { id: string };
+      expect(body.id).toBe(clientId);
+
+      const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+      const sent = JSON.parse(String(init.body)) as { data: { id: string } };
+      expect(sent.data.id).toBe(clientId);
+    });
+
+    it("ignores a malformed client id and mints its own", async () => {
+      const fetchImpl = publishOk();
+      const { call } = await mount({ ablyOptions: { apiKey: "k:s", fetchImpl } });
+
+      const res = await call("/api/chat/room-1/messages", {
+        method: "POST",
+        body: JSON.stringify({ id: "not-a-uuid; drop table", text: "hi", displayName: "Ann" }),
+      });
+      expect(res.status).toBe(202);
+      const body = (await res.json()) as { id: string };
+      expect(body.id).not.toBe("not-a-uuid; drop table");
+      expect(body.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    });
+
     it("masks profanity in the text before publishing", async () => {
       const fetchImpl = publishOk();
       const { call } = await mount({ ablyOptions: { apiKey: "k:s", fetchImpl } });

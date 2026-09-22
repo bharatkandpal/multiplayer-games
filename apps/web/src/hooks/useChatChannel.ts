@@ -10,11 +10,12 @@
  * `status` to decide what to render; this hook never surfaces a raw error.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Realtime } from "ably";
 import type * as Ably from "ably";
 import { fetchChatToken, sendChatMessage, type ChatMessage } from "../api/chat.js";
 import { getStoredUsername } from "../api/username.js";
+import { getSessionToken } from "../api/session.js";
 
 export type ChatStatus = "connecting" | "live" | "unavailable";
 
@@ -42,11 +43,9 @@ export function useChatChannel(roomId: string): UseChatChannelResult {
   const [connectionState, setConnectionState] = useState<Ably.ConnectionState | "unknown">(
     "unknown",
   );
-  const seenIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
-    seenIdsRef.current = new Set();
     setMessages([]);
     setStatus("connecting");
     setConnectionState("unknown");
@@ -123,10 +122,16 @@ export function useChatChannel(roomId: string): UseChatChannelResult {
       if (cancelled) return;
       const data = msg.data as Partial<ChatMessage> | undefined;
       if (!data || typeof data.id !== "string") return;
-      if (seenIdsRef.current.has(data.id)) return;
-      seenIdsRef.current.add(data.id);
+      const incoming = data as ChatMessage;
       setMessages((prev) => {
-        const next = [...prev, data as ChatMessage];
+        // Reconcile by id: this broadcast either confirms the sender's own
+        // optimistic bubble (CHAT-018) or is a duplicate re-delivery — in both
+        // cases replace in place with this authoritative server copy (masked
+        // text, server ts, no `delivery` marker). Otherwise it's someone
+        // else's message: append it.
+        const idx = prev.findIndex((m) => m.id === incoming.id);
+        const next =
+          idx >= 0 ? prev.map((m, i) => (i === idx ? incoming : m)) : [...prev, incoming];
         next.sort((a, b) => a.ts - b.ts);
         return next;
       });
@@ -149,8 +154,38 @@ export function useChatChannel(roomId: string): UseChatChannelResult {
   const send = useCallback(
     async (text: string): Promise<SendChatResult> => {
       const displayName = getStoredUsername() ?? "Player";
-      const result = await sendChatMessage(roomId, text, displayName);
-      if (result.ok) return { ok: true };
+      // Mint the id up front so the broadcast echo reconciles this exact
+      // bubble, and render it immediately as "pending" (CHAT-018): the sender
+      // sees their message the instant they hit send, not after the full
+      // client→server→Ably→subscription round-trip.
+      const id = crypto.randomUUID();
+      const optimistic: ChatMessage = {
+        id,
+        roomId,
+        // Session token so the bubble reads as our own and local mute stays
+        // consistent; the broadcast echo carries the same, server-derived one.
+        sender: { token: getSessionToken() ?? "", name: displayName },
+        text,
+        ts: Date.now(),
+        delivery: "pending",
+      };
+      setMessages((prev) => {
+        const next = [...prev, optimistic];
+        next.sort((a, b) => a.ts - b.ts);
+        return next;
+      });
+
+      const result = await sendChatMessage(roomId, text, displayName, id);
+      if (result.ok) {
+        // Clear the pending marker so a dropped broadcast echo can't strand the
+        // bubble as "sending…" forever; if the echo does arrive it replaces the
+        // whole entry anyway.
+        setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, delivery: undefined } : m)));
+        return { ok: true };
+      }
+      // The send never reached the server — pull the optimistic bubble back out
+      // (ChatScreen restores the draft, so nothing typed is lost).
+      setMessages((prev) => prev.filter((m) => m.id !== id));
       return { ok: false, reason: result.reason };
     },
     [roomId],

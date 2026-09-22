@@ -241,15 +241,24 @@ interface MessageBubbleProps {
  * marker glyph (▸/◂), never by color alone (UX_PRINCIPLES §4).
  */
 function MessageBubble({ message, isOwn, onMute }: MessageBubbleProps): React.JSX.Element {
+  const pending = message.delivery === "pending";
   const time = new Date(message.ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const ownClass = pending ? `${styles.own} ${styles.pending}` : styles.own;
   return (
-    <li className={isOwn ? `${styles.bubble} ${styles.own}` : `${styles.bubble} ${styles.other}`}>
+    <li className={isOwn ? `${styles.bubble} ${ownClass}` : `${styles.bubble} ${styles.other}`}>
       <div className={styles.bubbleHeader}>
         <span className={styles.bubbleMarker} aria-hidden="true">
           {isOwn ? "▸" : "◂"}
         </span>
         <span className={styles.bubbleName}>{isOwn ? "You" : message.sender.name}</span>
-        <span className={styles.bubbleTime}>{time}</span>
+        {/* Own bubbles show a delivery marker in place of a wall-clock time
+            until they're confirmed — the send felt instant, so "Sending…"
+            reassures without implying it's already delivered. */}
+        {isOwn && pending ? (
+          <span className={styles.bubbleTime}>Sending…</span>
+        ) : (
+          <span className={styles.bubbleTime}>{time}</span>
+        )}
         {!isOwn ? (
           <button
             type="button"

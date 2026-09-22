@@ -31,6 +31,14 @@ import { maskProfanity } from "./profanityMask.js";
 /** Matches the "safe slug" a room id already is (see rooms/RoomManager.ts ids). */
 const ROOM_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 
+/**
+ * A client-minted message id (CHAT-018): a v4-shaped UUID. Accepted only in
+ * this exact shape so the id stays an opaque, collision-free handle the sender
+ * chose for its own optimistic bubble — never a vector for injecting arbitrary
+ * strings into the broadcast. Anything else falls back to a server-minted id.
+ */
+const CLIENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const MAX_TEXT_LENGTH = 500;
 const MAX_DISPLAY_NAME_LENGTH = 40;
 
@@ -47,6 +55,7 @@ interface TokenRequestBody {
 }
 
 interface SendMessageBody {
+  readonly id?: unknown;
   readonly text?: unknown;
   readonly displayName?: unknown;
 }
@@ -136,8 +145,14 @@ export function createChatRouter(
         return;
       }
 
+      // Honor a well-formed client-minted id (CHAT-018) so the sender's
+      // optimistic bubble reconciles against this broadcast; otherwise mint one.
+      const rawId = body?.id;
+      const id =
+        typeof rawId === "string" && CLIENT_ID_RE.test(rawId) ? rawId : crypto.randomUUID();
+
       const message = {
-        id: crypto.randomUUID(),
+        id,
         roomId,
         // Sender identity comes from the session, never the request body — a
         // caller cannot claim to be someone else's session token.
