@@ -222,3 +222,13 @@ _chat messages_ are durable; reactions and `GameResult` transcripts are not.
 - Reaction/chat volume outgrowing single-node aggregation → move coalescing behind the
   Socket.IO Redis adapter / a fan-out worker (same scaling path as ADR 0001/ARCHITECTURE §7).
 - Abuse that light client-side filtering can't hold → server-authoritative moderation earlier.
+- **Encryption at rest for durable chat (CHAT-021 follow-up, planned).** Now that message
+  content persists (see the CHAT-021 addendum), a later phase should encrypt it at rest with a
+  **key-rotation mechanism** whose master key lives **off this service** — on the maintainer's
+  machine or a separate key-generator/KMS application that mints and rotates keys. This service
+  would envelope-encrypt/decrypt per message via that external key and never store it, so a
+  dump of `chat_messages` is inert without the external key. Needs its own design: envelope
+  scheme + per-message data keys, rotation cadence and re-wrap/read-through on rotation, key
+  custody/availability (the offline pillar means a key service being down must degrade to
+  "history unavailable", never block live chat), and how the private-room channel derivation
+  (CHAT-020) composes with per-message encryption.
