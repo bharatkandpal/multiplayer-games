@@ -76,6 +76,8 @@ Run from the repo root. `pnpm -r` fans a script out across all workspaces.
 | `pnpm build`                            | Build every workspace                                                   |
 | `pnpm test`                             | Full test suite (Vitest, all packages)                                  |
 | `pnpm test:fast`                        | Faster subset — excludes the heavy Connect Four AI strength simulations |
+| `pnpm verify`                           | The full gate: typecheck + lint + format:check + full test (pre-PR)     |
+| `pnpm verify:fast`                      | Same, but `test:fast` — identical to what pre-push runs                 |
 | `pnpm typecheck`                        | Strict `tsc --noEmit` across all packages                               |
 | `pnpm lint` / `pnpm lint:fix`           | ESLint (flat config)                                                    |
 | `pnpm format` / `pnpm format:check`     | Prettier                                                                |
@@ -101,8 +103,8 @@ still works, but limits you to local play.
   - Use `import type { … }` for type-only imports.
   - Array/index access is `T | undefined` — guard it.
   - Prefix intentionally-unused params with `_`.
-- **Prettier owns formatting** (incl. Markdown/tables). Run `pnpm format` before committing;
-  CI runs `format:check`.
+- **Prettier owns formatting** (incl. Markdown/tables). The pre-commit hook formats your
+  staged files for you; pre-push runs `format:check` over the whole tree (§9).
 - **ESM everywhere** (`"type": "module"`).
 
 ## 5. The game engine (`@mpg/engine`)
@@ -310,14 +312,48 @@ safe to point at staging and usable as a deploy gate.
   moves rejected; TTT Hard never loses; C4 Hard beats random ≥95%; strength monotonic
   (Hard ≥ Medium ≥ Easy).
 
-## 9. Git & CI workflow
+## 9. Git workflow & local verification
 
 - Work on a feature branch per task (e.g. `mpg-009-board`), not on `main`.
-- Keep it green before merging: `pnpm typecheck && pnpm lint && pnpm format:check && pnpm test`.
-- **CI** (`.github/workflows/ci.yml`) runs that same sequence on push/PR (Node 22,
-  pnpm 11, frozen lockfile). It executes once the repo has a GitHub remote.
 - Commit messages end with the project's Co-Authored-By / session trailer (see existing
   history).
+
+### Where verification runs
+
+**As of 2026-09-22 verification is local, not CI.** The `typecheck · lint · format ·
+test` job no longer runs on push or pull_request; git hooks (husky) run it on your
+machine instead. Hooks install automatically via the `prepare` script on `pnpm install`
+— if they ever stop firing, run `pnpm install` again.
+
+| Stage           | Hook                     | Runs                                                                          | Cost   |
+| --------------- | ------------------------ | ----------------------------------------------------------------------------- | ------ |
+| **pre-commit**  | `.husky/pre-commit`      | `lint-staged` — prettier + eslint `--fix` on **staged files only**, re-staged | ~1–3s  |
+| **pre-push**    | `.husky/pre-push`        | `pnpm typecheck` → `pnpm lint` → `pnpm format:check` → `pnpm -r test:fast`    | ~30s   |
+| **before a PR** | _manual_                 | `pnpm verify` — the same four, but the **full** `pnpm test`                   | ~75s   |
+| **on demand**   | `gh workflow run ci.yml` | Full suite on a clean Linux runner (`Verify`, manual dispatch only)           | remote |
+
+Order inside pre-push is cheapest-first so failures surface early. Typecheck runs
+**first and always**: Vitest does not typecheck, and the web tsconfig includes its own
+tests, so a change can pass every test and still fail `tsc`.
+
+### What the local gate does not cover
+
+Three real gaps — know them rather than assume green means green:
+
+1. **`packages/engine/src/ai/difficulty.test.ts` never runs on pre-push.** `test:fast`
+   excludes this depth-7 minimax sweep because it alone takes ~45s and times out on
+   loaded machines. Run `pnpm verify` (full `pnpm test`) before opening a PR, or
+   dispatch the `Verify` workflow. Tracked as MPG-151.
+2. **Hooks are bypassable.** `git commit --no-verify` / `git push --no-verify` skip
+   everything, and a hook only ever sees one working tree.
+3. **Nothing verifies the merged result.** Two branches can each be green and still
+   break `main` once combined. Dispatch `Verify` on `main` after a merge if a PR
+   touched anything shared.
+
+`.github/workflows/deploy.yml` is **unaffected** and still runs automatically — push to
+`main` deploys production, PRs get a preview. Deploys must stay remote: a macOS
+`vercel deploy --prebuilt` ships a broken `@resvg/resvg-js` native binding and 500s the
+whole production API.
 
 ## 10. Task board
 

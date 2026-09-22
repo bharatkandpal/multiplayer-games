@@ -19,7 +19,19 @@
     "format:check": "prettier --check .",
     "e2e": "playwright test",
     "test:e2e": "playwright test",
-    "dev": "pnpm -r --parallel run dev"
+    "dev": "pnpm -r --parallel run dev",
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
+    "verify:fast": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:fast",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,mjs,cjs}": [
+      "prettier --write",
+      "eslint --fix --no-warn-ignored"
+    ],
+    "*.{json,md,css,yml,yaml,html}": [
+      "prettier --write --ignore-unknown"
+    ]
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -27,6 +39,8 @@
     "@types/node": "^26.2.0",
     "eslint": "^10.9.0",
     "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.5.1",
     "prettier": "^3.9.6",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.67.0",

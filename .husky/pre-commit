@@ -1,0 +1,6 @@
+# Fast lane (~1-3s): format + lint ONLY the files you staged, auto-fixing and
+# re-staging them. Deliberately no typecheck and no tests — those need the whole
+# project, not a file subset, and belong in pre-push.
+#
+# See docs/DEVELOPER_GUIDE.md "Local verification".
+pnpm exec lint-staged
