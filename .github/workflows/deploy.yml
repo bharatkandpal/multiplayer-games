@@ -17,6 +17,18 @@ name: Deploy
 #   VERCEL_PROJECT_ID      - the `mpg` project id (web)
 #   VERCEL_API_PROJECT_ID  - the `mpg-api` project id
 #
+# Database migrations run here too, in a `migrate` job the deploy depends on,
+# so the schema always lands before the code that needs it (CHAT-022 added a
+# table the API 404s every chat room without). Needs one more secret, scoped to
+# the `Production` GitHub Environment rather than the repo so preview runs can
+# never reach the production database:
+#   DATABASE_URL - the production Neon connection string. Use the UNPOOLED
+#     (direct) URL, not the `-pooler` host: DDL over the pooler can misbehave.
+#     Note `vercel pull` cannot supply this — Vercel returns `[encrypted]` for
+#     variables marked sensitive, so it has to be a GitHub secret.
+#   Until that secret exists the migrate job WARNS AND SKIPS rather than
+#   failing, so adding this workflow cannot block deploys on its own.
+#
 # Optional fifth secret:
 #   VERCEL_AUTOMATION_BYPASS_SECRET - Protection Bypass for Automation token
 #     (Vercel project -> Settings -> Deployment Protection). Without it the
@@ -52,13 +64,71 @@ permissions:
   pull-requests: write
 
 jobs:
+  # Schema before code. `deploy` needs this job, so a failed migration blocks
+  # the deploy rather than shipping an API into a database that cannot serve it
+  # — the failure mode that would otherwise 404 every chat room (CHAT-022).
+  #
+  # Production only. Previews are wired to the real DEV database (MPG-139) and
+  # migrating that from a PR is a separate decision; until it is made, a PR that
+  # changes the schema gets a preview running the old one.
+  #
+  # Safe to re-run on every push: drizzle records applied migrations in
+  # `drizzle.__drizzle_migrations`, so a push with nothing pending is a no-op.
+  migrate:
+    name: Migrate production database
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # Scopes DATABASE_URL to this environment (and lets a required-reviewer rule
+    # gate schema changes, if you want migrations to need a human).
+    environment: Production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # WARN AND SKIP, never fail, when the secret is absent. This job ships
+      # before the secret exists, and a hard failure here would take every
+      # production deploy down with it — for a repo whose whole premise is that
+      # the game keeps working when the backend doesn't, that trade is wrong.
+      - name: Run migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::warning::Secret DATABASE_URL is not set on the Production environment — migrations SKIPPED, not applied. Any pending migration must be run by hand before the deploy that needs it. See this workflow's header."
+            exit 0
+          fi
+          echo "Applying pending migrations…"
+          pnpm --filter @mpg/server db:migrate
+          echo "::notice::Migrations applied."
+
   deploy:
     name: Vercel ${{ matrix.app }} (${{ github.event_name == 'push' && 'production' || 'preview' }})
     runs-on: ubuntu-latest
+    needs: migrate
     # Skip PRs from forks: secrets aren't exposed to them, so the deploy can't run.
+    #
+    # `!cancelled()` + an explicit result check, NOT a bare `needs:`. A skipped
+    # dependency skips its dependents by default, and `migrate` is skipped on
+    # every pull_request — a plain `needs: migrate` would silently stop all
+    # preview deploys. "skipped" is a pass here; only a real failure blocks.
     if: >-
-      github.event_name == 'push' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      !cancelled() &&
+      (needs.migrate.result == 'success' || needs.migrate.result == 'skipped') &&
+      (github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
     strategy:
       # Deploy both even if one fails — see header.
       fail-fast: false
