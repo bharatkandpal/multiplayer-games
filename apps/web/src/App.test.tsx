@@ -362,12 +362,14 @@ describe("CHAT-004: chat routing", () => {
     vi.restoreAllMocks();
   });
 
-  it("opens `/chat` onto the chat screen, defaulting to the lobby room", () => {
+  it("opens `/chat` onto the chat screen, defaulting to the Global room", () => {
     window.history.pushState({}, "", "/chat");
 
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "Chat" })).toBeInTheDocument();
+    // The header names the room you are in — a bare `/chat` is Global
+    // (CHAT-022), the same room the rail marks as current.
+    expect(screen.getByRole("heading", { name: /Global/ })).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Featured games" })).not.toBeInTheDocument();
   });
 
@@ -376,7 +378,7 @@ describe("CHAT-004: chat routing", () => {
 
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "Chat" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /my-room/ })).toBeInTheDocument();
   });
 
   it("Home offers a labelled entry point into chat that navigates and updates the URL", () => {
@@ -384,7 +386,7 @@ describe("CHAT-004: chat routing", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Chat" }));
 
-    expect(screen.getByRole("heading", { name: "Chat" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Global/ })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/chat");
   });
 
@@ -407,6 +409,6 @@ describe("CHAT-004: chat routing", () => {
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
 
-    expect(screen.getByRole("heading", { name: "Chat" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Global/ })).toBeInTheDocument();
   });
 });
