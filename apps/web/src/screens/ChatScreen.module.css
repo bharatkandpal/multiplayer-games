@@ -1,80 +1,70 @@
 /*
- * ChatScreen (CHAT-006). A page screen, not an in-game frame — but it still
- * follows the same viewport contract (UX_PRINCIPLES §9): the top bar and
- * composer are fixed, and the message list is the one region that scrolls,
- * so the "type a message" control is never lost off the bottom of a short
- * phone screen.
+ * ChatScreen (CHAT-006). A messaging app surface, not a page: like Discord,
+ * WhatsApp or Telegram it takes the entire canvas — no site gutters, no page
+ * footer, no outer scrolling region. It keeps the viewport contract
+ * (UX_PRINCIPLES §9): the header and composer are fixed, and the message list
+ * is the one region that scrolls, so "type a message" is never lost off the
+ * bottom of a short phone screen.
  */
 
 .main {
+  /* Edge to edge. A message log's value scales with area, and the width goes
+     to the room list and to showing more messages — never to longer lines,
+     which the bubble measure caps. */
   width: 100%;
-  /* Chat is the one screen that widens past `--container-md` (docs/CHAT_UI.md
-     §1.1): a message log's value scales with area, where a board or a form has
-     an ideal size. The width freed here goes to the room rail and to showing
-     more messages — never to longer lines, which the bubble measure caps. */
-  max-width: var(--container-xl);
-  margin: 0 auto;
-  padding: var(--space-4);
-
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  background: var(--color-bg);
 
   /* The reading measure for a message bubble — see `.bubble`. */
   --chat-measure: 62ch;
 }
 
 /*
- * Rail + conversation. Below 64rem this is a single column showing one of the
- * two at a time (driven by `data-view`); at 64rem and up both are always
- * visible and the switch is meaningless.
+ * Room list + conversation. The list is collapsed by default (`data-rail`):
+ * open at ≥ 64rem it is a fixed column beside the conversation; below that it
+ * is a drawer laid over the conversation, so neither is ever a cramped half.
  */
 .body {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-3);
+  display: flex;
+  align-items: stretch;
 }
 
 .railColumn {
   min-height: 0;
-  display: flex;
+  display: none;
   flex-direction: column;
+  padding: var(--space-3);
+  background: var(--color-bg-subtle);
+  border-right: var(--border-width-hairline) solid var(--color-border);
+}
+
+.body[data-rail="open"] .railColumn {
+  display: flex;
+  /* Narrow: a drawer over the conversation rather than a squeezed column. */
+  position: absolute;
+  inset: 0;
+  z-index: 1;
 }
 
 .conversation {
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-}
-
-/* Narrow: exactly one column on screen, so neither is ever a cramped half. */
-.body[data-view="lobby"] .conversation {
-  display: none;
-}
-
-.body[data-view="room"] .railColumn {
-  display: none;
 }
 
 @media (min-width: 64rem) {
-  .body {
-    grid-template-columns: 16rem 1fr;
-  }
-
-  /* Both columns, whatever `data-view` says — there is no switch at this size. */
-  .body[data-view="lobby"] .conversation,
-  .body[data-view="room"] .railColumn {
-    display: flex;
-  }
-
-  /* The rail is the way back to the list here, so the button is redundant. */
-  .backToRooms {
-    display: none;
+  .body[data-rail="open"] .railColumn {
+    position: static;
+    flex: 0 0 17rem;
+    width: 17rem;
   }
 }
 
@@ -83,7 +73,77 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border-bottom: var(--border-width-hairline) solid var(--color-border);
+}
+
+/* The two ends of the header. They hold their content's width so the room
+   name in the middle stays centred as status/labels change. */
+.topBarSide {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.topBarSide[data-align="end"] {
+  justify-content: flex-end;
+}
+
+.railToggle {
+  flex: 0 0 auto;
+}
+
+.railToggleGlyph {
+  font-size: var(--font-size-300);
+  line-height: 1;
+}
+
+.railToggleLabel {
+  margin-left: var(--space-1);
+}
+
+.statusSlot,
+.toolbarSlot {
+  display: inline-flex;
+  align-items: center;
+}
+
+/*
+ * Tight phones: the header has one row and five things want it, so the room
+ * name — the one thing that says where you are — is protected first.
+ *
+ * - The glyph alone carries Rooms/Home; the labels stay in the accessible name.
+ * - The status badge is dropped while chat is simply working. Connecting and
+ *   unavailable still show, because those change what you can do.
+ * - The theme switch is site chrome, offered on every page screen and one tap
+ *   away via Home — it yields the space here, the same way the in-game frame
+ *   withholds it (MPG-137).
+ */
+@media (max-width: 30rem) {
+  .railToggleLabel,
+  .homeLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .statusSlot[data-state="live"],
+  .toolbarSlot {
+    display: none;
+  }
+
+  /* The field keeps the row; the name chip truncates harder to pay for it. */
+  .nameEdit {
+    max-width: 4.5rem;
+  }
 }
 
 .homeIcons {
@@ -97,47 +157,38 @@
   margin-left: var(--space-1);
 }
 
+/* The header names the room, the way a messaging app does — the screen you are
+   in is the conversation, so a generic "Chat" title would spend the one line
+   that actually orients you. */
 .heading {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
   font-family: var(--font-family-display);
-  font-size: var(--font-size-500);
+  font-size: var(--font-size-400);
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-display);
   margin: 0;
 }
 
+.roomHash {
+  color: var(--color-text-muted);
+  margin-right: 0.125em;
+}
+
 .unavailableSlot {
   flex: 0 0 auto;
-}
-
-/* CHAT-019: the room bar sits under the top bar — a slim, non-scrolling row
-   naming the current room and opening the create/join/share dialog. */
-.roomBar {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.roomName {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-size-200);
-  color: var(--color-text-muted);
-}
-
-.roomName strong {
-  color: var(--color-text);
+  padding: var(--space-2) var(--space-3) 0;
 }
 
 .roomButton {
   flex: 0 0 auto;
 }
 
-/* CHAT-020: private-room marker in the room bar. The lock glyph is decorative;
+/* CHAT-020: private-room marker in the header. The lock glyph is decorative;
    the room stays readable without it, and a screen-reader-only "(private)"
    carries the meaning that colour/emoji alone can't (UX_PRINCIPLES §4). */
 .roomLock {
@@ -261,16 +312,14 @@
   align-self: flex-start;
 }
 
-/* The one scrolling region (UX_PRINCIPLES §9). */
+/* The one scrolling region (UX_PRINCIPLES §9). Full-bleed — no card border or
+   radius: the conversation *is* the surface, like every messaging app. */
 .messageList {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--color-bg-subtle);
-  border: var(--border-width-hairline) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
 }
 
 .empty {
@@ -353,8 +402,8 @@
   }
 }
 
-/* Own vs. others' — alignment + a directional marker glyph, never color
-   alone (UX_PRINCIPLES §4). */
+/* Own vs. others' — which side it sits on, plus whether it carries a sender
+   name, never colour alone (UX_PRINCIPLES §4). */
 .own {
   align-self: flex-end;
   background: var(--color-accent-bg);
@@ -366,28 +415,35 @@
 }
 
 /* An own message still in flight (CHAT-018): shown immediately, dimmed until
-   the server broadcast confirms it. Colour is not the only signal — the header
-   also reads "Sending…" — so this stays legible for colour-blind readers. */
+   the server broadcast confirms it. Colour is not the only signal — the meta
+   line also reads "Sending…" — so this stays legible for colour-blind readers. */
 .pending {
   opacity: 0.65;
 }
 
-.bubbleHeader {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
+/* Only ever on an incoming message: the sender, above their words. */
+.bubbleName {
+  display: block;
   font-size: var(--font-size-100);
-  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-accent-text);
   margin-bottom: var(--space-1);
 }
 
-.bubbleMarker {
-  font-size: var(--font-size-200);
-  line-height: 1;
+/* Time (and Mute, on incoming) sit under the text, out of the reading path. */
+.bubbleMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  font-size: var(--font-size-100);
+  color: var(--color-text-muted);
 }
 
-.bubbleName {
-  font-weight: var(--font-weight-medium);
+/* Yours end at the right edge, where the eye already is for a right-stacked
+   bubble; an incoming bubble reads left-to-right and keeps Mute at its end. */
+.own .bubbleMeta {
+  justify-content: flex-end;
 }
 
 .bubbleTime {
@@ -425,31 +481,49 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  background: var(--color-surface);
+  border-top: var(--border-width-hairline) solid var(--color-border);
 }
 
-.composerLabel {
-  font-size: var(--font-size-200);
-  color: var(--color-text-muted);
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
+/* Who you're posting as. It lives in the composer row rather than on a line of
+   its own, truncating rather than ever pushing the field narrow. */
 .nameEdit {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   background: none;
   border: none;
   color: var(--color-accent-text);
   text-decoration: underline;
   cursor: pointer;
-  font-size: inherit;
+  font: inherit;
+  font-size: var(--font-size-200);
   padding: var(--space-1);
   min-height: var(--size-touch-target);
+}
+
+.nameEdit:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .composerRow {
   display: flex;
   align-items: flex-end;
   gap: var(--space-2);
+}
+
+/* Positioning context for the overlaid counter. */
+.inputWrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
 }
 
 .textarea {
@@ -476,24 +550,36 @@
   outline-offset: 2px;
 }
 
-.composerFooter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-height: 1.25rem;
-}
-
+/* Laid over the field's bottom-right corner, on its own backdrop so it stays
+   readable above text — it costs the conversation no height at all. */
 .counter {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-1);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   font-family: var(--font-family-mono);
   font-variant-numeric: tabular-nums;
   font-size: var(--font-size-100);
   color: var(--color-text-muted);
+  pointer-events: none;
 }
 
+/* Only while the counter is actually there: keep the last line clear of it. */
+.inputWrap:has(.counter) .textarea {
+  padding-right: var(--space-10);
+}
+
+/* The live region stays mounted so an error is announced when it arrives, but
+   an empty one takes no space. */
 .sendErrorSlot {
-  flex: 1 1 auto;
+  padding-top: var(--space-1);
   text-align: right;
+}
+
+.sendErrorSlot:empty {
+  display: none;
 }
 
 .sendError {
@@ -501,30 +587,21 @@
   font-size: var(--font-size-100);
 }
 
-/* Mobile-first: stack the counter/error under the row on narrow screens so
-   nothing gets clipped at 320px. */
-@media (max-width: 22rem) {
-  .composerFooter {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .sendErrorSlot {
-    text-align: left;
-  }
-}
-
 /*
  * "Use the full space" is a mobile rule too (docs/CHAT_UI.md §3): a 320px
  * screen cannot afford 32px of symmetric gutter, and the own/other alignment
- * is already obvious from position and marker at that width.
+ * is already obvious from position at that width.
  */
 @media (max-width: 26rem) {
-  .main {
+  .messageList {
     padding: var(--space-2);
   }
 
-  .messageList {
+  .composer {
+    padding: var(--space-2);
+  }
+
+  .topBar {
     padding: var(--space-2);
   }
 

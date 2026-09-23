@@ -36,6 +36,27 @@ export function createPgChatMessageRepo(db: Database): ChatMessageRepo {
         .onConflictDoNothing({ target: chatMessages.id });
     },
 
+    // One multi-row insert for a whole batch (CHAT-023): the write-behind queue
+    // flushes a window of messages at once, and N round trips to Neon per
+    // window is the cost this exists to avoid.
+    async appendMany(messages) {
+      if (messages.length === 0) return;
+      await db
+        .insert(chatMessages)
+        .values(
+          messages.map((message) => ({
+            id: message.id,
+            channel: message.channel,
+            roomId: message.roomId,
+            senderToken: message.senderToken,
+            senderName: message.senderName,
+            text: message.text,
+            createdAt: new Date(message.ts),
+          })),
+        )
+        .onConflictDoNothing({ target: chatMessages.id });
+    },
+
     async page(channel, opts) {
       const before = opts.before;
       // Strictly older than the cursor in the (created_at, id) total order:

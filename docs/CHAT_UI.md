@@ -1,6 +1,7 @@
 # Chat UI Guidelines
 
-**Status: draft (2026-09-22).** Extends `UX_PRINCIPLES.md` §9 ("the screen is the frame")
+**Status: draft (2026-09-22; §1.1/§2/§6.4 revised 2026-09-23 — chat is now full-canvas
+with a collapsible room list).** Extends `UX_PRINCIPLES.md` §9 ("the screen is the frame")
 with rules specific to chat. Where the two disagree, §9 wins — nothing here licenses a page
 scroll or a control that hides off-screen.
 
@@ -22,9 +23,12 @@ and more context visible at once**. It must not mean longer lines.
 
 ### 1.1 Width is claimed by structure, not by stretching
 
-- **The chat shell widens to `--container-xl` (80rem)** and, above that, stays centred.
-  Chat is exempt from the `--container-md` convention; that exemption is deliberate and is
-  the only one — do not copy it onto other screens.
+- **The chat shell takes the entire canvas** — full viewport width and height, no centring
+  cap, no site gutters (revised 2026-09-23: `--container-xl` still left visible background
+  on a wide screen, which is the same bug as `--container-md`, smaller). Chat is treated
+  like an in-game frame: no site chrome row above it and no footer credit below it, so it
+  brings its own header and carries the theme switch there. That exemption is deliberate and
+  is chat's alone — do not copy it onto other screens.
 - **Reading measure is enforced on the text, not on the container.** A bubble caps at
   `min(80%, var(--chat-measure))` where `--chat-measure` is `62ch`. A 1400px-wide line of
   chat is less readable than a 500px one; the width freed by rule 1.1 goes to structure.
@@ -33,7 +37,8 @@ and more context visible at once**. It must not mean longer lines.
 
 ### 1.2 Vertical space belongs to the message list
 
-- Chrome (top bar, room bar, composer) is **fixed-height and compact**; the message list is
+- Chrome (**one** header — room list toggle, Home, room name, status, Share, theme — and the
+  composer) is **fixed-height and compact**; the message list is
   the only `flex: 1 1 auto` region and takes every remaining pixel. This already holds — do
   not regress it by giving the list a `max-height` or a fixed `height`.
 - **The empty state does not collapse the region.** An empty room shows the same-sized
@@ -41,6 +46,14 @@ and more context visible at once**. It must not mean longer lines.
   back down when the first message lands.
 - **The composer grows with its content** up to `max-height: 6.5rem`; the list shrinks to
   pay for it. The page never grows.
+- **The composer is one row, and nothing else by default** (2026-09-23). Standing chrome
+  around the field is height taken from the conversation, so: the "Message — playing as …"
+  label is screen-reader-only and the name control is a truncating chip inside the row; the
+  character count appears only within 50 of the limit, laid over the field's corner so it
+  costs no height; the send-error live region stays mounted but collapses while empty
+  (`:empty { display: none }`) so it takes space only when there is something to say.
+- **There is no footer on this screen at all** — the site credit belongs to page screens,
+  and chat is a frame (§1.1).
 
 ### 1.3 On a big screen, show more messages — not bigger ones
 
@@ -52,34 +65,33 @@ and more context visible at once**. It must not mean longer lines.
 
 ## 2. The responsive layout
 
-Three tiers. There are no breakpoint tokens (custom properties cannot be used in media
-queries), so these values are written literally and documented here as the convention.
+Two tiers, and one collapsible list. There are no breakpoint tokens (custom properties
+cannot be used in media queries), so these values are written literally and documented here
+as the convention.
 
-**< 64rem — single column.** Exactly today's layout. The rail does not exist; rooms and
-members stay in the existing dialog. Below `22rem`, the composer footer stacks (already
-implemented).
+**The room list is collapsed by default at every width.** You arrive in a conversation (the
+Global room), and the list is one labelled "Rooms" control away in the header — the same
+shape Discord, Telegram and WhatsApp Web use. Escape closes it; choosing a room closes it.
 
-**≥ 64rem (`--container-lg`) — rail + conversation.**
+**< 64rem — the list opens as a drawer** laid over the conversation (`position: absolute;
+inset: 0`), so neither surface is ever a cramped half.
+
+**≥ 64rem (`--container-lg`) — the list opens as a `17rem` column** beside the conversation,
+which keeps the rest.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│ 🏠 Home        Chat                           [status]  │  top bar, full width
-├──────────────┬──────────────────────────────────────────┤
-│ Rooms        │ 🔒 Private                      [Share]  │  room bar
-│ [All|Pub|🔒] ├──────────────────────────────────────────┤
-│  # Global 12 │                                          │
-│  🔒 Private 4│        messages — the ONE scroll region  │
-│              │                                          │
+┌──────────────┬──────────────────────────────────────────┐
+│ ☰ Rooms  🏠  │          # Global        [live] [Share]  │  one header, full width
+├──────────────┼──────────────────────────────────────────┤
+│ [All|Pub|🔒] │                                          │
+│  # Global 12 │        messages — the ONE scroll region  │
+│  🔒 Private 4│                                          │
 │              ├──────────────────────────────────────────┤
 │              │ [ type a message…             ] [ Send ] │
 │              │ 240 left                                 │
 └──────────────┴──────────────────────────────────────────┘
-   16rem fixed          1fr, bubbles capped at 62ch
+   17rem, collapsed by default    rest, bubbles capped at 62ch
 ```
-
-The rail is `16rem` fixed; the conversation column takes `1fr`.
-
-**≥ 80rem — as above, centred at `--container-xl`.** The rail does not keep growing.
 
 ### Rules the rail must obey
 
@@ -98,12 +110,18 @@ The rail is `16rem` fixed; the conversation column takes `1fr`.
 
 "Use the full space" is not a desktop-only rule. At ≤ 26rem:
 
-- Shell padding drops from `--space-4` to `--space-2`, and the message list's own padding
-  from `--space-3` to `--space-2`. A 320px screen cannot afford 32px of symmetric gutter.
+- The shell has no padding of its own at any width; at ≤ 26rem the header, message list and
+  composer each drop their padding to `--space-2`. A 320px screen cannot afford 32px of
+  symmetric gutter.
 - Bubble `max-width` rises from 80% to 92%. The 80% cap exists to make the own/other
   alignment readable; at 320px the alignment is already obvious from position and marker.
-- The room bar truncates the room name (already implemented) rather than wrapping to a
-  second line and stealing a row from the list.
+- At ≤ 30rem the header protects the room name first: the status badge is dropped **while
+  chat is live** (connecting/unavailable always show, because those change what you can do)
+  and the theme switch — site chrome, one tap away via Home — yields its space, exactly as
+  the in-game frame withholds it (MPG-137).
+- The header truncates the room name rather than wrapping to a second line and stealing a
+  row from the list, and at ≤ 30rem the "Rooms" and "Home" labels become screen-reader-only
+  (the buttons keep their accessible names; the glyphs carry them visually).
 
 ## 4. What does not change
 
@@ -115,9 +133,15 @@ Every §9 guarantee still binds, and widening the shell must not weaken any of t
 - **Every control keeps a visible text label.** A rail of bare glyphs fails this.
 - **Touch targets stay ≥ `--size-touch-target` (44px)**, including rail rows and the
   per-message mute control.
-- **Own/other is never signalled by colour alone** — alignment plus the marker glyph carry
-  it, and the grouped-message rule in 1.3 must not remove the marker from the first bubble
-  in a run.
+- **Own/other is never signalled by colour alone** (revised 2026-09-23) — the side a bubble
+  sits on plus **whether it carries a sender name** carry it. Your own messages stack right
+  and are unnamed; incoming ones stack left under the sender's name. The directional
+  marker glyphs (▸/◂) are gone: a name that only ever appears on incoming messages is a
+  stronger, quieter signal than a glyph on both. A screen-reader-only "You" stays on your
+  own bubbles, because assistive tech cannot perceive alignment at all — and the
+  grouped-message rule in 1.3 must not remove the name from the first bubble in a run.
+- **Your own name is never printed on your own messages.** You know who you are; the line
+  it would cost belongs to the conversation.
 - **Chat degrades to absence.** With the service down the composer disables quietly and the
   game remains fully playable. Nothing in this document may make chat a dependency of play.
 
@@ -125,7 +149,8 @@ Every §9 guarantee still binds, and widening the shell must not weaken any of t
 
 - E2E at **320×568, 390×844, 1280×800, 1920×1080**. jsdom has no layout, so unit tests
   cannot see any of this — extend `e2e/layout-frame.spec.ts` rather than adding jsdom tests.
-- Assert at 1280×800 that the message list's measured width is **> 60%** of the viewport
+- Assert at 1280×800, with the room list collapsed, that the message list's measured width
+  is **> 60%** of the viewport
   (the regression this document exists to prevent) and that no bubble exceeds `--chat-measure`.
 - Assert at every size that `document.scrollingElement.scrollHeight` equals its
   `clientHeight` — a page scrollbar is always a bug.
@@ -240,31 +265,34 @@ If an admin API is wanted later, the minimum that fits this codebase is an `ADMI
 env var checked as a bearer header on `POST/PATCH/DELETE /api/chat/rooms` — the app has
 session tokens but no user accounts, so there is no role to hang this off yet.
 
-### 6.4 The view switch
+### 6.4 Opening and closing the room list (revised 2026-09-23)
 
-**≥ 64rem** — the lobby rail persists; joining swaps only the conversation column. Nothing
-about the rail changes, so there is no "switch" to perceive.
-
-**< 64rem** — the lobby is a full screen and joining _replaces_ it with the conversation:
+The list is **collapsed by default at every width** and toggled from one labelled control in
+the header. There is no separate lobby screen and no `← Rooms` back control any more: the
+toggle is always on screen, so the way in and the way out are the same button.
 
 ```
-   LOBBY (narrow)                 JOINED (narrow)
+   CLOSED (default)                OPEN (narrow: a drawer)
 ┌──────────────────────┐      ┌──────────────────────┐
-│ 🏠 Home     Chat     │      │ ← Rooms   🔒 pvt     │
+│ ☰ Rooms 🏠  # Global │      │ ☰ Rooms 🏠  # Global │
 ├──────────────────────┤      ├──────────────────────┤
-│ [ All | Public | 🔒 ]│      │                      │
-│ # Global       12 ●  │      │   messages fill the  │
-│ 🔒 Private      4 ●  │      │   whole container    │
+│                      │      │ [ All | Public | 🔒 ]│
+│   messages fill the  │      │ # Global       12 ●  │
+│   whole canvas       │      │ 🔒 Private      4 ●  │
 │                      │      │                      │
-│                      │      ├──────────────────────┤
-│                      │      │ [ type a message… ]  │
+├──────────────────────┤      │                      │
+│ [ type a message… ]  │      │                      │
 └──────────────────────┘      └──────────────────────┘
 ```
 
-- The return control is **"← Rooms" with a visible text label**, never a bare chevron (§9).
-- The conversation view is unchanged from §1–§3: composer pinned at the bottom, message list
-  taking every remaining pixel as the one scroll region.
-- **A direct URL still opens a room**, so the lobby is a convenience rather than the only
+- The toggle carries a **visible text label** ("Rooms"), never a bare glyph (§9) — below
+  30rem the label is screen-reader-only and the ☰ glyph stands in visually.
+- It is `aria-expanded` + `aria-controls` on the list container, and the collapsed list is
+  `display: none` — out of the a11y tree and out of the tab order, not merely off-screen.
+- **Escape closes it**, because on a narrow screen it covers the conversation.
+- The toggle is **not offered at all when there is no list** (registry down): chat degrades
+  to absence, never to a control that does nothing.
+- **A direct URL still opens a room**, so the list stays a convenience rather than the only
   route (§9). With two seeded rooms the filter is near-pointless at first; it is built
   because the set is admin-grown, not because it earns its keep on day one.
 
@@ -291,8 +319,8 @@ anything else on the screen:
   with the active tab announced.
 - The active-member count needs a text label, not a bare number + dot:
   `aria-label="tactics, 4 people active"`.
-- The narrow-screen view switch moves focus to the conversation heading on join, and back to
-  the room row on return — otherwise a keyboard user is dropped at the top of the document.
+- The room-list toggle is `aria-expanded`/`aria-controls`, and the collapsed list is
+  `display: none` so it is neither focusable nor announced. Escape closes it.
 
 ## 7. Where `active` comes from — resolved (2026-09-22)
 

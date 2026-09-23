@@ -29,11 +29,11 @@ function uniqueRoomId(label: string): string {
   return `e2e-${label}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000)}`;
 }
 
-/** Opens the chat lobby from Home via the labelled "Chat" button (not a direct nav — proves the entry point too). */
+/** Opens chat from Home via the labelled "Chat" button (not a direct nav — proves the entry point too). Lands in the default Global room, which the header names. */
 async function openChatFromHome(page: Page): Promise<void> {
   await page.goto("/");
   await page.getByRole("button", { name: "Chat", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Chat" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Global/ })).toBeVisible();
 }
 
 test.describe("Chat — degrades to absence when unconfigured", () => {

@@ -39,7 +39,7 @@ import { GAME_CATALOG, REALTIME_CATALOG } from "./screens/HomeScreen";
 import { SharedResultScreen } from "./screens/SharedResultScreen";
 import { buildGameItems, nextGame, prevGame, type GameItem } from "./screens/catalog";
 import { pickGameOfTheDay } from "./screens/gameOfTheDay";
-import { isPrivateRoomSearch, roomPath } from "./screens/chatRoom";
+import { DEFAULT_CHAT_ROOM_ID, isPrivateRoomSearch, roomPath } from "./screens/chatRoom";
 import { isAllBotRoom, publicRoomToSeats, toSeatConfigInput } from "./api/roomSeats";
 import { ensureUsername, getStoredUsername, reconcileUsername } from "./api/username";
 import { initSession } from "./api/session";
@@ -117,9 +117,6 @@ const ROOM_PATH_RE = /^\/([^/]+)\/room\/([^/]+)\/?$/;
 const SHARE_PATH_RE = /^\/s\/([^/]+)\/?$/;
 const GAME_SLUG_RE = /^\/([^/]+)\/?$/;
 const CHAT_PATH_RE = /^\/chat(?:\/([^/]+))?\/?$/;
-
-/** Default room a bare `/chat` link opens (CHAT-004). */
-const DEFAULT_CHAT_ROOM_ID = "lobby";
 
 /**
  * Parses `/chat` or `/chat/:roomId` out of a pathname (CHAT-004), reading the
@@ -537,6 +534,11 @@ export default function App(): React.JSX.Element {
   // MPG-136/137: an in-game screen is a frame, not a page — it carries only its
   // own top bar, the board and the pinned action bar.
   const inGame = IN_GAME_SCREENS.has(route.screen);
+  // Chat is an app surface, not a page: like any messaging app it takes the
+  // whole canvas and brings its own header, so it gets the frame treatment too
+  // — no site chrome row, no footer credit, no outer scrolling region. The
+  // theme switch is handed to its header instead of being dropped.
+  const frame = inGame || route.screen === "chat";
 
   return (
     <main className={styles.main}>
@@ -544,7 +546,7 @@ export default function App(): React.JSX.Element {
           height, and the top bar is spoken for (Home + title + Rules,
           UX_PRINCIPLES §9) — so it's offered on every page screen and withheld
           from the frame, exactly like the footer credit below. */}
-      {inGame ? null : (
+      {frame ? null : (
         <div className={styles.chromeBar}>
           <ThemeSwitch dark={resolvedTheme === "dark"} onChange={(next) => setTheme(next)} />
         </div>
@@ -553,7 +555,7 @@ export default function App(): React.JSX.Element {
       {/* MPG-137: the one scrolling region. A page screen scrolls in here; an
           in-game screen doesn't scroll at all. Either way the page itself is
           pinned to the viewport, so no control can scroll out of reach. */}
-      <div className={cx(styles.screen, inGame && styles.screenInGame)}>
+      <div className={cx(styles.screen, frame && styles.screenInGame)}>
         {route.screen === "home" ? (
           <HomeScreen
             games={games}
@@ -756,6 +758,9 @@ export default function App(): React.JSX.Element {
             key={`${route.roomId}:${route.private ? "private" : "public"}`}
             roomId={route.roomId}
             isPrivate={route.private ?? false}
+            toolbar={
+              <ThemeSwitch dark={resolvedTheme === "dark"} onChange={(next) => setTheme(next)} />
+            }
             onBack={() => {
               goHome();
             }}
@@ -782,7 +787,7 @@ export default function App(): React.JSX.Element {
             none — it ends at the pinned action bar (UX_PRINCIPLES §9: the
             screen is the frame, and the bar is its bottom edge). On a page
             screen it sits below the content, inside the scrolling region. */}
-        {inGame ? null : <footer className={styles.footer}>Created by Bharat Kandpal</footer>}
+        {frame ? null : <footer className={styles.footer}>Created by Bharat Kandpal</footer>}
       </div>
 
       <UsernamePrompt

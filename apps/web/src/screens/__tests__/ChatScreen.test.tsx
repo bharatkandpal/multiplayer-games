@@ -98,8 +98,13 @@ describe("ChatScreen", () => {
 
     expect(screen.getByText("hi")).toBeInTheDocument();
     expect(screen.getByText("hey")).toBeInTheDocument();
-    expect(screen.getAllByText("You")).toHaveLength(1);
+    // An incoming message is named; your own is not — side carries it, and your
+    // own name is the one you already know. "You" survives only for assistive
+    // tech, which cannot perceive which side a bubble sits on.
     expect(screen.getByText("Ada")).toBeInTheDocument();
+    const log = screen.getByRole("log", { name: "Chat messages" });
+    expect(within(log).queryByText("me")).not.toBeInTheDocument();
+    expect(screen.getAllByText("You")).toHaveLength(1);
     // Only the other player's message offers a mute control.
     expect(screen.getByRole("button", { name: "Mute Ada" })).toBeInTheDocument();
   });
@@ -139,6 +144,31 @@ describe("ChatScreen", () => {
     await user.keyboard("{Enter}");
 
     await waitFor(() => expect(state.send).toHaveBeenCalledWith("quick message"));
+  });
+
+  it("keeps the composer to one row: the counter only appears near the limit", async () => {
+    state.status = "live";
+    const user = userEvent.setup();
+    render(<ChatScreen roomId="lobby" onBack={() => {}} />);
+
+    const input = screen.getByRole("textbox", { name: /Message/ });
+    await user.type(input, "short");
+    // Nothing standing in the composer but the field — no count of characters
+    // nobody is watching, and no "playing as" line of its own.
+    expect(screen.queryByText("495")).not.toBeInTheDocument();
+
+    // Within 50 of the 500 limit it appears, counting down what's left.
+    fireEvent.change(input, { target: { value: "x".repeat(470) } });
+    expect(screen.getByText("30")).toBeInTheDocument();
+  });
+
+  it("offers the name change from the composer row, labelled with the current name", () => {
+    state.status = "live";
+    render(<ChatScreen roomId="lobby" onBack={() => {}} />);
+
+    expect(
+      screen.getByRole("button", { name: "Change your name — currently me" }),
+    ).toBeInTheDocument();
   });
 
   it("calls onBack when Home is activated", async () => {
@@ -185,6 +215,45 @@ describe("ChatScreen", () => {
       const rail = screen.getByRole("navigation", { name: "Chat rooms" });
       await user.click(within(rail).getByText("Private"));
       expect(onOpenRoom).toHaveBeenCalledWith("pvt", { private: true });
+    });
+
+    it("starts with the room list collapsed, and the Rooms control opens it", async () => {
+      state.status = "live";
+      const user = userEvent.setup();
+      render(<ChatScreen roomId="global" onBack={() => {}} onOpenRoom={() => {}} />);
+
+      // Collapsed is the default — you land in the conversation, not a lobby.
+      const toggle = screen.getByRole("button", { name: "Rooms" });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+      await user.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+      // Escape closes it — on a narrow screen it covers the conversation.
+      await user.keyboard("{Escape}");
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("closes the room list once a room is chosen", async () => {
+      state.status = "live";
+      const user = userEvent.setup();
+      render(<ChatScreen roomId="global" onBack={() => {}} onOpenRoom={() => {}} />);
+
+      const toggle = screen.getByRole("button", { name: "Rooms" });
+      await user.click(toggle);
+      const rail = screen.getByRole("navigation", { name: "Chat rooms" });
+      await user.click(within(rail).getByText("Private"));
+
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("offers no Rooms control when there is no list to open", () => {
+      state.status = "live";
+      state.rooms = null;
+      render(<ChatScreen roomId="global" onBack={() => {}} onOpenRoom={() => {}} />);
+
+      // Degrades to absence — never a control that does nothing.
+      expect(screen.queryByRole("button", { name: "Rooms" })).not.toBeInTheDocument();
     });
 
     it("renders no rail at all when the room list is unavailable", () => {
