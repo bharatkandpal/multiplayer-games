@@ -54,16 +54,68 @@ export async function fetchChatToken(
   roomId: string,
   secret?: string,
 ): Promise<ChatTokenResponse | null> {
+  const result = await requestChatToken(roomId, secret);
+  return result.ok ? result.token : null;
+}
+
+/**
+ * Why a token request failed, for the one caller that must tell these apart:
+ * the secret gate, which shows "that code doesn't match" for `bad_secret` but
+ * must degrade silently for `unavailable` (CHAT_UI.md §6.5).
+ */
+export type ChatTokenResult =
+  | { ok: true; token: ChatTokenResponse }
+  | { ok: false; reason: "bad_secret" | "unknown_room" | "unavailable" };
+
+/**
+ * The same request as {@link fetchChatToken}, keeping the reason. Still never
+ * throws — an unreachable service is `unavailable`, exactly as before.
+ */
+export async function requestChatToken(roomId: string, secret?: string): Promise<ChatTokenResult> {
   try {
     const res = await apiFetch("/api/chat/token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // A private room carries a shared secret; the server folds it into the
-      // channel name it scopes the token to (and returns as `channelName`).
+      // A private room carries a shared secret; the server checks it against
+      // the registry and folds it into the channel it scopes the token to.
       body: JSON.stringify(secret ? { roomId, secret } : { roomId }),
     });
+    if (res.status === 403) return { ok: false, reason: "bad_secret" };
+    if (res.status === 404) return { ok: false, reason: "unknown_room" };
+    if (!res.ok) return { ok: false, reason: "unavailable" };
+    return { ok: true, token: (await res.json()) as ChatTokenResponse };
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
+}
+
+/** One room in the lobby list. Never carries the room code — see CHAT_UI.md §6.2. */
+export interface ChatRoomSummary {
+  id: string;
+  label: string;
+  visibility: "public" | "private";
+  /**
+   * People with the room open right now. **Absent** (not zero) when occupancy
+   * is unavailable — a missing count renders as nothing, where a zero would
+   * claim the room is empty.
+   */
+  active?: number;
+}
+
+/**
+ * The room list backing the lobby rail (CHAT-022). Rooms are
+ * administrator-owned, so this is read-only and the set is fixed — there is no
+ * create counterpart.
+ *
+ * Resolves to `null` for ANY failure, like every other call here: the rail
+ * degrades to absence and direct room links keep working.
+ */
+export async function fetchChatRooms(): Promise<ChatRoomSummary[] | null> {
+  try {
+    const res = await apiFetch("/api/chat/rooms");
     if (!res.ok) return null;
-    return (await res.json()) as ChatTokenResponse;
+    const body = (await res.json()) as { rooms?: unknown };
+    return Array.isArray(body.rooms) ? (body.rooms as ChatRoomSummary[]) : null;
   } catch {
     return null;
   }

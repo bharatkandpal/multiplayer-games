@@ -16,15 +16,18 @@
  * banner over a game the player didn't ask to chat in.
  */
 
+import { timingSafeEqual } from "node:crypto";
+
 import { Router } from "express";
 import type { Request, Response } from "express";
 
 import { noopLimit, type RateLimitFor } from "../middleware/rateLimit.js";
-import type { ChatCursor, ChatStoredMessage, Store } from "../store/ports.js";
+import type { ChatCursor, ChatRoom, ChatStoredMessage, Store } from "../store/ports.js";
 import {
   requestAblyToken,
   publishAblyMessage,
   getAblyApiKey,
+  fetchChannelOccupancy,
   type AblyClientOptions,
 } from "./ably.js";
 import { channelNameFor, normalizeRoomSecret } from "./privateChannel.js";
@@ -92,6 +95,81 @@ function privateRoomKey(resolvedApiKey: string): string {
   return typeof dedicated === "string" && dedicated.length > 0 ? dedicated : resolvedApiKey;
 }
 
+/** Constant-time string compare, so a room code can't be probed byte-by-byte. */
+function secretMatches(supplied: string, stored: string): boolean {
+  const a = Buffer.from(supplied, "utf8");
+  const b = Buffer.from(stored, "utf8");
+  // `timingSafeEqual` throws on a length mismatch, which would itself leak the
+  // length — compare against a same-length buffer and fold the length check in.
+  if (a.length !== b.length) {
+    timingSafeEqual(b, b);
+    return false;
+  }
+  return timingSafeEqual(a, b);
+}
+
+/**
+ * The outcome of turning `(roomId, supplied secret)` into a channel to act on.
+ * Every chat endpoint goes through this, so the registry is a single gate
+ * rather than three copies of the same checks.
+ */
+type RoomResolution =
+  | { readonly ok: true; readonly room: ChatRoom; readonly channelName: string }
+  | { readonly ok: false; readonly status: number; readonly error: string };
+
+/**
+ * Resolve a request's room against the registry (CHAT-022).
+ *
+ * Rooms are administrator-owned, so an id that isn't in the table is a 404 —
+ * where it used to mint a token for any slug-shaped string. Private rooms are
+ * gated on the stored room code here; previously a wrong secret silently
+ * derived a *different* channel and the caller saw an empty room, which was
+ * unguessable but also indistinguishable from "nobody has spoken yet".
+ *
+ * The channel is still derived, never stored, and always from the room's
+ * **canonical** id and stored secret — so the legacy `lobby` alias resolves to
+ * the default room's channel, and a secret that differs only in whitespace
+ * can't split a room across two channels.
+ */
+async function resolveRoom(
+  store: Store,
+  roomId: string,
+  rawSecret: unknown,
+  hmacKey: string,
+): Promise<RoomResolution> {
+  const supplied = normalizeRoomSecret(rawSecret);
+  if (!supplied.ok) return { ok: false, status: 400, error: "INVALID_SECRET" };
+
+  let room: ChatRoom | null;
+  try {
+    room = await store.chatRooms.get(roomId);
+  } catch (err) {
+    // The registry is unreachable — chat degrades to absence, like every other
+    // chat failure, rather than surfacing a database error.
+    console.error("[chat] room lookup failed", err);
+    return { ok: false, status: 503, error: "chat_unavailable" };
+  }
+
+  if (!room) return { ok: false, status: 404, error: "UNKNOWN_ROOM" };
+
+  if (room.visibility === "public") {
+    // A public room has no code; any secret sent alongside is ignored rather
+    // than treated as an error, so a stale client can't lock itself out.
+    return { ok: true, room, channelName: channelNameFor(room.id, null, hmacKey) };
+  }
+
+  // Private. A room marked private with no stored code is a misconfiguration —
+  // refuse rather than fall through to the public channel.
+  if (room.secret === null || room.secret.length === 0) {
+    console.error(`[chat] private room ${room.id} has no secret configured`);
+    return { ok: false, status: 503, error: "chat_unavailable" };
+  }
+  if (supplied.secret === null || !secretMatches(supplied.secret, room.secret)) {
+    return { ok: false, status: 403, error: "BAD_SECRET" };
+  }
+  return { ok: true, room, channelName: channelNameFor(room.id, room.secret, hmacKey) };
+}
+
 interface TokenRequestBody {
   readonly roomId?: unknown;
   readonly secret?: unknown;
@@ -122,6 +200,15 @@ export function createChatRouter(
 ): Router {
   const router = Router();
 
+  /**
+   * The lobby list is polled by every open client, so it is cached per router
+   * instance — one Ably enumeration serves every caller in the window. Short
+   * enough that a room filling up shows within a poll or two; long enough that
+   * N clients don't mean N enumerations.
+   */
+  const ROOM_LIST_CACHE_MS = 15_000;
+  let cachedRooms: { at: number; payload: unknown[] } | null = null;
+
   // POST /api/chat/token — mint a subscribe-only token scoped to exactly one room's channel.
   router.post("/chat/token", limit("chat_token"), async (req: Request, res: Response) => {
     const token = req.sessionToken;
@@ -143,15 +230,14 @@ export function createChatRouter(
       return;
     }
 
-    // A private room folds a shared secret into the channel name; a public room
-    // (no secret) keeps the plain `chat:<roomId>` channel.
-    const secret = normalizeRoomSecret(body?.secret);
-    if (!secret.ok) {
-      res.status(400).json({ error: "INVALID_SECRET" });
+    // The registry decides whether this room exists and, for a private room,
+    // whether the caller's code is right — before any token is minted.
+    const resolved = await resolveRoom(store, roomId, body?.secret, privateRoomKey(apiKey));
+    if (!resolved.ok) {
+      res.status(resolved.status).json({ error: resolved.error });
       return;
     }
-
-    const channelName = channelNameFor(roomId, secret.secret, privateRoomKey(apiKey));
+    const { channelName } = resolved;
 
     try {
       // Subscribe-only, scoped to exactly this one channel — never "*", never publish.
@@ -192,13 +278,15 @@ export function createChatRouter(
 
       const body = req.body as SendMessageBody | undefined;
 
-      // Publish to the same secret-derived channel the sender's token was
-      // scoped to; a wrong/missing secret just publishes to a different channel.
-      const secret = normalizeRoomSecret(body?.secret);
-      if (!secret.ok) {
-        res.status(400).json({ error: "INVALID_SECRET" });
+      // Same gate as the token endpoint: unknown room → 404, wrong code → 403.
+      // A caller cannot publish into a private room without its code, even
+      // holding a valid session.
+      const resolved = await resolveRoom(store, roomId, body?.secret, privateRoomKey(apiKey));
+      if (!resolved.ok) {
+        res.status(resolved.status).json({ error: resolved.error });
         return;
       }
+      const { channelName } = resolved;
 
       const rawText = body?.text;
       const rawDisplayName = body?.displayName;
@@ -223,15 +311,15 @@ export function createChatRouter(
 
       const message = {
         id,
-        roomId,
+        // The registry's canonical id, so a message sent via the legacy `lobby`
+        // alias is broadcast and stored as the room it actually landed in.
+        roomId: resolved.room.id,
         // Sender identity comes from the session, never the request body — a
         // caller cannot claim to be someone else's session token.
         sender: { token: senderToken, name: displayName },
         text: maskProfanity(text),
         ts: Date.now(),
       };
-
-      const channelName = channelNameFor(roomId, secret.secret, privateRoomKey(apiKey));
 
       try {
         await publishAblyMessage(channelName, message, ablyOptions);
@@ -250,7 +338,7 @@ export function createChatRouter(
         await store.chat.append({
           id: message.id,
           channel: channelName,
-          roomId,
+          roomId: resolved.room.id,
           senderToken: message.sender.token,
           senderName: message.sender.name,
           text: message.text,
@@ -291,11 +379,14 @@ export function createChatRouter(
 
       const body = req.body as HistoryRequestBody | undefined;
 
-      const secret = normalizeRoomSecret(body?.secret);
-      if (!secret.ok) {
-        res.status(400).json({ error: "INVALID_SECRET" });
+      // History is scoped by the same gate — a private room's transcript is not
+      // readable without its code.
+      const resolved = await resolveRoom(store, roomId, body?.secret, privateRoomKey(apiKey));
+      if (!resolved.ok) {
+        res.status(resolved.status).json({ error: resolved.error });
         return;
       }
+      const { channelName } = resolved;
 
       const before = parseCursor(body?.before);
       const rawLimit = body?.limit;
@@ -303,8 +394,6 @@ export function createChatRouter(
         typeof rawLimit === "number" && Number.isFinite(rawLimit) && rawLimit > 0
           ? Math.min(Math.floor(rawLimit), MAX_HISTORY_LIMIT)
           : DEFAULT_HISTORY_LIMIT;
-
-      const channelName = channelNameFor(roomId, secret.secret, privateRoomKey(apiKey));
 
       try {
         // Fetch one extra to know whether an older page exists without a second query.
@@ -335,6 +424,54 @@ export function createChatRouter(
       }
     },
   );
+
+  // GET /api/chat/rooms — the lobby list (CHAT-022). Public in both senses: no
+  // session required, and it exposes nothing a room link wouldn't. Deliberately
+  // read-only — rooms are administrator-owned and managed in the database, so
+  // there is no create/update/delete counterpart (docs/CHAT_UI.md §6.3.1).
+  router.get("/chat/rooms", limit("chat_rooms"), async (_req: Request, res: Response) => {
+    const now = Date.now();
+    if (cachedRooms && now - cachedRooms.at < ROOM_LIST_CACHE_MS) {
+      res.status(200).json({ rooms: cachedRooms.payload });
+      return;
+    }
+
+    let rooms;
+    try {
+      rooms = await store.chatRooms.list();
+    } catch (err) {
+      // The list degrades to absence, never an error over the game: the client
+      // renders no rail and direct room links still work.
+      console.error("[chat] room list failed", err);
+      res.status(503).json({ error: "chat_unavailable" });
+      return;
+    }
+
+    // Occupancy decorates the list; it never gates it. When it is unavailable
+    // `active` is *omitted* rather than zeroed — an absent count is honest, a
+    // zero would claim the room is empty.
+    const apiKey = ablyOptions.apiKey ?? getAblyApiKey();
+    const occupancy = apiKey ? await fetchChannelOccupancy(ablyOptions) : null;
+    const hmacKey = apiKey ? privateRoomKey(apiKey) : null;
+
+    const payload = rooms.map((room) => {
+      const base = { id: room.id, label: room.label, visibility: room.visibility };
+      if (!occupancy || !hmacKey) return base;
+      // A private room is matched by its derived channel, not by scanning the
+      // listing — the hash never has to be recognised, only recomputed.
+      const channel = channelNameFor(
+        room.id,
+        room.visibility === "private" ? room.secret : null,
+        hmacKey,
+      );
+      // Absent from enumeration means "no one is connected", which for a room
+      // the registry vouches for is a genuine zero.
+      return { ...base, active: occupancy.get(channel) ?? 0 };
+    });
+
+    cachedRooms = { at: now, payload };
+    res.status(200).json({ rooms: payload });
+  });
 
   return router;
 }

@@ -1,0 +1,157 @@
+/*
+ * The lobby rail (CHAT-022 / docs/CHAT_UI.md §2, §6).
+ *
+ * At ≥ 64rem this is a fixed 16rem column beside the conversation; below that
+ * the parent promotes it to the full-width lobby view. It is the second scoped
+ * scrolling region on the screen — the page itself still never scrolls.
+ */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.filters {
+  display: flex;
+  gap: var(--space-1);
+  flex: 0 0 auto;
+}
+
+.filter {
+  flex: 1 1 auto;
+  min-height: var(--size-touch-target);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  border: var(--border-width-thin) solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--font-size-200);
+  cursor: pointer;
+}
+
+.filter:hover {
+  color: var(--color-text);
+}
+
+.filter:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Selected state carries a border and weight change, not colour alone. */
+.filterOn {
+  color: var(--color-text);
+  border-color: var(--color-accent);
+  background: var(--color-accent-bg);
+  font-weight: var(--font-weight-medium);
+}
+
+.rooms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.room {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--size-touch-target);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  border: var(--border-width-thin) solid transparent;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.room:hover {
+  background: var(--color-bg-subtle);
+}
+
+.room:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* The current room: a border + surface change, so it reads without colour. */
+.roomOn {
+  border-color: var(--color-accent);
+  background: var(--color-accent-bg);
+  font-weight: var(--font-weight-medium);
+}
+
+.roomMark {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+}
+
+.roomLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roomCount {
+  flex: 0 0 auto;
+  font-family: var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-100);
+  color: var(--color-text-muted);
+}
+
+.skeletonList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.skeletonRow {
+  height: var(--size-touch-target);
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-inset) 25%,
+    var(--color-surface) 50%,
+    var(--color-bg-inset) 75%
+  );
+  background-size: 200% 100%;
+  animation: room-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes room-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

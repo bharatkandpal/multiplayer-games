@@ -41,8 +41,8 @@ describe("chatRoom", () => {
   });
 
   describe("roomLabel / roomPath / roomShareUrl", () => {
-    it("gives the lobby a friendly label and the bare /chat path", () => {
-      expect(roomLabel(DEFAULT_CHAT_ROOM_ID)).toBe("Lobby");
+    it("gives the default room a friendly label and the bare /chat path", () => {
+      expect(roomLabel(DEFAULT_CHAT_ROOM_ID)).toBe("Global");
       expect(roomPath(DEFAULT_CHAT_ROOM_ID)).toBe("/chat");
       expect(roomShareUrl(DEFAULT_CHAT_ROOM_ID, "https://mpg.example")).toBe(
         "https://mpg.example/chat",

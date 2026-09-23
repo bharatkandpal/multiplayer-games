@@ -8,7 +8,11 @@
 
 .main {
   width: 100%;
-  max-width: var(--container-md);
+  /* Chat is the one screen that widens past `--container-md` (docs/CHAT_UI.md
+     §1.1): a message log's value scales with area, where a board or a form has
+     an ideal size. The width freed here goes to the room rail and to showing
+     more messages — never to longer lines, which the bubble measure caps. */
+  max-width: var(--container-xl);
   margin: 0 auto;
   padding: var(--space-4);
 
@@ -17,6 +21,61 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+
+  /* The reading measure for a message bubble — see `.bubble`. */
+  --chat-measure: 62ch;
+}
+
+/*
+ * Rail + conversation. Below 64rem this is a single column showing one of the
+ * two at a time (driven by `data-view`); at 64rem and up both are always
+ * visible and the switch is meaningless.
+ */
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+.railColumn {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.conversation {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Narrow: exactly one column on screen, so neither is ever a cramped half. */
+.body[data-view="lobby"] .conversation {
+  display: none;
+}
+
+.body[data-view="room"] .railColumn {
+  display: none;
+}
+
+@media (min-width: 64rem) {
+  .body {
+    grid-template-columns: 16rem 1fr;
+  }
+
+  /* Both columns, whatever `data-view` says — there is no switch at this size. */
+  .body[data-view="lobby"] .conversation,
+  .body[data-view="room"] .railColumn {
+    display: flex;
+  }
+
+  /* The rail is the way back to the list here, so the button is redundant. */
+  .backToRooms {
+    display: none;
+  }
 }
 
 .topBar {
@@ -270,7 +329,10 @@
 }
 
 .bubble {
-  max-width: 80%;
+  /* Percentage alone would stretch a line to ~1100px in the wide layout, which
+     reads worse than a short one. The measure is the real cap; the percentage
+     keeps the own/other alignment legible on a narrow screen. */
+  max-width: min(80%, var(--chat-measure));
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-lg);
   border: var(--border-width-thin) solid var(--color-border);
@@ -449,5 +511,24 @@
 
   .sendErrorSlot {
     text-align: left;
+  }
+}
+
+/*
+ * "Use the full space" is a mobile rule too (docs/CHAT_UI.md §3): a 320px
+ * screen cannot afford 32px of symmetric gutter, and the own/other alignment
+ * is already obvious from position and marker at that width.
+ */
+@media (max-width: 26rem) {
+  .main {
+    padding: var(--space-2);
+  }
+
+  .messageList {
+    padding: var(--space-2);
+  }
+
+  .bubble {
+    max-width: min(92%, var(--chat-measure));
   }
 }

@@ -214,3 +214,6 @@ reachable. Then hand it to someone who has never used the app and say nothing: i
 
 Backlog: **MPG-136** (in-game bottom action bar + larger Home) and **MPG-137** (no-scroll
 viewport layout across the remaining screens) — both landed.
+
+Chat applies this law with its own space rules (it is the one screen that widens past
+`--container-md`): see `CHAT_UI.md`.

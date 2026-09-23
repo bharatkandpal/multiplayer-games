@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { ChatScreen } from "../ChatScreen";
-import type { ChatMessage } from "../../api/chat";
+import type { ChatMessage, ChatRoomSummary } from "../../api/chat";
 
 const state = vi.hoisted(() => ({
   status: "connecting" as "connecting" | "live" | "unavailable",
@@ -12,6 +12,10 @@ const state = vi.hoisted(() => ({
   hasMoreHistory: false,
   loadingOlder: false,
   loadOlder: vi.fn(),
+  // CHAT-022: the administrator-owned room registry the rail renders.
+  rooms: null as ChatRoomSummary[] | null,
+  roomsLoading: false,
+  requestChatToken: vi.fn(),
 }));
 
 vi.mock("../../hooks/useChatChannel.js", () => ({
@@ -24,6 +28,15 @@ vi.mock("../../hooks/useChatChannel.js", () => ({
     loadOlder: state.loadOlder,
     connectionState: "unknown",
   }),
+}));
+
+vi.mock("../../hooks/useChatRooms.js", () => ({
+  useChatRooms: () => ({ rooms: state.rooms, loading: state.roomsLoading }),
+}));
+
+vi.mock("../../api/chat.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../api/chat.js")>()),
+  requestChatToken: (...args: unknown[]) => state.requestChatToken(...args),
 }));
 
 const SESSION_KEY = "mpg_session_token";
@@ -40,6 +53,12 @@ describe("ChatScreen", () => {
     state.hasMoreHistory = false;
     state.loadingOlder = false;
     state.loadOlder = vi.fn();
+    state.rooms = [
+      { id: "global", label: "Global", visibility: "public", active: 3 },
+      { id: "pvt", label: "Private", visibility: "private", active: 1 },
+    ];
+    state.roomsLoading = false;
+    state.requestChatToken = vi.fn().mockResolvedValue({ ok: true, token: {} });
   });
 
   afterEach(() => {
@@ -131,63 +150,59 @@ describe("ChatScreen", () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  describe("CHAT-019: room switching", () => {
-    it("hides the room bar entirely when room switching isn't wired", () => {
-      render(<ChatScreen roomId="lobby" onBack={() => {}} />);
-      expect(screen.queryByRole("button", { name: "Rooms" })).not.toBeInTheDocument();
+  describe("CHAT-022: the room rail", () => {
+    it("lists the administrator-owned rooms with their live counts", () => {
+      state.status = "live";
+      render(<ChatScreen roomId="global" onBack={() => {}} onOpenRoom={() => {}} />);
+
+      const rail = screen.getByRole("navigation", { name: "Chat rooms" });
+      expect(within(rail).getByText("Global")).toBeInTheDocument();
+      expect(within(rail).getByText("Private")).toBeInTheDocument();
+      // The count has a text equivalent, not just a bare number.
+      expect(within(rail).getByText("3 people here")).toBeInTheDocument();
+      expect(within(rail).getByText("1 person here")).toBeInTheDocument();
     });
 
-    it("names the current room and opens the create/join dialog", async () => {
+    it("offers no way to create a room — the set is admin-owned", async () => {
       state.status = "live";
       const user = userEvent.setup();
-      render(<ChatScreen roomId="lobby" onBack={() => {}} onOpenRoom={() => {}} />);
+      render(<ChatScreen roomId="global" onBack={() => {}} onOpenRoom={() => {}} />);
 
-      // The room bar names the current room.
-      expect(screen.getByText("Lobby")).toBeInTheDocument();
-
-      await user.click(screen.getByRole("button", { name: "Rooms" }));
-      expect(screen.getByRole("dialog", { name: "Rooms" })).toBeInTheDocument();
-      expect(screen.getByRole("textbox", { name: "Room name" })).toBeInTheDocument();
+      expect(screen.queryByRole("textbox", { name: "Room name" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Share" }));
+      // The dialog that used to create/join rooms is share-only now.
+      expect(screen.getByRole("dialog", { name: "Share room" })).toBeInTheDocument();
+      expect(screen.queryByRole("textbox", { name: "Room name" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Go" })).not.toBeInTheDocument();
     });
 
-    it("navigates to a slugified room when a name is submitted", async () => {
-      state.status = "live";
-      const onOpenRoom = vi.fn();
-      const user = userEvent.setup();
-      render(<ChatScreen roomId="lobby" onBack={() => {}} onOpenRoom={onOpenRoom} />);
-
-      await user.click(screen.getByRole("button", { name: "Rooms" }));
-      await user.type(screen.getByRole("textbox", { name: "Room name" }), "Weekend Games!");
-      await user.click(screen.getByRole("button", { name: "Go" }));
-
-      // A public room (no secret) navigates with no private options.
-      expect(onOpenRoom).toHaveBeenCalledWith("weekend-games", undefined);
-    });
-
-    it("rejects a name that slugifies to nothing, without navigating", async () => {
+    it("opens a public room directly and a private one through the gate", async () => {
       state.status = "live";
       const onOpenRoom = vi.fn();
       const user = userEvent.setup();
-      render(<ChatScreen roomId="lobby" onBack={() => {}} onOpenRoom={onOpenRoom} />);
+      render(<ChatScreen roomId="global" onBack={() => {}} onOpenRoom={onOpenRoom} />);
 
-      await user.click(screen.getByRole("button", { name: "Rooms" }));
-      await user.type(screen.getByRole("textbox", { name: "Room name" }), "!!!");
-      await user.click(screen.getByRole("button", { name: "Go" }));
-
-      expect(onOpenRoom).not.toHaveBeenCalled();
-      expect(screen.getByText(/Use letters or numbers/)).toBeInTheDocument();
+      const rail = screen.getByRole("navigation", { name: "Chat rooms" });
+      await user.click(within(rail).getByText("Private"));
+      expect(onOpenRoom).toHaveBeenCalledWith("pvt", { private: true });
     });
 
-    it("offers a back-to-lobby jump only when not already in the lobby", async () => {
+    it("renders no rail at all when the room list is unavailable", () => {
       state.status = "live";
-      const onOpenRoom = vi.fn();
-      const user = userEvent.setup();
-      render(<ChatScreen roomId="my-room" onBack={() => {}} onOpenRoom={onOpenRoom} />);
+      state.rooms = null;
+      render(<ChatScreen roomId="global" onBack={() => {}} onOpenRoom={() => {}} />);
 
-      await user.click(screen.getByRole("button", { name: "Rooms" }));
-      await user.click(screen.getByRole("button", { name: "Back to the lobby" }));
+      // Degrades to absence: no error row, no retry — the conversation is intact.
+      expect(screen.queryByRole("navigation", { name: "Chat rooms" })).not.toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: /Message/ })).toBeInTheDocument();
+    });
 
-      expect(onOpenRoom).toHaveBeenCalledWith("lobby", undefined);
+    it("falls back to the slug when the registry has no label for the room", () => {
+      state.status = "live";
+      state.rooms = [];
+      render(<ChatScreen roomId="mystery" onBack={() => {}} onOpenRoom={() => {}} />);
+
+      expect(screen.getByText("mystery")).toBeInTheDocument();
     });
   });
 
@@ -238,7 +253,9 @@ describe("ChatScreen", () => {
       expect(screen.getByRole("button", { name: "Join" })).toBeInTheDocument();
       expect(screen.queryByRole("textbox", { name: /Message/ })).not.toBeInTheDocument();
       // The room bar flags it as private for assistive tech, not colour alone.
-      expect(screen.getByText("(private)")).toBeInTheDocument();
+      // Scoped to the room bar: the rail also marks its own private rooms, so
+      // a bare getByText would now match both.
+      expect(screen.getAllByText("(private)").length).toBeGreaterThan(0);
     });
 
     it("reveals the chat body once the secret is entered, and remembers it for the tab", async () => {

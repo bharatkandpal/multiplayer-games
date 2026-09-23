@@ -1,5 +1,6 @@
 import type { Store } from "../ports.js";
 import { createMemoryChatMessageRepo } from "./chat-message-repo.memory.js";
+import { createMemoryChatRoomRepo } from "./chat-room-repo.memory.js";
 import { createMemoryEventRepo } from "./event-repo.memory.js";
 import { createMemoryIdentityRepo } from "./identity-repo.memory.js";
 import { createMemoryLeaderboardRepo } from "./leaderboard-repo.memory.js";
@@ -21,5 +22,6 @@ export function createMemoryStore(): Store {
     reports: createMemoryReportRepo(),
     variants: createMemoryVariantRepo(),
     chat: createMemoryChatMessageRepo(),
+    chatRooms: createMemoryChatRoomRepo(),
   };
 }

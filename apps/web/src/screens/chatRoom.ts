@@ -8,8 +8,15 @@
  * component so the rules are unit-testable on their own.
  */
 
-/** The room a bare `/chat` link opens — the shared, un-scoped lobby. */
-export const DEFAULT_CHAT_ROOM_ID = "lobby";
+/**
+ * The room a bare `/chat` link opens.
+ *
+ * Mirrors the server's seeded default (`apps/server/src/chat/defaultRooms.ts`).
+ * Renamed from `lobby` when rooms became an administrator-owned registry
+ * (CHAT-022); `lobby` still resolves server-side, so links shared before the
+ * rename keep working.
+ */
+export const DEFAULT_CHAT_ROOM_ID = "global";
 
 /** The safe-slug shape a room id must match (mirrors the server's ROOM_ID_RE). */
 const ROOM_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -35,9 +42,13 @@ export function slugifyRoomName(input: string): string | null {
   return slug.length > 0 ? slug : null;
 }
 
-/** Human label for a room id — the lobby gets a friendly name, others show as-is. */
+/**
+ * Human label for a room id. The registry carries a real `label` per room
+ * (CHAT-022) — prefer that wherever the room list is loaded; this is the
+ * fallback for a room reached by direct link before the list arrives.
+ */
 export function roomLabel(roomId: string): string {
-  return roomId === DEFAULT_CHAT_ROOM_ID ? "Lobby" : roomId;
+  return roomId === DEFAULT_CHAT_ROOM_ID ? "Global" : roomId;
 }
 
 /**

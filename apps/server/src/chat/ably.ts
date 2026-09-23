@@ -124,3 +124,60 @@ export async function publishAblyMessage(
     throw new Error(`Ably publish failed: ${response.status}`);
   }
 }
+
+/** One channel's live subscriber count, keyed by channel name. */
+export type ChannelOccupancy = ReadonlyMap<string, number>;
+
+/**
+ * Current subscriber counts for every *active* channel, via Ably's channel
+ * enumeration (CHAT-022). Verified against our account: enumeration is
+ * permitted and `metrics.subscribers` tracks real subscribers exactly (see
+ * docs/CHAT_UI.md §7).
+ *
+ * Two things callers must know:
+ *
+ *  - **Only active channels appear.** A room nobody is sitting in is simply
+ *    absent from the map — that is "zero", not "unknown", for a room the
+ *    registry vouches for.
+ *  - **Private channels appear too**, as their opaque `chat:p-<hmac>` names.
+ *    The map is keyed by channel, so a caller resolves a private room by
+ *    deriving its channel — nothing here leaks which hashes exist to a client.
+ *
+ * Returns `null` on any failure. Occupancy is decoration on a list that must
+ * render without it (offline pillar), so this never throws.
+ */
+export async function fetchChannelOccupancy(
+  opts: AblyClientOptions = {},
+): Promise<ChannelOccupancy | null> {
+  const apiKey = opts.apiKey ?? getAblyApiKey();
+  if (!apiKey) return null;
+  const fetchImpl = opts.fetchImpl ?? fetch;
+
+  try {
+    const response = await fetchImpl(`${ABLY_REST_BASE}/channels?by=id,occupancy&limit=100`, {
+      headers: { Authorization: basicAuthHeader(apiKey) },
+    });
+    if (!response.ok) return null;
+
+    const body: unknown = await response.json();
+    if (!Array.isArray(body)) return null;
+
+    const counts = new Map<string, number>();
+    for (const entry of body) {
+      const row = entry as {
+        channelId?: unknown;
+        status?: { occupancy?: { metrics?: { subscribers?: unknown } } };
+      };
+      const id = row.channelId;
+      const subscribers = row.status?.occupancy?.metrics?.subscribers;
+      if (typeof id === "string" && typeof subscribers === "number") {
+        counts.set(id, subscribers);
+      }
+    }
+    return counts;
+  } catch {
+    // Network failure, malformed JSON, a key without `channel-metadata` — all
+    // the same to the caller: counts are unavailable, the list still renders.
+    return null;
+  }
+}
