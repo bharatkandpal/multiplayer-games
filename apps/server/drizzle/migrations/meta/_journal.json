@@ -57,6 +57,13 @@
       "when": 1790081982046,
       "tag": "0007_dizzy_bulldozer",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790098771325,
+      "tag": "0008_natural_enchantress",
+      "breakpoints": true
     }
   ]
 }

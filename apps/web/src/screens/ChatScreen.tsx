@@ -16,9 +16,11 @@ import {
   UsernamePrompt,
 } from "../components/ui";
 import { useChatChannel } from "../hooks/useChatChannel.js";
-import type { ChatMessage } from "../api/chat.js";
+import { useChatRooms } from "../hooks/useChatRooms.js";
+import { requestChatToken } from "../api/chat.js";
+import type { ChatMessage, ChatRoomSummary } from "../api/chat.js";
 import { getSessionToken } from "../api/session.js";
-import { DEFAULT_CHAT_ROOM_ID, roomLabel, roomShareUrl, slugifyRoomName } from "./chatRoom.js";
+import { DEFAULT_CHAT_ROOM_ID, roomLabel, roomShareUrl } from "./chatRoom.js";
 import {
   ensureUsername,
   onUsernameChange,
@@ -27,6 +29,7 @@ import {
 } from "../api/username.js";
 import { getMutedTokens, muteToken, onMuteChange } from "../api/chatMute.js";
 import { getRoomSecret, setRoomSecret } from "../api/chatSecret.js";
+import { RoomRail } from "./RoomRail.js";
 import styles from "./ChatScreen.module.css";
 
 /** How another room is opened — public, or private with a `?p=1` link (CHAT-020). */
@@ -36,7 +39,7 @@ export interface OpenRoomOptions {
 }
 
 export interface ChatScreenProps {
-  /** The chat room to join — `"lobby"` for the default, un-scoped room. */
+  /** The chat room to join — `"global"` for the default room (CHAT-022). */
   roomId: string;
   /**
    * This room is private (CHAT-020): its channel is derived from a shared
@@ -46,9 +49,9 @@ export interface ChatScreenProps {
   isPrivate?: boolean;
   onBack: () => void;
   /**
-   * Navigate to another room (CHAT-019). When provided, the screen shows a
-   * room bar that can create/join a room by name and share the current one.
-   * Omit to hide room switching entirely (the lobby-only entry point).
+   * Navigate to another room. When provided, the room rail can switch rooms and
+   * the room bar can share the current one. Omit to pin the screen to one room.
+   * Rooms are administrator-owned (CHAT-022), so nothing here creates one.
    */
   onOpenRoom?: (roomId: string, opts?: OpenRoomOptions) => void;
 }
@@ -95,6 +98,19 @@ export function ChatScreen({
   const [name, setName] = useState(ensureUsername);
   const [editingName, setEditingName] = useState(false);
   const [roomDialogOpen, setRoomDialogOpen] = useState(false);
+  const { rooms, loading: roomsLoading } = useChatRooms();
+  // Narrow screens show one column at a time (docs/CHAT_UI.md §6.4). Opening a
+  // room link lands you in the conversation; "← Rooms" goes back to the list.
+  // Ignored entirely at ≥ 64rem, where both columns are always visible.
+  const [view, setView] = useState<"lobby" | "room">("room");
+  // Set when a room code is rejected, so the gate can say so in place rather
+  // than degrading to silence (docs/CHAT_UI.md §6.5).
+  const [unlockError, setUnlockError] = useState<string | undefined>(undefined);
+
+  // Prefer the registry's label over the slug — the rail knows a room's real
+  // name, and a room reached by direct link falls back to the slug until the
+  // list arrives.
+  const currentRoomLabel = rooms?.find((r) => r.id === roomId)?.label ?? roomLabel(roomId);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // When we prepend an older page, this holds the pre-load distance from the
@@ -187,15 +203,36 @@ export function ChatScreen({
     void syncUsername(next);
   };
 
-  // Unlock a private room: remember the secret for the tab, then let the hook
-  // connect. A wrong secret can't error here (there's no server-side check —
-  // it just lands you on a different, empty channel), so the gate can only ever
-  // succeed; the empty room is its own quiet signal to re-check the secret.
+  // Unlock a private room. The registry now checks the code server-side
+  // (CHAT-022), so a wrong one is a real, recoverable error told in place —
+  // before it became a registry, a wrong code silently landed you on a
+  // different empty channel with nothing to distinguish it from a quiet room.
   const handleUnlock = (next: string): void => {
     const trimmed = next.trim();
     if (!trimmed) return;
-    setRoomSecret(roomId, trimmed);
-    setSecret(trimmed);
+    setUnlockError(undefined);
+    void requestChatToken(roomId, trimmed).then((result) => {
+      if (result.ok) {
+        setRoomSecret(roomId, trimmed);
+        setSecret(trimmed);
+        return;
+      }
+      if (result.reason === "bad_secret") {
+        setUnlockError("That code doesn't match. Check it and try again.");
+        return;
+      }
+      // Unknown room or chat down: degrade to absence rather than blaming the
+      // code the player typed — it may well have been right.
+      setUnlockError(undefined);
+    });
+  };
+
+  // Selecting a room from the rail. A private room routes through the gate; a
+  // public one opens straight into the conversation.
+  const handleRoomSelect = (room: ChatRoomSummary): void => {
+    setView("room");
+    if (room.id === roomId) return;
+    onOpenRoom?.(room.id, { private: room.visibility === "private" });
   };
 
   const badgeStatus =
@@ -219,134 +256,167 @@ export function ChatScreen({
         </StatusBadge>
       </div>
 
-      {onOpenRoom ? (
-        <div className={styles.roomBar}>
-          <span className={styles.roomName}>
-            Room ·{" "}
-            {isPrivate ? (
-              <span className={styles.roomLock} title="Private room">
-                <span aria-hidden="true">🔒</span> <strong>{roomLabel(roomId)}</strong>
-                <span className={styles.srOnly}> (private)</span>
-              </span>
-            ) : (
-              <strong>{roomLabel(roomId)}</strong>
-            )}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={styles.roomButton}
-            onClick={() => setRoomDialogOpen(true)}
-            aria-haspopup="dialog"
-          >
-            Rooms
-          </Button>
+      {/* `data-view` drives the narrow-screen switch in CSS: below 64rem one of
+          the two columns is shown at a time, above it both always are. Keeping
+          it in CSS means no viewport-width state in React and no flash of the
+          wrong column on first paint. */}
+      <div className={styles.body} data-view={view}>
+        <div className={styles.railColumn}>
+          <RoomRail
+            rooms={rooms}
+            loading={roomsLoading}
+            currentRoomId={roomId}
+            onSelect={handleRoomSelect}
+          />
         </div>
-      ) : null}
 
-      {locked ? (
-        <LockGate roomLabel={roomLabel(roomId)} onUnlock={handleUnlock} />
-      ) : (
-        <>
-          {status === "unavailable" ? (
-            <div className={styles.unavailableSlot}>
-              <Toast variant="warning">
-                Chat is unavailable right now — nothing else is affected, and your messages will
-                send again once it's back.
-              </Toast>
-            </div>
-          ) : null}
-
-          <div
-            ref={listRef}
-            className={styles.messageList}
-            role="log"
-            aria-live="polite"
-            aria-label="Chat messages"
-            onScroll={handleListScroll}
-          >
-            {/* Earlier-history affordance (CHAT-021): a quiet marker at the top
-                while an older page loads, so scroll-up paging is legible without
-                a spinner that outlives its request. */}
-            {loadingOlder ? (
-              <p className={styles.loadingOlder} aria-live="polite">
-                Loading earlier messages…
-              </p>
-            ) : null}
-
-            {status === "connecting" && messages.length === 0 ? (
-              <ul className={styles.skeletonList} aria-hidden="true">
-                <li className={styles.skeletonBubble} />
-                <li className={styles.skeletonBubble} />
-                <li className={styles.skeletonBubble} />
-              </ul>
-            ) : null}
-
-            {status === "live" && visibleMessages.length === 0 ? (
-              <p className={styles.empty}>No messages yet — say hello.</p>
-            ) : null}
-
-            {visibleMessages.length > 0 ? (
-              <ul className={styles.bubbles}>
-                {visibleMessages.map((message) => (
-                  <MessageBubble
-                    key={message.id}
-                    message={message}
-                    isOwn={myToken !== null && message.sender.token === myToken}
-                    onMute={() => muteToken(message.sender.token)}
-                  />
-                ))}
-              </ul>
+        <div className={styles.conversation}>
+          <div className={styles.roomBar}>
+            {/* Narrow screens only: the labelled way back to the room list
+                (UX_PRINCIPLES §9 — never a bare chevron). */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={styles.backToRooms}
+              onClick={() => setView("lobby")}
+            >
+              ← Rooms
+            </Button>
+            <span className={styles.roomName}>
+              {isPrivate ? (
+                <span className={styles.roomLock} title="Private room">
+                  <span aria-hidden="true">🔒</span> <strong>{currentRoomLabel}</strong>
+                  <span className={styles.srOnly}> (private)</span>
+                </span>
+              ) : (
+                <strong>{currentRoomLabel}</strong>
+              )}
+            </span>
+            {onOpenRoom ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className={styles.roomButton}
+                onClick={() => setRoomDialogOpen(true)}
+                aria-haspopup="dialog"
+              >
+                Share
+              </Button>
             ) : null}
           </div>
 
-          <form className={styles.composer} onSubmit={handleSubmit}>
-            <label className={styles.composerLabel} htmlFor="chat-input">
-              Message — playing as <strong>{name}</strong>
-              <button
-                type="button"
-                className={styles.nameEdit}
-                onClick={() => setEditingName(true)}
+          {locked ? (
+            <LockGate roomLabel={currentRoomLabel} error={unlockError} onUnlock={handleUnlock} />
+          ) : (
+            <>
+              {status === "unavailable" ? (
+                <div className={styles.unavailableSlot}>
+                  <Toast variant="warning">
+                    Chat is unavailable right now — nothing else is affected, and your messages will
+                    send again once it's back.
+                  </Toast>
+                </div>
+              ) : null}
+
+              <div
+                ref={listRef}
+                className={styles.messageList}
+                role="log"
+                aria-live="polite"
+                aria-label="Chat messages"
+                onScroll={handleListScroll}
               >
-                change
-              </button>
-            </label>
-            <div className={styles.composerRow}>
-              <textarea
-                id="chat-input"
-                ref={inputRef}
-                className={styles.textarea}
-                value={draft}
-                onChange={(event) => setDraft(event.target.value.slice(0, MAX_LENGTH))}
-                onKeyDown={handleKeyDown}
-                maxLength={MAX_LENGTH}
-                placeholder={status === "unavailable" ? "Chat is unavailable" : "Type a message…"}
-                disabled={status !== "live"}
-                rows={1}
-                aria-describedby={`${counterId} ${errorId}`}
-              />
-              <Button
-                type="submit"
-                variant="primary"
-                size="md"
-                loading={sending}
-                loadingLabel="Sending"
-                disabled={status !== "live" || draft.trim().length === 0}
-              >
-                Send
-              </Button>
-            </div>
-            <div className={styles.composerFooter}>
-              <span id={counterId} className={styles.counter}>
-                {draft.length}/{MAX_LENGTH}
-              </span>
-              <div id={errorId} role="alert" aria-live="assertive" className={styles.sendErrorSlot}>
-                {sendError ? <span className={styles.sendError}>{sendError}</span> : null}
+                {/* Earlier-history affordance (CHAT-021): a quiet marker at the top
+                while an older page loads, so scroll-up paging is legible without
+                a spinner that outlives its request. */}
+                {loadingOlder ? (
+                  <p className={styles.loadingOlder} aria-live="polite">
+                    Loading earlier messages…
+                  </p>
+                ) : null}
+
+                {status === "connecting" && messages.length === 0 ? (
+                  <ul className={styles.skeletonList} aria-hidden="true">
+                    <li className={styles.skeletonBubble} />
+                    <li className={styles.skeletonBubble} />
+                    <li className={styles.skeletonBubble} />
+                  </ul>
+                ) : null}
+
+                {status === "live" && visibleMessages.length === 0 ? (
+                  <p className={styles.empty}>No messages yet — say hello.</p>
+                ) : null}
+
+                {visibleMessages.length > 0 ? (
+                  <ul className={styles.bubbles}>
+                    {visibleMessages.map((message) => (
+                      <MessageBubble
+                        key={message.id}
+                        message={message}
+                        isOwn={myToken !== null && message.sender.token === myToken}
+                        onMute={() => muteToken(message.sender.token)}
+                      />
+                    ))}
+                  </ul>
+                ) : null}
               </div>
-            </div>
-          </form>
-        </>
-      )}
+
+              <form className={styles.composer} onSubmit={handleSubmit}>
+                <label className={styles.composerLabel} htmlFor="chat-input">
+                  Message — playing as <strong>{name}</strong>
+                  <button
+                    type="button"
+                    className={styles.nameEdit}
+                    onClick={() => setEditingName(true)}
+                  >
+                    change
+                  </button>
+                </label>
+                <div className={styles.composerRow}>
+                  <textarea
+                    id="chat-input"
+                    ref={inputRef}
+                    className={styles.textarea}
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value.slice(0, MAX_LENGTH))}
+                    onKeyDown={handleKeyDown}
+                    maxLength={MAX_LENGTH}
+                    placeholder={
+                      status === "unavailable" ? "Chat is unavailable" : "Type a message…"
+                    }
+                    disabled={status !== "live"}
+                    rows={1}
+                    aria-describedby={`${counterId} ${errorId}`}
+                  />
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="md"
+                    loading={sending}
+                    loadingLabel="Sending"
+                    disabled={status !== "live" || draft.trim().length === 0}
+                  >
+                    Send
+                  </Button>
+                </div>
+                <div className={styles.composerFooter}>
+                  <span id={counterId} className={styles.counter}>
+                    {draft.length}/{MAX_LENGTH}
+                  </span>
+                  <div
+                    id={errorId}
+                    role="alert"
+                    aria-live="assertive"
+                    className={styles.sendErrorSlot}
+                  >
+                    {sendError ? <span className={styles.sendError}>{sendError}</span> : null}
+                  </div>
+                </div>
+              </form>
+            </>
+          )}
+        </div>
+      </div>
 
       <UsernamePrompt
         isOpen={editingName}
@@ -375,17 +445,23 @@ export function ChatScreen({
 
 interface LockGateProps {
   roomLabel: string;
+  /** Set when the server rejected the code, so the gate can say so in place. */
+  error?: string | undefined;
   onUnlock: (secret: string) => void;
 }
 
 /**
- * The secret gate shown for a private room until its secret is entered
- * (CHAT-020). It replaces the message list + composer — nothing connects
- * behind it — so a passer-by with the link but not the secret sees a plain
- * prompt, never the conversation. There is no "wrong secret" error: a mismatch
- * simply lands you on a different, empty channel, which is its own signal.
+ * The secret gate shown for a private room until its code is entered
+ * (CHAT-020). It replaces the message list + composer — nothing connects behind
+ * it — so a passer-by with the link but not the code sees a plain prompt, never
+ * the conversation.
+ *
+ * Since the room registry landed (CHAT-022) the server checks the code, so a
+ * wrong one is a real, recoverable error shown here with the field retained.
+ * Before that, a mismatch silently derived a different empty channel and the
+ * gate could only ever "succeed".
  */
-function LockGate({ roomLabel, onUnlock }: LockGateProps): React.JSX.Element {
+function LockGate({ roomLabel, error, onUnlock }: LockGateProps): React.JSX.Element {
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -424,9 +500,9 @@ function LockGate({ roomLabel, onUnlock }: LockGateProps): React.JSX.Element {
             Join
           </Button>
         </div>
-        <p className={styles.roomHint}>
-          If the room looks empty after joining, double-check the secret — it has to match exactly.
-        </p>
+        <div role="alert" aria-live="assertive" className={styles.roomErrorSlot}>
+          {error ? <span className={styles.roomError}>{error}</span> : null}
+        </div>
       </form>
     </div>
   );
@@ -459,43 +535,13 @@ function RoomSwitchPrompt({
   onClose,
   onOpenRoom,
 }: RoomSwitchPromptProps): React.JSX.Element {
-  const [roomDraft, setRoomDraft] = useState("");
-  const [secretDraft, setSecretDraft] = useState("");
-  const [roomError, setRoomError] = useState<string | undefined>(undefined);
   const shareUrl =
     typeof window !== "undefined"
       ? roomShareUrl(roomId, window.location.origin, { private: isPrivate })
       : "";
 
-  const handleRoomSubmit = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-    const slug = slugifyRoomName(roomDraft);
-    if (!slug) {
-      setRoomError("Use letters or numbers for the room name.");
-      return;
-    }
-    const secret = secretDraft.trim();
-    const wantsPrivate = secret.length > 0;
-    if (slug === roomId && wantsPrivate === isPrivate) {
-      // Already here (same room, same public/private-ness) — just close.
-      onClose();
-      return;
-    }
-    setRoomDraft("");
-    setSecretDraft("");
-    setRoomError(undefined);
-    if (wantsPrivate) {
-      // Persist the secret for the destination before navigating, so it mounts
-      // already unlocked rather than gating the user right back out.
-      setRoomSecret(slug, secret);
-      onOpenRoom(slug, { private: true });
-    } else {
-      onOpenRoom(slug);
-    }
-  };
-
   return (
-    <Modal isOpen={isOpen} title="Rooms" onClose={onClose}>
+    <Modal isOpen={isOpen} title="Share room" onClose={onClose}>
       <div className={styles.roomDialog}>
         <section className={styles.roomSection}>
           <h3 className={styles.roomSectionTitle}>Share this room</h3>
@@ -516,59 +562,17 @@ function RoomSwitchPrompt({
           ) : null}
         </section>
 
-        <form className={styles.roomSection} onSubmit={handleRoomSubmit}>
-          <h3 className={styles.roomSectionTitle}>Create or join a room</h3>
-          <p className={styles.roomHint}>
-            Type a name — anyone who opens the same name lands in the same room. Add a secret to
-            make it private: only people with that secret can read or post.
-          </p>
-          <div className={styles.roomRow}>
-            <input
-              type="text"
-              className={styles.roomInput}
-              value={roomDraft}
-              onChange={(event) => setRoomDraft(event.target.value)}
-              placeholder="e.g. weekend-games"
-              aria-label="Room name"
-              aria-invalid={roomError ? true : undefined}
-              maxLength={64}
-            />
-          </div>
-          <div className={styles.roomRow}>
-            <input
-              type="password"
-              className={styles.roomInput}
-              value={secretDraft}
-              onChange={(event) => setSecretDraft(event.target.value)}
-              placeholder="Secret (optional — leave blank for public)"
-              aria-label="Room secret (optional)"
-              autoComplete="off"
-              maxLength={128}
-            />
-            <Button
-              type="submit"
-              variant="primary"
-              size="md"
-              disabled={roomDraft.trim().length === 0}
-            >
-              Go
-            </Button>
-          </div>
-          <div role="alert" aria-live="assertive" className={styles.roomErrorSlot}>
-            {roomError ? <span className={styles.roomError}>{roomError}</span> : null}
-          </div>
-          {roomId !== DEFAULT_CHAT_ROOM_ID ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className={styles.roomLobbyLink}
-              onClick={() => onOpenRoom(DEFAULT_CHAT_ROOM_ID)}
-            >
-              Back to the lobby
-            </Button>
-          ) : null}
-        </form>
+        {roomId !== DEFAULT_CHAT_ROOM_ID ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={styles.roomLobbyLink}
+            onClick={() => onOpenRoom(DEFAULT_CHAT_ROOM_ID)}
+          >
+            Back to Global
+          </Button>
+        ) : null}
       </div>
     </Modal>
   );

@@ -1,6 +1,7 @@
 import type { Database } from "../../db/drizzle.js";
 import type { Store } from "../ports.js";
 import { createPgChatMessageRepo } from "./chat-message-repo.pg.js";
+import { createPgChatRoomRepo } from "./chat-room-repo.pg.js";
 import { createPgEventRepo } from "./event-repo.pg.js";
 import { createPgIdentityRepo } from "./identity-repo.pg.js";
 import { createPgLeaderboardRepo } from "./leaderboard-repo.pg.js";
@@ -22,5 +23,6 @@ export function createPgStore(db: Database): Store {
     reports: createPgReportRepo(db),
     variants: createPgVariantRepo(db),
     chat: createPgChatMessageRepo(db),
+    chatRooms: createPgChatRoomRepo(db),
   };
 }

@@ -514,6 +514,39 @@ export interface ChatMessageRepo {
 }
 
 // ---------------------------------------------------------------------------
+// Chat Room (CHAT-022 — admin-owned room registry)
+// ---------------------------------------------------------------------------
+
+export type ChatRoomVisibility = "public" | "private";
+
+/**
+ * A room as the registry holds it — **including the secret**, which is why this
+ * type never leaves the server. The wire shape the lobby renders is built from
+ * it by dropping `secret` (docs/CHAT_UI.md §6.2).
+ */
+export interface ChatRoom {
+  readonly id: string;
+  readonly label: string;
+  readonly visibility: ChatRoomVisibility;
+  /** The shared room code; non-null exactly when `visibility === "private"`. */
+  readonly secret: string | null;
+  readonly sortOrder: number;
+}
+
+/**
+ * Read-only by design. Rooms are administrator-owned and managed directly in
+ * the database, so there is deliberately no `create`/`update`/`delete` here —
+ * see docs/CHAT_UI.md §6.3.1 for the `ADMIN_TOKEN` shape if that ever changes.
+ */
+export interface ChatRoomRepo {
+  /** Every room, in admin order (`sortOrder` asc, then `id` asc). */
+  list(): Promise<ChatRoom[]>;
+
+  /** One room by slug, or `null` when no such room exists. */
+  get(roomId: string): Promise<ChatRoom | null>;
+}
+
+// ---------------------------------------------------------------------------
 // Store (bundle of all repos)
 // ---------------------------------------------------------------------------
 
@@ -527,4 +560,5 @@ export interface Store {
   readonly reports: ReportRepo;
   readonly variants: VariantRepo;
   readonly chat: ChatMessageRepo;
+  readonly chatRooms: ChatRoomRepo;
 }

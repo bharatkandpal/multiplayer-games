@@ -373,3 +373,49 @@ export const chatMessages = pgTable(
     index("chat_messages_sender_idx").on(t.senderToken),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// chat_rooms (CHAT-022 — admin-owned room registry)
+// ---------------------------------------------------------------------------
+
+/**
+ * The complete set of chat rooms. Rooms are **administrator-owned**: players
+ * join, never create, and the app ships no endpoint that writes this table —
+ * rooms are managed directly in the database (docs/CHAT_UI.md §6.1/§6.3.1).
+ *
+ * Before this table, a room existed merely because someone typed a slug into a
+ * URL and the token endpoint minted a token for anything slug-shaped. The
+ * registry turns that into a closed set, and — because the server now knows a
+ * private room exists — lets private rooms be *listed* by name while still
+ * gating entry on the secret.
+ *
+ * `secret` is stored in the clear, deliberately: it is a shared room code every
+ * member already knows, not a user credential, and keeping it readable is what
+ * makes rotating it a one-line UPDATE. It must never be returned by an
+ * endpoint, never logged, and never presented to a user as a reusable password.
+ *
+ * The channel a room lives on is still *derived*, never stored: public rooms
+ * use `chat:<id>`, private rooms the opaque `chat:p-<hmac(id, secret)>` from
+ * chat/privateChannel.ts. This table is a gate in front of that derivation, not
+ * a replacement for it.
+ */
+export const chatRooms = pgTable(
+  "chat_rooms",
+  {
+    /** The room slug — the `:roomId` in `/chat/:roomId`, e.g. "global". */
+    id: text("id").primaryKey(),
+    /** Display name shown in the lobby and room bar. */
+    label: text("label").notNull(),
+    /** `"public"` | `"private"`. Text, not an enum, so adding a tier needs no migration. */
+    visibility: text("visibility").notNull(),
+    /** The shared room code. Required iff `visibility = 'private'`; null otherwise. */
+    secret: text("secret"),
+    /** Admin ordering; the lobby sorts on this before it sorts on occupancy. */
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // The lobby's one query: every room, in admin order.
+    index("chat_rooms_sort_idx").on(t.sortOrder, t.id),
+  ],
+);
