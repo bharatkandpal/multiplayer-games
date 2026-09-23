@@ -9,6 +9,7 @@ import { createMemoryChatRoomRepo } from "../../store/memory/chat-room-repo.memo
 import { SESSION_HEADER, createSessionMiddleware } from "../../sessions/sessionMiddleware.js";
 import type { ChatRoom, Store } from "../../store/ports.js";
 import { createChatRouter } from "../chatRoutes.js";
+import type { ChatHistoryQueueOptions } from "../historyQueue.js";
 import { channelNameFor } from "../privateChannel.js";
 import type { AblyClientOptions } from "../ably.js";
 
@@ -59,6 +60,9 @@ describe("chat routes (CHAT-002/003)", () => {
       rooms?: readonly ChatRoom[];
       /** Make the room registry throw, to prove chat degrades rather than 500s. */
       breakRoomRegistry?: boolean;
+      /** History-queue overrides (CHAT-023). Defaults to a zero-delay window so
+       *  a test only has to wait for the write, not for the batching window. */
+      history?: ChatHistoryQueueOptions;
     } = {},
   ): Promise<{ call: (path: string, init?: RequestInit) => Promise<Response> }> {
     store = createMemoryStore();
@@ -101,6 +105,7 @@ describe("chat routes (CHAT-002/003)", () => {
         store,
         limiter ? limiter.limit.bind(limiter) : noopLimit,
         opts.ablyOptions ?? {},
+        opts.history ?? { flushDelayMs: 0 },
       ),
     );
 
@@ -464,8 +469,13 @@ describe("chat routes (CHAT-002/003)", () => {
       expect(res.status).toBe(202);
       const body = (await res.json()) as { id: string; ts: number };
 
-      const stored = await store.chat.page("chat:room-1", { limit: 10 });
-      expect(stored).toHaveLength(1);
+      // Written behind the response (CHAT-023), so wait for the flush rather
+      // than assuming the row exists the instant the sender is answered.
+      const stored = await vi.waitFor(async () => {
+        const rows = await store.chat.page("chat:room-1", { limit: 10 });
+        expect(rows).toHaveLength(1);
+        return rows;
+      });
       expect(stored[0]).toMatchObject({
         id: body.id,
         channel: "chat:room-1",
@@ -488,13 +498,39 @@ describe("chat routes (CHAT-002/003)", () => {
       });
 
       const channel = channelNameFor("room-p", "royal", "keyName.abc:secret");
-      const stored = await store.chat.page(channel, { limit: 10 });
-      expect(stored).toHaveLength(1);
+      const stored = await vi.waitFor(async () => {
+        const rows = await store.chat.page(channel, { limit: 10 });
+        expect(rows).toHaveLength(1);
+        return rows;
+      });
       expect(stored[0]?.channel).toBe(channel);
       // The public room's channel never sees it, and the secret itself is
       // nowhere in the stored row.
       expect(await store.chat.page("chat:room-1", { limit: 10 })).toHaveLength(0);
       expect(JSON.stringify(stored)).not.toContain("royal");
+    });
+
+    it("answers the sender without waiting for the history write (CHAT-023)", async () => {
+      // A store that never resolves stands in for a slow one: with history on
+      // the request path this send could not return at all.
+      let release: (() => void) | undefined;
+      const blocked = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const { call } = await mount({
+        ablyOptions: { apiKey: "k:s", fetchImpl: publishOk() },
+      });
+      store.chat.append = () => blocked;
+      store.chat.appendMany = () => blocked;
+
+      const res = await call("/api/chat/room-1/messages", {
+        method: "POST",
+        body: JSON.stringify({ text: "hi", displayName: "Ann" }),
+      });
+
+      // Delivered live and acknowledged while the write is still pending.
+      expect(res.status).toBe(202);
+      release?.();
     });
 
     it("still delivers (202) when persistence throws — history degrades, the message doesn't", async () => {
@@ -538,6 +574,14 @@ describe("chat routes (CHAT-002/003)", () => {
         });
         expect(res.status).toBe(202);
       }
+      // Sends are answered before history is written (CHAT-023), so a test that
+      // reads the transcript back has to wait for the queue to catch up.
+      await vi.waitFor(async () => {
+        const channel = secret
+          ? channelNameFor(room, secret, "keyName.abc:secret")
+          : `chat:${room}`;
+        expect(await store.chat.page(channel, { limit: count + 1 })).toHaveLength(count);
+      });
     }
 
     it("degrades to 503 when ABLY_API_KEY is unset", async () => {

@@ -30,6 +30,7 @@ import {
   fetchChannelOccupancy,
   type AblyClientOptions,
 } from "./ably.js";
+import { createChatHistoryQueue, type ChatHistoryQueueOptions } from "./historyQueue.js";
 import { channelNameFor, normalizeRoomSecret } from "./privateChannel.js";
 import { maskProfanity } from "./profanityMask.js";
 
@@ -197,8 +198,14 @@ export function createChatRouter(
   store: Store,
   limit: RateLimitFor = noopLimit,
   ablyOptions: AblyClientOptions = {},
+  historyOptions: ChatHistoryQueueOptions = {},
 ): Router {
   const router = Router();
+
+  // Durable history is written behind the request (CHAT-023) — see
+  // `historyQueue.ts`. Delivery is the Ably publish below; this only decides
+  // when the transcript catches up.
+  const history = createChatHistoryQueue(store.chat, historyOptions);
 
   /**
    * The lobby list is polled by every open client, so it is cached per router
@@ -329,24 +336,22 @@ export function createChatRouter(
         return;
       }
 
-      // Persist for history (CHAT-021) — strictly best-effort and off the
-      // critical path: the message is already delivered live, so a store outage
-      // must degrade history to absence, never turn a delivered message into a
-      // 503. Keyed by the derived channel (a private room groups by its opaque
-      // hash); the secret is never stored.
-      try {
-        await store.chat.append({
-          id: message.id,
-          channel: channelName,
-          roomId: resolved.room.id,
-          senderToken: message.sender.token,
-          senderName: message.sender.name,
-          text: message.text,
-          ts: message.ts,
-        });
-      } catch (err) {
-        console.error("[chat] history persist failed (message still delivered)", err);
-      }
+      // Persist for history (CHAT-021) — strictly best-effort and, since
+      // CHAT-023, off the request path entirely: the message is already
+      // delivered live over Ably, so the transcript can catch up a window
+      // later. A store outage degrades history to absence and never turns a
+      // delivered message into a 503 (or into a slow send). Keyed by the
+      // derived channel (a private room groups by its opaque hash); the secret
+      // is never stored.
+      await history.enqueue({
+        id: message.id,
+        channel: channelName,
+        roomId: resolved.room.id,
+        senderToken: message.sender.token,
+        senderName: message.sender.name,
+        text: message.text,
+        ts: message.ts,
+      });
 
       res.status(202).json({ id: message.id, ts: message.ts });
     },

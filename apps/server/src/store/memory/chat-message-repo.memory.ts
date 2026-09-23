@@ -32,6 +32,10 @@ export function createMemoryChatMessageRepo(): ChatMessageRepo {
       });
     },
 
+    async appendMany(batch) {
+      for (const message of batch) await this.append(message);
+    },
+
     async page(channel, opts) {
       const before = opts.before;
       const page = messages

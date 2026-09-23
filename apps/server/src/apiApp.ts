@@ -26,6 +26,7 @@ import { createEventRouter } from "./analytics/eventRoutes.js";
 import { type EventSink } from "./analytics/sink.js";
 import { createCardRouter } from "./cards/cardRoutes.js";
 import { createChatRouter } from "./chat/chatRoutes.js";
+import type { ChatHistoryQueueOptions } from "./chat/historyQueue.js";
 // Re-exported so a bundled deployment can inject the card fonts it embedded at
 // build time without reaching past this module's public surface — see
 // `cards/raster.ts` and `apps/api/scripts/bundle.mjs`.
@@ -52,6 +53,14 @@ export interface CreateApiAppOptions {
   /** `cors` origin value (see `parseCorsOrigin`). Defaults to `"*"`. */
   corsOrigin?: string | string[];
   /**
+   * How durable chat history is written (CHAT-023). Defaults to the batched
+   * write-behind queue, which is right for the long-running container. The
+   * serverless entry below overrides it to `inline` — a function instance can
+   * be frozen the moment the response ends, so anything scheduled past it is
+   * silently dropped.
+   */
+  chatHistory?: ChatHistoryQueueOptions;
+  /**
    * Hook to mount additional routes AFTER the stateless surface and BEFORE the
    * error handler. The container uses it for the room routes; the functions
    * pass nothing.
@@ -70,6 +79,7 @@ export function createApiApp({
   eventSink,
   limit = noopLimit,
   corsOrigin = "*",
+  chatHistory,
   extend,
 }: CreateApiAppOptions): Express {
   const app = express();
@@ -89,7 +99,7 @@ export function createApiApp({
   app.use("/api", createReportRouter(store, limit));
   // Server-authoritative Ably chat (CHAT-002/003) — degrades to absence (503)
   // when ABLY_API_KEY is unset, per the offline pillar (CLAUDE.md).
-  app.use("/api", createChatRouter(store, limit));
+  app.use("/api", createChatRouter(store, limit, {}, chatHistory));
   // Public, session-free card image for unfurls (MPG-085-b) — the `og:image`
   // target ADR 0009's shim points at.
   app.use("/api", createCardRouter(store));
@@ -156,5 +166,10 @@ export async function createServerlessApiApp(): Promise<Express> {
     eventSink,
     limit: rateLimiter.limit.bind(rateLimiter),
     corsOrigin,
+    // Write chat history inside the request here. The write-behind queue
+    // (CHAT-023) assumes a process that outlives the response; a Vercel
+    // instance does not, and a timer that never fires loses the transcript
+    // silently — the same failure mode the DATABASE_URL guard above refuses.
+    chatHistory: { mode: "inline" },
   });
 }

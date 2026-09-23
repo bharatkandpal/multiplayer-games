@@ -208,6 +208,27 @@ _chat messages_ are durable; reactions and `GameResult` transcripts are not.
   path**: a delivered message is a 202 even if the store write fails (history just misses it),
   and a history read that fails degrades to "live only" — never an error, never a block. The
   live plane (ADR 0002/0005 pub-sub) is unchanged; the store is a side-channel for replay.
+
+### Amendment (CHAT-023) — history is written _behind_ the request
+
+CHAT-021 kept the store write inside the request (best-effort, but `await`ed before the 202).
+Delivery and persistence have different deadlines, so they no longer share a latency budget:
+
+- **Delivery is the Ably publish, and only that.** The server publishes, then answers. The
+  sender's optimistic bubble (CHAT-018) reconciles against the broadcast, never against a
+  database row, so nothing a reader or sender sees depends on the write.
+- **The write is queued and batched** (`apps/server/src/chat/historyQueue.ts`): a short window
+  (250ms) collects messages and writes them in **one** insert (`ChatMessageRepo.appendMany`).
+  A failed batch retries a few times, then is dropped with a log — history degrades to absence,
+  exactly as the bullet above requires. A sustained outage drops the **oldest** queued messages
+  past a bound rather than growing memory without limit.
+- **Serverless writes stay inline.** A Vercel instance can be frozen the moment the response
+  ends, so `createServerlessApiApp` sets `chatHistory: { mode: "inline" }` — the queue's timer
+  would never fire there and the transcript would vanish silently, which is worse than the
+  latency it saves. The container gets the write-behind path.
+- **Not a durable job queue.** It lives in one process's memory: a crash loses at most one
+  unflushed window. That is acceptable only because history is a convenience, not a source of
+  truth. If it ever becomes one, this needs an external broker — not a bigger buffer.
 - **Still deferred.** No delete/redact-a-message UI yet — a durable transcript reopens the
   redaction question ("a deleted message must not resurrect"), now the next revisit for chat
   moderation (see below), not a launch blocker.

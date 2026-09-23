@@ -500,6 +500,15 @@ export interface ChatMessageRepo {
   append(message: NewChatMessage): Promise<void>;
 
   /**
+   * Persist a batch in one round trip, for the write-behind history queue
+   * (CHAT-023). Same idempotency contract as {@link append}, per message.
+   *
+   * Optional: a repo that doesn't implement it is written one message at a
+   * time by the queue, which is correct, just chattier.
+   */
+  appendMany?(messages: readonly NewChatMessage[]): Promise<void>;
+
+  /**
    * A page of a channel's messages, **newest first**, strictly older than
    * `before` when given. `(ts, id)` is the total order — ties on `ts` break by
    * `id`, so paging never skips or repeats a same-millisecond message.
