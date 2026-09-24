@@ -414,6 +414,12 @@
   align-self: flex-start;
 }
 
+/* A bubble continuing a same-sender run: no name/time/mute above or below, so
+   it sits closer to the one before it than a fresh turn would. */
+.grouped {
+  margin-top: calc(var(--space-2) * -1);
+}
+
 /* An own message still in flight (CHAT-018): shown immediately, dimmed until
    the server broadcast confirms it. Colour is not the only signal — the meta
    line also reads "Sending…" — so this stays legible for colour-blind readers. */

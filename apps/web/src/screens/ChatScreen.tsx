@@ -404,14 +404,20 @@ export function ChatScreen({
 
                 {visibleMessages.length > 0 ? (
                   <ul className={styles.bubbles}>
-                    {visibleMessages.map((message) => (
-                      <MessageBubble
-                        key={message.id}
-                        message={message}
-                        isOwn={myToken !== null && message.sender.token === myToken}
-                        onMute={() => muteToken(message.sender.token)}
-                      />
-                    ))}
+                    {visibleMessages.map((message, index) => {
+                      const previous = index > 0 ? visibleMessages[index - 1] : undefined;
+                      const isGroupStart =
+                        !previous || previous.sender.token !== message.sender.token;
+                      return (
+                        <MessageBubble
+                          key={message.id}
+                          message={message}
+                          isOwn={myToken !== null && message.sender.token === myToken}
+                          isGroupStart={isGroupStart}
+                          onMute={() => muteToken(message.sender.token)}
+                        />
+                      );
+                    })}
                   </ul>
                 ) : null}
               </div>
@@ -650,6 +656,8 @@ function RoomSwitchPrompt({
 interface MessageBubbleProps {
   message: ChatMessage;
   isOwn: boolean;
+  /** False when the previous visible message was from the same sender — see below. */
+  isGroupStart: boolean;
   onMute: () => void;
 }
 
@@ -659,38 +667,53 @@ interface MessageBubbleProps {
  * bubble spends a line to say nothing. Theirs stack left under the sender's
  * name, the way every messaging app does it.
  *
+ * Consecutive messages from the same sender are a run, not N separate turns:
+ * only the first bubble in a run carries the name/time/mute meta — the rest
+ * are just text, the way every messaging app collapses a burst of messages.
+ *
  * Nothing here is signalled by colour alone (UX_PRINCIPLES §4): side and the
  * presence of a name carry own/other visually, and a screen-reader-only "You"
  * carries it for assistive tech, which cannot perceive alignment at all.
  */
-function MessageBubble({ message, isOwn, onMute }: MessageBubbleProps): React.JSX.Element {
+function MessageBubble({
+  message,
+  isOwn,
+  isGroupStart,
+  onMute,
+}: MessageBubbleProps): React.JSX.Element {
   const pending = message.delivery === "pending";
   const time = new Date(message.ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const ownClass = pending ? `${styles.own} ${styles.pending}` : styles.own;
+  const baseClass = isOwn ? `${styles.bubble} ${ownClass}` : `${styles.bubble} ${styles.other}`;
+  const groupClass = isGroupStart ? baseClass : `${baseClass} ${styles.grouped}`;
   return (
-    <li className={isOwn ? `${styles.bubble} ${ownClass}` : `${styles.bubble} ${styles.other}`}>
-      {isOwn ? (
-        <span className={styles.srOnly}>You</span>
-      ) : (
-        <span className={styles.bubbleName}>{message.sender.name}</span>
-      )}
+    <li className={groupClass}>
+      {isGroupStart ? (
+        isOwn ? (
+          <span className={styles.srOnly}>You</span>
+        ) : (
+          <span className={styles.bubbleName}>{message.sender.name}</span>
+        )
+      ) : null}
       <p className={styles.bubbleText}>{message.text}</p>
-      <div className={styles.bubbleMeta}>
-        {/* Own bubbles show a delivery marker in place of a wall-clock time
-            until they're confirmed — the send felt instant, so "Sending…"
-            reassures without implying it's already delivered. */}
-        <span className={styles.bubbleTime}>{isOwn && pending ? "Sending…" : time}</span>
-        {!isOwn ? (
-          <button
-            type="button"
-            className={styles.muteButton}
-            onClick={onMute}
-            aria-label={`Mute ${message.sender.name}`}
-          >
-            Mute
-          </button>
-        ) : null}
-      </div>
+      {isGroupStart ? (
+        <div className={styles.bubbleMeta}>
+          {/* Own bubbles show a delivery marker in place of a wall-clock time
+              until they're confirmed — the send felt instant, so "Sending…"
+              reassures without implying it's already delivered. */}
+          <span className={styles.bubbleTime}>{isOwn && pending ? "Sending…" : time}</span>
+          {!isOwn ? (
+            <button
+              type="button"
+              className={styles.muteButton}
+              onClick={onMute}
+              aria-label={`Mute ${message.sender.name}`}
+            >
+              Mute
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </li>
   );
 }
