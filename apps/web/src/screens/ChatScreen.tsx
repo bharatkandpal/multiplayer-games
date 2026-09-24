@@ -27,7 +27,15 @@ import {
   setStoredUsername,
   syncUsername,
 } from "../api/username.js";
-import { getMutedTokens, muteToken, onMuteChange } from "../api/chatMute.js";
+import {
+  getMutedEntries,
+  getMutedTokens,
+  muteToken,
+  onMuteChange,
+  unmuteAll,
+  unmuteToken,
+} from "../api/chatMute.js";
+import type { MutedEntry } from "../api/chatMute.js";
 import { getRoomSecret, setRoomSecret } from "../api/chatSecret.js";
 import { RoomRail } from "./RoomRail.js";
 import styles from "./ChatScreen.module.css";
@@ -105,6 +113,15 @@ export function ChatScreen({
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | undefined>(undefined);
   const [muted, setMuted] = useState<Set<string>>(() => getMutedTokens());
+  // The same mutes, kept with a name for the "who's muted?" undo list — a
+  // muted sender's messages stop rendering, so there's otherwise no surface
+  // left to unmute them from (see CHAT-007 doc comment in chatMute.ts).
+  const [mutedEntries, setMutedEntries] = useState<MutedEntry[]>(() => getMutedEntries());
+  const [mutedListOpen, setMutedListOpen] = useState(false);
+  // Which message (if any) has its timestamp/mute row pulled open — a tap
+  // reveals it in place rather than paying its height on every bubble.
+  // Single id, not a set: opening one closes whichever was already open.
+  const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
   const [name, setName] = useState(ensureUsername);
   const [editingName, setEditingName] = useState(false);
   const [roomDialogOpen, setRoomDialogOpen] = useState(false);
@@ -139,7 +156,20 @@ export function ChatScreen({
   const myToken = getSessionToken();
 
   useEffect(() => onUsernameChange(setName), []);
-  useEffect(() => onMuteChange(() => setMuted(getMutedTokens())), []);
+  useEffect(
+    () =>
+      onMuteChange(() => {
+        setMuted(getMutedTokens());
+        setMutedEntries(getMutedEntries());
+      }),
+    [],
+  );
+
+  // A revealed timestamp is tied to a moment in this conversation, not
+  // something that should survive leaving it — switching rooms collapses it.
+  useEffect(() => {
+    setExpandedMessageId(null);
+  }, [roomId]);
 
   // Escape closes the room list — on a narrow screen it covers the
   // conversation, and a covering surface must always be dismissible.
@@ -330,6 +360,21 @@ export function ChatScreen({
               {badgeLabel}
             </StatusBadge>
           </span>
+          {/* Hidden until there's at least one mute to undo — the whole point
+              of hiding the meta row behind a tap is to spend no space on
+              things nobody needs, and an empty "Muted" control is exactly
+              that. */}
+          {mutedEntries.length > 0 ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={styles.roomButton}
+              onClick={() => setMutedListOpen(true)}
+              aria-haspopup="dialog"
+            >
+              Muted ({mutedEntries.length})
+            </Button>
+          ) : null}
           {onOpenRoom ? (
             <Button
               variant="ghost"
@@ -414,7 +459,13 @@ export function ChatScreen({
                           message={message}
                           isOwn={myToken !== null && message.sender.token === myToken}
                           isGroupStart={isGroupStart}
-                          onMute={() => muteToken(message.sender.token)}
+                          isExpanded={message.id === expandedMessageId}
+                          onToggleExpand={() =>
+                            setExpandedMessageId((prev) =>
+                              prev === message.id ? null : message.id,
+                            )
+                          }
+                          onMute={() => muteToken(message.sender.token, message.sender.name)}
                         />
                       );
                     })}
@@ -514,6 +565,14 @@ export function ChatScreen({
           }}
         />
       ) : null}
+
+      <MutedListPrompt
+        isOpen={mutedListOpen}
+        entries={mutedEntries}
+        onClose={() => setMutedListOpen(false)}
+        onUnmute={unmuteToken}
+        onUnmuteAll={unmuteAll}
+      />
     </div>
   );
 }
@@ -653,11 +712,75 @@ function RoomSwitchPrompt({
   );
 }
 
+interface MutedListPromptProps {
+  isOpen: boolean;
+  entries: MutedEntry[];
+  onClose: () => void;
+  onUnmute: (token: string) => void;
+  onUnmuteAll: () => void;
+}
+
+/**
+ * The undo surface for mute (CHAT-007 had none): once a sender is muted their
+ * messages stop rendering, so there's no bubble left to un-mute them from —
+ * this list is the only way back from an accidental tap, which matters most
+ * on mobile where "Mute" sits right where a scroll gesture can land.
+ */
+function MutedListPrompt({
+  isOpen,
+  entries,
+  onClose,
+  onUnmute,
+  onUnmuteAll,
+}: MutedListPromptProps): React.JSX.Element {
+  return (
+    <Modal isOpen={isOpen} title="Muted senders" onClose={onClose}>
+      <div className={styles.roomDialog}>
+        {entries.length > 0 ? (
+          <>
+            <ul className={styles.mutedList}>
+              {entries.map((entry) => (
+                <li key={entry.token} className={styles.mutedRow}>
+                  <span className={styles.mutedName}>{entry.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onUnmute(entry.token)}
+                  >
+                    Unmute
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            {entries.length > 1 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={styles.roomLobbyLink}
+                onClick={onUnmuteAll}
+              >
+                Unmute all
+              </Button>
+            ) : null}
+          </>
+        ) : (
+          <p className={styles.roomHint}>Nobody's muted right now.</p>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 interface MessageBubbleProps {
   message: ChatMessage;
   isOwn: boolean;
   /** False when the previous visible message was from the same sender — see below. */
   isGroupStart: boolean;
+  /** Whether this bubble's time/mute row is pulled open right now. */
+  isExpanded: boolean;
+  onToggleExpand: () => void;
   onMute: () => void;
 }
 
@@ -671,6 +794,12 @@ interface MessageBubbleProps {
  * only the first bubble in a run carries the name/time/mute meta — the rest
  * are just text, the way every messaging app collapses a burst of messages.
  *
+ * The time/mute row costs a line on every bubble that has it, for information
+ * that's rarely needed — so it starts collapsed and opens on tap, the way a
+ * timestamp reveal works in most messaging apps. Only one bubble is ever open
+ * at a time (state lives in the parent), so tapping another — or leaving the
+ * room — closes whichever was open.
+ *
  * Nothing here is signalled by colour alone (UX_PRINCIPLES §4): side and the
  * presence of a name carry own/other visually, and a screen-reader-only "You"
  * carries it for assistive tech, which cannot perceive alignment at all.
@@ -679,6 +808,8 @@ function MessageBubble({
   message,
   isOwn,
   isGroupStart,
+  isExpanded,
+  onToggleExpand,
   onMute,
 }: MessageBubbleProps): React.JSX.Element {
   const pending = message.delivery === "pending";
@@ -686,8 +817,23 @@ function MessageBubble({
   const ownClass = pending ? `${styles.own} ${styles.pending}` : styles.own;
   const baseClass = isOwn ? `${styles.bubble} ${ownClass}` : `${styles.bubble} ${styles.other}`;
   const groupClass = isGroupStart ? baseClass : `${baseClass} ${styles.grouped}`;
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLLIElement>): void => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onToggleExpand();
+  };
+
   return (
-    <li className={groupClass}>
+    <li
+      className={groupClass}
+      role="button"
+      tabIndex={0}
+      aria-expanded={isExpanded}
+      aria-label={isExpanded ? "Message, hide time sent" : "Message, show time sent"}
+      onClick={onToggleExpand}
+      onKeyDown={handleKeyDown}
+    >
       {isGroupStart ? (
         isOwn ? (
           <span className={styles.srOnly}>You</span>
@@ -696,7 +842,7 @@ function MessageBubble({
         )
       ) : null}
       <p className={styles.bubbleText}>{message.text}</p>
-      {isGroupStart ? (
+      {isGroupStart && isExpanded ? (
         <div className={styles.bubbleMeta}>
           {/* Own bubbles show a delivery marker in place of a wall-clock time
               until they're confirmed — the send felt instant, so "Sending…"
@@ -706,7 +852,10 @@ function MessageBubble({
             <button
               type="button"
               className={styles.muteButton}
-              onClick={onMute}
+              onClick={(event) => {
+                event.stopPropagation();
+                onMute();
+              }}
               aria-label={`Mute ${message.sender.name}`}
             >
               Mute

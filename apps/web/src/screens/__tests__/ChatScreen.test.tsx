@@ -105,8 +105,66 @@ describe("ChatScreen", () => {
     const log = screen.getByRole("log", { name: "Chat messages" });
     expect(within(log).queryByText("me")).not.toBeInTheDocument();
     expect(screen.getAllByText("You")).toHaveLength(1);
+    // The time/mute row is collapsed until the bubble is tapped.
+    expect(screen.queryByRole("button", { name: "Mute Ada" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("hey"));
     // Only the other player's message offers a mute control.
     expect(screen.getByRole("button", { name: "Mute Ada" })).toBeInTheDocument();
+  });
+
+  it("toggles a bubble's time/mute row open and closed on click", () => {
+    state.status = "live";
+    state.messages = [
+      {
+        id: "m1",
+        roomId: "lobby",
+        sender: { token: "tok-other", name: "Ada" },
+        text: "hey",
+        ts: 2,
+      },
+    ];
+    render(<ChatScreen roomId="lobby" onBack={() => {}} />);
+
+    const bubble = screen.getByText("hey").closest("li")!;
+    expect(screen.queryByRole("button", { name: "Mute Ada" })).not.toBeInTheDocument();
+
+    fireEvent.click(bubble);
+    expect(screen.getByRole("button", { name: "Mute Ada" })).toBeInTheDocument();
+
+    fireEvent.click(bubble);
+    expect(screen.queryByRole("button", { name: "Mute Ada" })).not.toBeInTheDocument();
+  });
+
+  it("mutes a sender, then lets it be undone from the Muted list — no dead-end for an accidental mute", () => {
+    state.status = "live";
+    state.messages = [
+      {
+        id: "m1",
+        roomId: "lobby",
+        sender: { token: "tok-other", name: "Ada" },
+        text: "hey",
+        ts: 2,
+      },
+    ];
+    render(<ChatScreen roomId="lobby" onBack={() => {}} />);
+
+    // No "Muted" control until there's something to undo.
+    expect(screen.queryByRole("button", { name: /^Muted/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("hey"));
+    fireEvent.click(screen.getByRole("button", { name: "Mute Ada" }));
+
+    const log = screen.getByRole("log", { name: "Chat messages" });
+    expect(within(log).queryByText("hey")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Muted (1)" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("Ada")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Unmute" }));
+
+    expect(screen.queryByRole("button", { name: /^Muted/ })).not.toBeInTheDocument();
+    expect(within(log).getByText("hey")).toBeInTheDocument();
   });
 
   it("shows the unavailable state with a quiet note, never an error banner blocking anything", () => {

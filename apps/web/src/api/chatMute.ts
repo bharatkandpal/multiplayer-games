@@ -7,26 +7,35 @@
  * messages. Persisted to localStorage so a mute survives a reload; entirely
  * local, no network call and nothing sent to the server — a muted sender
  * still reaches everyone else.
+ *
+ * Stored as token → last-known display name, not just a set of tokens: once a
+ * sender is muted their messages stop rendering, so a name has to be kept
+ * *at mute time* to show a "who did I mute?" list a reader can undo from
+ * (there is otherwise no way to see, let alone reverse, an accidental mute).
  */
 
 const STORAGE_KEY = "mpg_chat_muted_tokens";
 
-function readMuted(): Set<string> {
+function readMuted(): Map<string, string> {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return new Set();
+    if (!raw) return new Map();
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.filter((value): value is string => typeof value === "string"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return new Map();
+    return new Map(
+      Object.entries(parsed as Record<string, unknown>).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      ),
+    );
   } catch {
     // Malformed JSON or storage unavailable (privacy mode, disabled storage, …).
-    return new Set();
+    return new Map();
   }
 }
 
-function writeMuted(tokens: Set<string>): void {
+function writeMuted(muted: Map<string, string>): void {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...tokens]));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(muted)));
   } catch {
     // Best-effort persistence only; the mute still works for this render.
   }
@@ -50,17 +59,28 @@ function notifyMuteChange(): void {
 
 /** Synchronously reads the current muted-token set. No network. */
 export function getMutedTokens(): Set<string> {
-  return readMuted();
+  return new Set(readMuted().keys());
+}
+
+export interface MutedEntry {
+  token: string;
+  /** Display name as of the moment they were muted — may be stale if they've since renamed. */
+  name: string;
+}
+
+/** The muted list for a "who's muted, and undo" surface — name included so it's legible. */
+export function getMutedEntries(): MutedEntry[] {
+  return [...readMuted()].map(([token, name]) => ({ token, name }));
 }
 
 export function isTokenMuted(token: string): boolean {
   return readMuted().has(token);
 }
 
-export function muteToken(token: string): void {
+export function muteToken(token: string, name: string = token): void {
   const muted = readMuted();
   if (muted.has(token)) return;
-  muted.add(token);
+  muted.set(token, name);
   writeMuted(muted);
 }
 
@@ -69,4 +89,10 @@ export function unmuteToken(token: string): void {
   if (!muted.has(token)) return;
   muted.delete(token);
   writeMuted(muted);
+}
+
+/** Clears every mute in one step — the reset the accidental-mute case needs. */
+export function unmuteAll(): void {
+  if (readMuted().size === 0) return;
+  writeMuted(new Map());
 }

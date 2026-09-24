@@ -312,6 +312,27 @@
   align-self: flex-start;
 }
 
+.mutedList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mutedRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.mutedName {
+  font-weight: var(--font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
 /* The one scrolling region (UX_PRINCIPLES §9). Full-bleed — no card border or
    radius: the conversation *is* the surface, like every messaging app. */
 .messageList {
@@ -389,6 +410,8 @@
   /* Motion with meaning: a message arrives, it doesn't decorate — and it
      respects prefers-reduced-motion via the global token override. */
   animation: chat-bubble-in var(--duration-base) var(--ease-standard);
+  /* Every bubble toggles its own time/mute row on tap (see .bubbleMeta). */
+  cursor: pointer;
 }
 
 @keyframes chat-bubble-in {
