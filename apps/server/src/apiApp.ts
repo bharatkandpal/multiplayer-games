@@ -158,10 +158,15 @@ export async function createServerlessApiApp(): Promise<Express> {
     eventSink,
     limit: rateLimiter.limit.bind(rateLimiter),
     corsOrigin,
-    // Write chat history inside the request here. The write-behind queue
-    // (CHAT-023) assumes a process that outlives the response; a Vercel
-    // instance does not, and a timer that never fires loses the transcript
-    // silently — the same failure mode the DATABASE_URL guard above refuses.
+    // The route never awaits the history write either way (CHAT-023) — it
+    // answers the sender the moment Ably confirms delivery. "inline" here
+    // just means the write starts immediately instead of sitting in a
+    // batching window first, which matters on a serverless instance that may
+    // freeze shortly after the response: starting sooner is strictly better
+    // for the odds it finishes. The write-behind queue's batching delay
+    // (CHAT-023) is a false economy here — a container that outlives the
+    // response would benefit from the batching, but a Vercel instance mostly
+    // doesn't outlive it, so there's nothing to batch for.
     chatHistory: { mode: "inline" },
   });
 }

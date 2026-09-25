@@ -328,22 +328,17 @@ export function createChatRouter(
         ts: Date.now(),
       };
 
-      try {
-        await publishAblyMessage(channelName, message, ablyOptions);
-      } catch (err) {
-        console.error("[chat] publish failed", err);
-        res.status(503).json({ error: "chat_unavailable" });
-        return;
-      }
-
       // Persist for history (CHAT-021) — strictly best-effort and, since
-      // CHAT-023, off the request path entirely: the message is already
-      // delivered live over Ably, so the transcript can catch up a window
-      // later. A store outage degrades history to absence and never turns a
-      // delivered message into a 503 (or into a slow send). Keyed by the
-      // derived channel (a private room groups by its opaque hash); the secret
-      // is never stored.
-      await history.enqueue({
+      // CHAT-023, never on the response path: started here, alongside the
+      // Ably publish, but never awaited. The sender is answered the moment
+      // delivery (Ably) confirms, not when the database does — history is
+      // documented as best-effort/non-authoritative (ADR 0005), so trading a
+      // rare, silent write loss (e.g. a serverless instance frozen between
+      // the response and this promise settling) for send latency is an
+      // accepted tradeoff, not a bug. `enqueue` never rejects, so this never
+      // produces an unhandled rejection. Keyed by the derived channel (a
+      // private room groups by its opaque hash); the secret is never stored.
+      void history.enqueue({
         id: message.id,
         channel: channelName,
         roomId: resolved.room.id,
@@ -352,6 +347,14 @@ export function createChatRouter(
         text: message.text,
         ts: message.ts,
       });
+
+      try {
+        await publishAblyMessage(channelName, message, ablyOptions);
+      } catch (err) {
+        console.error("[chat] publish failed", err);
+        res.status(503).json({ error: "chat_unavailable" });
+        return;
+      }
 
       res.status(202).json({ id: message.id, ts: message.ts });
     },
