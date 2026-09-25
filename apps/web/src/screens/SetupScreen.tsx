@@ -17,14 +17,13 @@ export interface SetupScreenProps {
   onStart: (seats: SeatsConfig) => void;
   onBack: () => void;
   /**
-   * MPG-012/MPG-025: creates a room instead of starting a local pass-and-play
-   * game — an open human seat shows the invite-link flow, an all-bot config
-   * (every seat `kind: "bot"`) instead starts a server-driven "watch" room.
-   * Receives the real seat config to create with (MPG-025: previously this
-   * screen ignored whatever was configured and the caller always hardcoded
-   * an all-human invite — see the "Play online" vs. Customize section's
-   * online action below for the two ways a caller ends up here). Optional —
-   * omitted in contexts (e.g. tests) that don't wire up the room client.
+   * MPG-012: opens the invite-link flow for `seats` (peer-to-peer Ably play,
+   * `useOnlineGame`). Online play is human-vs-human only — bot seats run
+   * entirely client-side and have no network path (CLAUDE.md), so this is
+   * only ever offered/called for an all-human config; see the "Play online"
+   * quick action and the Customize section's online button below, which is
+   * hidden once any seat is set to Bot. Optional — omitted in contexts (e.g.
+   * tests) that don't wire up online play.
    */
   onPlayOnline?: (seats: SeatsConfig) => void;
 }
@@ -214,18 +213,16 @@ export function SetupScreen({
             <Button variant="primary" size="lg" onClick={() => onStart(seats)}>
               Start game
             </Button>
-            {onPlayOnline ? (
+            {onPlayOnline && seats.every((seat) => seat.kind === "human") ? (
               <Button variant="secondary" size="lg" onClick={() => onPlayOnline(seats)}>
-                {seats.every((seat) => seat.kind === "bot")
-                  ? "Watch online — all-bot"
-                  : "Play online — this setup"}
+                Play online — this setup
               </Button>
             ) : null}
           </div>
-          {onPlayOnline && seats.every((seat) => seat.kind === "bot") ? (
+          {onPlayOnline && seats.some((seat) => seat.kind === "bot") ? (
             <p className={styles.watchHint}>
-              Every seat is a bot — this creates a live game you (and only you, for now) can watch
-              play out on the server, paced move by move. Nobody takes a turn here.
+              Online play is human vs human — bot seats play locally only. Switch every seat to
+              Human to invite a friend.
             </p>
           ) : null}
         </div>

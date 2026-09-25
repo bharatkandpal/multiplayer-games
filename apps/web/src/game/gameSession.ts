@@ -67,10 +67,12 @@ export interface GameSessionState<S, M> {
    * a log derived in an effect lags the position it describes by a render — long
    * enough for a game-over handler to read it one move short.
    *
-   * Fed by `apply_local_move` alone. `reconcile` deliberately does NOT append:
-   * online play would double-count its own optimistically-applied move, and the
-   * server's broadcast is the source of truth there — `useOnlinePlay` keeps its
-   * own log from that stream. This one is authoritative for local play.
+   * Fed by `apply_local_move` for local play. Peer-to-peer online play
+   * (`useOnlineGame.ts`) feeds it two other ways: `apply_remote_move` appends
+   * the peer's own moves (so this session's `moveLog` stays the single
+   * complete history either side of the wire can replay), and `reconcile`'s
+   * optional `moveLog` wholesale-replaces it on a rehydrate/resync rather than
+   * appending (there's no single "new move" to append in either case).
    */
   readonly moveLog: readonly AppliedMove<M>[];
   readonly status: GameSessionStatus<M>;
@@ -121,8 +123,33 @@ export type GameSessionAction<S, M> =
    * a move — including the local player's own optimistically-applied one — so the
    * session never drifts from the source of truth. Safe to call even when nothing was
    * pending locally.
+   *
+   * `moveLog`, when given, wholesale-replaces `session.moveLog` too (rather than the
+   * usual "leave it alone" reconcile behaviour) — used by the peer-to-peer online path
+   * (`useOnlineGame.ts`) to rehydrate from `localStorage` on mount and to adopt a
+   * peer's full log after a `sync_state` resync, where the log itself (not just the
+   * position) needs replacing wholesale.
    */
-  | { readonly type: "reconcile"; readonly state: S; readonly lastMove?: AppliedMove<M> }
+  | {
+      readonly type: "reconcile";
+      readonly state: S;
+      readonly lastMove?: AppliedMove<M>;
+      readonly moveLog?: readonly AppliedMove<M>[];
+    }
+  /**
+   * FUTURE NET HOOK (peer-to-peer). Applies a move that arrived from the *other*
+   * peer over the wire (`useOnlineGame.ts`'s `"move"` protocol message) — the one
+   * anti-cheat boundary there is, since there is no server referee in the
+   * peer-to-peer model. Unlike `apply_local_move`, `player` is asserted by the
+   * message rather than read from `currentPlayer(state)`: a message claiming to be
+   * the wrong player's move is silently ignored (not surfaced as an "error" status —
+   * that status is reserved for explaining something to THIS session's own player,
+   * and a malformed/out-of-turn peer message is never that). Likewise an
+   * `IllegalMoveError` from `applyMove` (a stale or fabricated move) is swallowed:
+   * the local, already-optimistically-applied state is authoritative and is left
+   * untouched.
+   */
+  | { readonly type: "apply_remote_move"; readonly move: M; readonly player: Player }
   /**
    * FUTURE NET HOOK. Rolls back an optimistic move that the server rejected (a
    * `move:rejected` event). `state` is the last known-good authoritative state (typically
@@ -192,8 +219,36 @@ export function gameSessionReducer<S, M>(
         result,
         turn: session.game.currentPlayer(action.state),
         lastMove: action.lastMove ?? session.lastMove,
+        moveLog: action.moveLog ?? session.moveLog,
         status: statusForResult(result),
       };
+    }
+
+    case "apply_remote_move": {
+      const expected = session.game.currentPlayer(session.state);
+      if (action.player !== expected) {
+        // Out-of-turn message (stale, duplicate, or a misbehaving peer) — ignore
+        // rather than error; this session's own player did nothing wrong.
+        return session;
+      }
+      try {
+        const nextState = session.game.applyMove(session.state, action.move, action.player);
+        const result = session.game.getResult(nextState);
+        return {
+          ...session,
+          state: nextState,
+          result,
+          turn: session.game.currentPlayer(nextState),
+          lastMove: { move: action.move, player: action.player },
+          moveLog: [...session.moveLog, { move: action.move, player: action.player }],
+          status: statusForResult(result),
+        };
+      } catch (err) {
+        if (!(err instanceof IllegalMoveError)) throw err;
+        // A fabricated/illegal move from the peer — the anti-cheat boundary.
+        // Leave local state untouched; nothing to explain to this player.
+        return session;
+      }
     }
 
     case "revert": {

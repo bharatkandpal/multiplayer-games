@@ -2,28 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { InviteScreen } from "../InviteScreen";
-import type { PublicRoom } from "../../api/roomTypes";
-
-const waitingRoom: PublicRoom = {
-  roomId: "room-1",
-  gameId: "tictactoe",
-  status: "waiting",
-  turn: 1,
-  state: {},
-  seats: [
-    { slot: 1, kind: "human", open: false, connected: true },
-    { slot: 2, kind: "human", open: true, connected: false },
-  ],
-};
-
-const activeRoom: PublicRoom = {
-  ...waitingRoom,
-  status: "active",
-  seats: [
-    { slot: 1, kind: "human", open: false, connected: true },
-    { slot: 2, kind: "human", open: false, connected: true },
-  ],
-};
 
 describe("InviteScreen", () => {
   afterEach(() => {
@@ -34,15 +12,18 @@ describe("InviteScreen", () => {
     render(
       <InviteScreen
         gameId="tictactoe"
-        room={waitingRoom}
-        inviteUrl="http://localhost/tictactoe/room/room-1"
+        inviteUrl="http://localhost/tictactoe/room/room-1#s=secret"
+        peerConnected={false}
+        unavailable={false}
         onReady={vi.fn()}
         onCancel={vi.fn()}
       />,
     );
 
     expect(screen.getByText("Waiting for opponent…")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("http://localhost/tictactoe/room/room-1")).toBeInTheDocument();
+    expect(
+      screen.getByDisplayValue("http://localhost/tictactoe/room/room-1#s=secret"),
+    ).toBeInTheDocument();
     expect(screen.getByText("1 / 2 seats filled")).toBeInTheDocument();
   });
 
@@ -56,8 +37,9 @@ describe("InviteScreen", () => {
     render(
       <InviteScreen
         gameId="tictactoe"
-        room={waitingRoom}
         inviteUrl="http://localhost/tictactoe/room/room-1"
+        peerConnected={false}
+        unavailable={false}
         onReady={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -77,8 +59,9 @@ describe("InviteScreen", () => {
     render(
       <InviteScreen
         gameId="tictactoe"
-        room={waitingRoom}
         inviteUrl="http://localhost/tictactoe/room/room-1"
+        peerConnected={false}
+        unavailable={false}
         onReady={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -96,13 +79,14 @@ describe("InviteScreen", () => {
     Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, "share");
   });
 
-  it("calls onReady once the room becomes active", async () => {
+  it("calls onReady once the peer's presence is seen", async () => {
     const onReady = vi.fn();
     const { rerender } = render(
       <InviteScreen
         gameId="tictactoe"
-        room={waitingRoom}
         inviteUrl="http://localhost/tictactoe/room/room-1"
+        peerConnected={false}
+        unavailable={false}
         onReady={onReady}
         onCancel={vi.fn()}
       />,
@@ -113,14 +97,15 @@ describe("InviteScreen", () => {
     rerender(
       <InviteScreen
         gameId="tictactoe"
-        room={activeRoom}
         inviteUrl="http://localhost/tictactoe/room/room-1"
+        peerConnected={true}
+        unavailable={false}
         onReady={onReady}
         onCancel={vi.fn()}
       />,
     );
 
-    await waitFor(() => expect(onReady).toHaveBeenCalledWith(activeRoom));
+    await waitFor(() => expect(onReady).toHaveBeenCalled());
   });
 
   it("calls onCancel when Cancel is clicked", async () => {
@@ -130,14 +115,35 @@ describe("InviteScreen", () => {
     render(
       <InviteScreen
         gameId="tictactoe"
-        room={waitingRoom}
         inviteUrl="http://localhost/tictactoe/room/room-1"
+        peerConnected={false}
+        unavailable={false}
         onReady={vi.fn()}
         onCancel={onCancel}
       />,
     );
 
     await user.click(screen.getByRole("button", { name: "← Cancel" }));
+    expect(onCancel).toHaveBeenCalled();
+  });
+
+  it("shows an unavailable state with a way out instead of a dead-end", async () => {
+    const onCancel = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <InviteScreen
+        gameId="tictactoe"
+        inviteUrl="http://localhost/tictactoe/room/room-1"
+        peerConnected={false}
+        unavailable={true}
+        onReady={vi.fn()}
+        onCancel={onCancel}
+      />,
+    );
+
+    expect(screen.getByText("Online play isn't available right now.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "← Back" }));
     expect(onCancel).toHaveBeenCalled();
   });
 });

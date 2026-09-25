@@ -57,16 +57,23 @@ export function normalizeRoomSecret(raw: unknown): NormalizedSecret {
 }
 
 /**
- * The Ably channel a room lives on. Public rooms use `chat:<roomId>` (unchanged
- * from CHAT-002, so existing links keep working); private rooms use an opaque
- * `chat:p-<hmac>` derived from the secret. `roomId` is folded into the HMAC so
- * the same secret in two different rooms yields two different channels.
+ * The Ably channel a room lives on, namespaced by `prefix` (e.g. "chat", "game")
+ * so unrelated features never collide on the same channel even if they reuse a
+ * room id. Public rooms use `<prefix>:<roomId>` (unchanged from CHAT-002, so
+ * existing chat links keep working); private rooms use an opaque
+ * `<prefix>:p-<hmac>` derived from the secret. `roomId` is folded into the HMAC
+ * so the same secret in two different rooms yields two different channels.
  */
-export function channelNameFor(roomId: string, secret: string | null, hmacKey: string): string {
-  if (secret === null) return `chat:${roomId}`;
+export function channelNameFor(
+  prefix: string,
+  roomId: string,
+  secret: string | null,
+  hmacKey: string,
+): string {
+  if (secret === null) return `${prefix}:${roomId}`;
   const digest = createHmac("sha256", hmacKey)
     .update(`${roomId}\n${secret}`)
     .digest("hex")
     .slice(0, PRIVATE_CHANNEL_HASH_LENGTH);
-  return `chat:p-${digest}`;
+  return `${prefix}:p-${digest}`;
 }

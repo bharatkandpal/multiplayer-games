@@ -1,30 +1,37 @@
 import { useEffect } from "react";
 import type { GameId } from "@mpg/engine";
 import { Button, Spinner, StatusBadge, Toast } from "../components/ui";
-import type { PublicRoom } from "../api/roomTypes";
 import { useShareLink } from "../hooks/useShareLink";
 import { GAME_CATALOG } from "./HomeScreen";
 import styles from "./InviteScreen.module.css";
 
 export interface InviteScreenProps {
   gameId: GameId;
-  room: PublicRoom | undefined;
-  /** Full, shareable invite URL (origin + `/{gameId}/room/{roomId}`). */
+  /** Full, shareable invite URL (origin + `/{gameId}/room/{roomId}` + the secret fragment). */
   inviteUrl: string;
-  /** Fires once the room fills and moves to `active` — the caller transitions to the board. */
-  onReady: (room: PublicRoom) => void;
+  /**
+   * Whether the peer's presence has been seen on the room's Ably channel yet
+   * (`useOnlineGame`'s `peerConnected`) — this screen's only signal that the
+   * link was opened, since there's no server room to poll a `status` from.
+   */
+  peerConnected: boolean;
+  /** True if the token mint/Ably connection failed outright — online play isn't available right now. */
+  unavailable: boolean;
+  /** Fires once the peer has joined — the caller transitions to the board. */
+  onReady: () => void;
   onCancel: () => void;
 }
 
 /**
- * Shown to the room's creator while waiting for the invited opponent(s) to
- * join (MPG-012). Transitions automatically once every human seat is filled
- * (`room.status === "active"`).
+ * Shown to the room's creator while waiting for the invited opponent to open
+ * the link (MPG-012, reworked onto peer-to-peer Ably play). Transitions
+ * automatically once the peer's presence is seen on the channel.
  */
 export function InviteScreen({
   gameId,
-  room,
   inviteUrl,
+  peerConnected,
+  unavailable,
   onReady,
   onCancel,
 }: InviteScreenProps): React.JSX.Element {
@@ -32,8 +39,8 @@ export function InviteScreen({
   const { share, status, canShare, reset } = useShareLink();
 
   useEffect(() => {
-    if (room?.status === "active") onReady(room);
-  }, [room, onReady]);
+    if (peerConnected) onReady();
+  }, [peerConnected, onReady]);
 
   const handleShare = (): void => {
     void share({
@@ -43,8 +50,23 @@ export function InviteScreen({
     });
   };
 
-  const filledCount = room?.seats.filter((s) => s.kind !== "human" || s.connected).length ?? 0;
-  const totalCount = room?.seats.length ?? 0;
+  if (unavailable) {
+    return (
+      <div className={styles.main}>
+        <h1 className={styles.heading}>Invite a friend to {title}</h1>
+        <StatusBadge status="warning">Online play isn&apos;t available right now.</StatusBadge>
+        <p className={styles.seatCount}>
+          You can still play {title} against the bot, or a friend on this device.
+        </p>
+        <Button variant="primary" onClick={onCancel}>
+          ← Back
+        </Button>
+      </div>
+    );
+  }
+
+  const filledCount = peerConnected ? 2 : 1;
+  const totalCount = 2;
 
   return (
     <div className={styles.main}>

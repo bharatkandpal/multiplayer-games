@@ -1,6 +1,6 @@
 # ADR 0010 — Turn-based multiplayer over the serverless API
 
-**Status:** Proposed (2026-09-16)
+**Status:** Accepted (2026-09-25, superseding amendment — see bottom of this file)
 **Date:** 2026-09-16
 **Deciders:** Bharat (lead)
 **Decision lens:** Let PvP work without a long-running process, because every game we
@@ -203,6 +203,10 @@ direction, since §3's subscription endpoint is the only thing that would change
 
 **Client-authoritative / peer-to-peer.** Rejected outright. It forfeits server-authoritative
 legality, which is the anti-cheat foundation the whole seat model rests on.
+
+> **Reversed, 2026-09-25.** This is exactly what shipped. See the closing amendment for
+> why "forfeits server-authoritative legality" turned out to be an acceptable trade, not
+> a disqualifying one, once each peer enforces the same rules the server would have.
 
 ## Consequences
 
@@ -410,3 +414,128 @@ inline) are unchanged. What changes: §3's long-poll becomes Ably push with shor
 fallback, and §5's "container as accelerator" becomes "Ably as accelerator" — the container is
 no longer needed even as the fast path. Open question #3 (does the container stay deployed) is
 thereby answered: **no — local dev convenience only.**
+
+---
+
+## Amendment (2026-09-25) — no Neon, no RoomRepo: peer-to-peer over Ably instead
+
+This amendment supersedes the 2026-09-21 amendment's transport-plus-state design (Ably as
+a notify-only hop over a Neon-backed `RoomRepo`) with something simpler that was actually
+built and shipped: **there is no server in the loop at all.** Two browsers exchange moves
+directly over an Ably Realtime channel; each keeps its own copy of game state in
+`localStorage`; nothing about a room is ever written to Neon. §1 (`RoomRepo`) and §2
+(optimistic `version`) were never implemented and are now dropped, not deferred — there is
+no room record for them to guard.
+
+### Why the reversal
+
+The previous amendment kept "the push channel carries a notification, never authority" as
+load-bearing — Ably's payload was never trusted, `GET /api/rooms/:id` was always the source
+of truth. That framing assumed a server was still doing move validation and persistence
+somewhere. Revisiting the premise: **every multiplayer game in the catalogue is 1v1
+human-vs-human, played over a shared invite link, with no ranking or history dependent on
+the outcome living anywhere durable.** Nothing in the product actually needs a third party
+to adjudicate the game — the two players already trust each other enough to be in the same
+room, and a game a cheating peer can win by forging illegal moves is a much smaller
+problem than the cost (Neon schema, `RoomRepo`, optimistic-concurrency handling, bot
+inlining inside a request) of standing up server authority for it. The "rejected outright"
+verdict on client-authoritative play in **Alternatives considered** above was reasoning
+about a system that needed anti-cheat; this one doesn't clear that bar.
+
+### The design that shipped
+
+- **State of record is `localStorage`, one copy per browser.** No Neon writes for rooms or
+  moves. A room "exists" only as long as two browsers hold the invite link; there is
+  nothing to sweep, expire, or migrate.
+- **Move validation moved to the client — symmetric, not asymmetric.** Each peer runs the
+  same pure `GameModule` (`@mpg/engine`) the server would have. On receiving a move,
+  `slot === module.currentPlayer(state)` is checked and `module.applyMove` is called;
+  `IllegalMoveError` (wrong turn, out of bounds, game over) causes the message to be
+  silently ignored, leaving local state untouched. This is the exact trust model local
+  hot-seat and bot play already used — it was never true that only the server enforced
+  the rules; the server enforcement was additive, and turned out to be droppable.
+- **The Ably token now grants `["subscribe", "publish"]`, not `subscribe`-only.** This is
+  the one deliberate divergence from chat's pattern (ADR 0005: server is the only
+  publisher) — chat still holds that invariant; online play does not, because both peers
+  need to write moves directly with nothing server-side to relay through.
+- **Room setup mirrors chat's private-room channel derivation exactly**
+  (`chat/privateChannel.ts`'s `channelNameFor`, generalized to take a namespace prefix so
+  `chat:` and `game:` channels can't collide): a room id + secret are generated
+  client-side and travel in the invite link; the Ably channel is an HMAC of
+  `(roomId, secret)`. `POST /api/game/token` (`apps/server/src/game/gameTokenRoutes.ts`)
+  is the _entire_ server surface this feature has — one stateless endpoint that mints a
+  token for that derived channel. No room registry, no DB row, nothing to be "down" for a
+  given room beyond Ably itself.
+- **Reconnect/resync is peer-driven, not server-driven.** Each move carries a `seq`
+  (the mover's local move-log length). A receiver who's behind requests the peer's full
+  move log and replays it through the engine rather than trusting a state blob — the
+  same "never trust the wire, only the engine's own replay" discipline the ping-then-fetch
+  design applied to server state, just applied peer-to-peer instead.
+- **Bots stay local-only, out of scope for this feature.** Bot seats already play entirely
+  client-side (`packages/engine`'s minimax runs in the browser); this feature only ever
+  replaces the human↔human transport, so §4 (bots resolve inline server-side) is now moot
+  rather than superseded — there's no request for a bot move to resolve inline _in_.
+- **Rematch and the all-bot "watch" mode were dropped, not ported.** Both depended on
+  server-held room state to re-link sessions across a new room or broadcast to
+  non-participants; neither survives "no server, no room registry" in a form worth
+  building yet. Flagged here as a known gap, not an oversight.
+
+### What this drops from the 2026-09-21 amendment
+
+- `RoomRepo`, `RoomRecord`, the `version` optimistic-concurrency guard, and `touchSeat` —
+  never implemented. There is no shared record for two writers to race on, because there
+  are only ever two writers and they're the two players, each mutating their own copy.
+- The "ping-then-fetch" contract (Ably carries a hint, `GET /api/rooms/:id` carries truth)
+  — there is no `GET /api/rooms/:id` anymore. Ably carries the move itself, validated
+  locally by both sides.
+- Idempotency keys on the move endpoint — there is no move endpoint; moves never leave the
+  browser except over Ably.
+
+### Consequences (revised)
+
+**Positive**
+
+- Zero new database schema, zero optimistic-concurrency code to get right, zero
+  server-side bot-inlining logic. The entire server surface for online play is one
+  stateless token-minting route.
+- Removes the double-write-ordering concern the previous amendment flagged ("Neon commit,
+  then Ably publish") entirely — there is only one write target (the browser), so there is
+  nothing to order.
+- Consistent with the offline/degradation pillar at the extreme: a game's live state
+  depends on nothing but the two browsers involved. Ably going down affects only _new_
+  moves reaching the peer promptly, never the local player's ability to see/interact with
+  their own board.
+
+**Negative / watch-outs**
+
+- **No server-enforced anti-cheat.** A modified client can publish an illegal move; the
+  honest peer's engine-validation rejects it, but a peer who patches out that check could
+  desync the two browsers' views of the game. Accepted because there is no ranking,
+  wagering, or durable record riding on the outcome — see "Why the reversal" above. If
+  that stops being true (leaderboard-eligible online play, for instance), this trade needs
+  revisiting.
+- **No durable history.** A finished online game leaves no server-side trace — no
+  leaderboard entry, no result row, unlike local/bot play. This was true under the
+  ping-then-fetch design too (Neon held live room state, not settled results) but is worth
+  naming as still-true.
+- **Rematch and watch mode are gone**, not degraded — there is currently no path to either
+  for online games. A future pass would need to design them against "no server room
+  state" from scratch rather than port the old handlers.
+- **Two browsers can each believe a different game is in progress** if a resync races with
+  a live move (e.g. a `sync_state` reply crosses in flight with a fresh `move`). The
+  `seq`-based gap detection makes this self-correcting on the next message exchange, but
+  it is a real edge case, not a proven-absent one.
+
+**Scope**
+
+Unchanged: this is still the turn-based family only; chat/reactions/voice remain
+container/provider-backed per ADR 0005/0006 and are untouched.
+
+### Status
+
+This amendment reflects the implementation as shipped (2026-09-25):
+`apps/server/src/game/gameTokenRoutes.ts` (server), `apps/web/src/hooks/useOnlineGame.ts`
+(client). Moving the ADR's top-line **Status** to **Accepted** on that basis — this is not
+a proposal anymore, it's running. §1/§2's `RoomRepo` work is not "not yet done," it is
+**no longer planned**; a future ADR would be needed to reintroduce server-authoritative
+state if a feature (ranked online play, a durable rematch/watch story) needs it.

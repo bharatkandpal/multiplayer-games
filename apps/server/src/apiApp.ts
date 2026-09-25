@@ -1,15 +1,12 @@
 /**
  * The stateless HTTP surface, as a reusable Express app.
  *
- * MPG-023 splits the backend in two: a long-running container that owns rooms +
- * Socket.IO (which need a persistent process), and stateless HTTP endpoints that
- * can run as serverless functions. Everything here is the latter — sessions,
- * leaderboard, results, share links, and funnel events — mounted the exact same
- * way in both deployments so the two can't drift:
+ * MPG-023 (since revised — see game/gameTokenRoutes.ts) split the backend so
+ * stateless HTTP endpoints could run as serverless functions. That surface is
+ * now the whole backend: sessions, leaderboard, results, share links, chat,
+ * Ably token minting, and funnel events, mounted identically in both places:
  *
- *   • the container (`index.ts`) calls `createApiApp` with an `extend` hook that
- *     bolts the room routes on before the error handler, then wraps the app in an
- *     HTTP server it also attaches Socket.IO to;
+ *   • `index.ts` binds this app to a port for local dev;
  *   • the Vercel functions call `createServerlessApiApp`, which assembles the
  *     store / sink / limiter from the environment and returns the app to export.
  *
@@ -26,6 +23,7 @@ import { createEventRouter } from "./analytics/eventRoutes.js";
 import { type EventSink } from "./analytics/sink.js";
 import { createCardRouter } from "./cards/cardRoutes.js";
 import { createChatRouter } from "./chat/chatRoutes.js";
+import { createGameRouter } from "./game/gameTokenRoutes.js";
 import type { ChatHistoryQueueOptions } from "./chat/historyQueue.js";
 // Re-exported so a bundled deployment can inject the card fonts it embedded at
 // build time without reaching past this module's public surface — see
@@ -60,12 +58,6 @@ export interface CreateApiAppOptions {
    * silently dropped.
    */
   chatHistory?: ChatHistoryQueueOptions;
-  /**
-   * Hook to mount additional routes AFTER the stateless surface and BEFORE the
-   * error handler. The container uses it for the room routes; the functions
-   * pass nothing.
-   */
-  extend?: (app: Express) => void;
 }
 
 const startedAt = Date.now();
@@ -80,7 +72,6 @@ export function createApiApp({
   limit = noopLimit,
   corsOrigin = "*",
   chatHistory,
-  extend,
 }: CreateApiAppOptions): Express {
   const app = express();
 
@@ -100,6 +91,9 @@ export function createApiApp({
   // Server-authoritative Ably chat (CHAT-002/003) — degrades to absence (503)
   // when ABLY_API_KEY is unset, per the offline pillar (CLAUDE.md).
   app.use("/api", createChatRouter(store, limit, {}, chatHistory));
+  // Peer-to-peer online play (Ably token mint only — no room registry, no
+  // Neon writes for moves; see game/gameTokenRoutes.ts header).
+  app.use("/api", createGameRouter(limit));
   // Public, session-free card image for unfurls (MPG-085-b) — the `og:image`
   // target ADR 0009's shim points at.
   app.use("/api", createCardRouter(store));
@@ -112,8 +106,6 @@ export function createApiApp({
   app.get("/healthz", (_req: Request, res: Response) => {
     res.json({ status: "ok" });
   });
-
-  extend?.(app);
 
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     console.error(err);

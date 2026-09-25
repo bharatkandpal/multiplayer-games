@@ -7,7 +7,6 @@ import {
   SESSION_COOKIE,
   SESSION_HEADER,
   createSessionMiddleware,
-  createSocketSessionMiddleware,
   extractSessionToken,
   parseCookies,
 } from "../sessionMiddleware.js";
@@ -114,56 +113,5 @@ describe("createSessionMiddleware", () => {
     await middleware(req, res, next);
 
     expect(next).toHaveBeenCalledWith(expect.any(Error));
-  });
-});
-
-describe("createSocketSessionMiddleware", () => {
-  function mockSocket(overrides: {
-    auth?: Record<string, unknown>;
-    headers?: Record<string, string | string[] | undefined>;
-  }) {
-    return {
-      handshake: {
-        auth: overrides.auth ?? {},
-        headers: overrides.headers ?? {},
-      },
-      data: {} as Record<string, unknown>,
-    } as unknown as import("socket.io").Socket;
-  }
-
-  it("uses the token from handshake auth when present", async () => {
-    const store = createMemoryStore();
-    const middleware = createSocketSessionMiddleware(store);
-    const socket = mockSocket({ auth: { sessionToken: "auth-token" } });
-    const next = vi.fn();
-
-    await middleware(socket, next);
-
-    expect(socket.data["sessionToken"]).toBe("auth-token");
-    expect(next).toHaveBeenCalledWith();
-  });
-
-  it("falls back to headers, then mints a token", async () => {
-    const store = createMemoryStore();
-    const middleware = createSocketSessionMiddleware(store);
-    const socket = mockSocket({ headers: { [SESSION_HEADER]: "hdr-token" } });
-    const next = vi.fn();
-
-    await middleware(socket, next);
-
-    expect(socket.data["sessionToken"]).toBe("hdr-token");
-  });
-
-  it("mints a token when nothing is present", async () => {
-    const store = createMemoryStore();
-    const middleware = createSocketSessionMiddleware(store);
-    const socket = mockSocket({});
-    const next = vi.fn();
-
-    await middleware(socket, next);
-
-    expect(typeof socket.data["sessionToken"]).toBe("string");
-    expect((socket.data["sessionToken"] as string).length).toBeGreaterThan(0);
-    expect(next).toHaveBeenCalledWith();
   });
 });

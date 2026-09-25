@@ -1,93 +1,72 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { GameId } from "@mpg/engine";
-import { Button, Spinner, StatusBadge } from "../components/ui";
-import type { PublicRoom, RoomErrorPayload } from "../api/roomTypes";
+import { Button, StatusBadge } from "../components/ui";
 import { GAME_CATALOG } from "./HomeScreen";
 import styles from "./JoinScreen.module.css";
 
 export interface JoinScreenProps {
   gameId: GameId;
   roomId: string;
-  /** Emits `room:join` for `roomId`; resolves with the room on success. */
-  joinRoom: (roomId: string) => Promise<PublicRoom | undefined>;
-  /** Set once a `room:join` (or the resulting `room:error`) fails. */
-  error: RoomErrorPayload | undefined;
-  onJoined: (room: PublicRoom) => void;
+  /** The invite link's secret, parsed from the URL fragment — `undefined` for
+   * a malformed/incomplete link (never a crash, just an immediate friendly
+   * failure, same as any other join error). */
+  secret: string | undefined;
+  /** Starts joining `(roomId, secret)` as slot 2 (`useOnlineGame().joinRoom`). */
+  joinRoom: (roomId: string, secret: string) => void;
+  onJoined: () => void;
   onBackHome: () => void;
 }
 
-const FRIENDLY_ERROR: Record<string, string> = {
-  NOT_FOUND: "This invite link has expired or the room no longer exists.",
-  EXPIRED: "This invite link has expired.",
-  ROOM_FULL: "This room is already full.",
-  SEAT_TAKEN: "That seat has already been taken.",
-  SEAT_NOT_FOUND: "That seat doesn't exist in this room.",
-};
-
-function friendlyMessage(error: RoomErrorPayload): string {
-  return FRIENDLY_ERROR[error.code] ?? error.message ?? "Couldn't join this room.";
-}
-
 /**
- * Shown when a player opens an invite link (`/:gameId/room/:roomId`, MPG-012):
- * joins the room over the socket, then hands off to the game once seated.
- * On failure (room full/expired/not found), shows a friendly message with a
- * way back home rather than a raw error code (UX_PRINCIPLES).
+ * Shown, briefly, when a player opens an invite link (`/:gameId/room/:roomId#s=...`,
+ * MPG-012, reworked onto peer-to-peer Ably play): starts joining the room's
+ * channel, then hands straight off to the game screen, which owns every
+ * state from there (connecting / waiting for the peer / unavailable /
+ * playing) — there's no separate server ack to wait on here. The one thing
+ * this screen itself can fail on is the link being malformed (no secret in
+ * the fragment), shown as a friendly message with a way back home rather
+ * than a raw error (UX_PRINCIPLES).
  */
 export function JoinScreen({
   gameId,
   roomId,
+  secret,
   joinRoom,
-  error,
   onJoined,
   onBackHome,
 }: JoinScreenProps): React.JSX.Element {
-  const [status, setStatus] = useState<"joining" | "joined" | "failed">("joining");
   const attempted = useRef(false);
   const title = GAME_CATALOG[gameId]?.title ?? gameId;
 
   useEffect(() => {
-    if (attempted.current) return;
+    if (attempted.current || !secret) return;
     attempted.current = true;
-    void joinRoom(roomId).then((room) => {
-      if (room) {
-        setStatus("joined");
-        onJoined(room);
-      } else {
-        setStatus("failed");
-      }
-    });
-    // Only run once per mount — `roomId` identifies this screen instance.
-    // (`joinRoom` is intentionally omitted from deps: it's a stable callback
-    // from `useRoom`, and re-running this effect on every render would
+    joinRoom(roomId, secret);
+    onJoined();
+    // Only run once per mount — `roomId`/`secret` identify this screen
+    // instance. (`joinRoom`/`onJoined` are intentionally omitted from deps:
+    // stable callbacks, and re-running this effect on every render would
     // re-join repeatedly.)
-  }, [roomId]);
+  }, [roomId, secret]);
 
-  useEffect(() => {
-    if (error) setStatus("failed");
-  }, [error]);
-
-  return (
-    <div className={styles.main}>
-      <h1 className={styles.heading}>Joining {title}</h1>
-
-      {status === "joining" ? (
-        <div className={styles.joiningBlock}>
-          <Spinner />
-          <StatusBadge status="info">Joining room…</StatusBadge>
-        </div>
-      ) : null}
-
-      {status === "failed" ? (
+  if (!secret) {
+    return (
+      <div className={styles.main}>
+        <h1 className={styles.heading}>Joining {title}</h1>
         <div className={styles.errorBlock}>
           <StatusBadge status="danger">
-            {error ? friendlyMessage(error) : "Couldn't join this room."}
+            This invite link is missing its secret — ask for a fresh one.
           </StatusBadge>
           <Button variant="primary" onClick={onBackHome}>
             ← Back to home
           </Button>
         </div>
-      ) : null}
-    </div>
-  );
+      </div>
+    );
+  }
+
+  // The game screen takes over immediately (it owns "connecting" and every
+  // state after) — this screen has nothing left to show once `onJoined` fires
+  // in the same tick above.
+  return <div className={styles.main} />;
 }

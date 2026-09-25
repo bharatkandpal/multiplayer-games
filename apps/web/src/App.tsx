@@ -16,7 +16,6 @@ import {
   ChatScreen,
   ConnectFourOnlineRoute,
   ConnectFourRoute,
-  ConnectFourWatchRoute,
   HomeScreen,
   InviteScreen,
   JoinScreen,
@@ -27,26 +26,23 @@ import {
   SetupScreen,
   TicTacToeMoveOnlineRoute,
   TicTacToeMoveRoute,
-  TicTacToeMoveWatchRoute,
   TicTacToeOnlineRoute,
   TicTacToeRoute,
-  TicTacToeWatchRoute,
   type GameRouteProps,
   type OnlineGameRouteProps,
-  type WatchGameRouteProps,
 } from "./screens";
 import { GAME_CATALOG, REALTIME_CATALOG } from "./screens/HomeScreen";
 import { SharedResultScreen } from "./screens/SharedResultScreen";
 import { buildGameItems, nextGame, prevGame, type GameItem } from "./screens/catalog";
 import { pickGameOfTheDay } from "./screens/gameOfTheDay";
 import { DEFAULT_CHAT_ROOM_ID, isPrivateRoomSearch, roomPath } from "./screens/chatRoom";
-import { isAllBotRoom, publicRoomToSeats, toSeatConfigInput } from "./api/roomSeats";
+import { parseInviteSecret } from "./api/gameInvite";
+import { loadGameRoom } from "./api/gameRoomStorage";
 import { ensureUsername, getStoredUsername, reconcileUsername } from "./api/username";
 import { initSession } from "./api/session";
 import { installFlushOnHide } from "./api/events";
 import { markColdArrival } from "./analytics/firstInput";
-import { getStoredCreatorToken } from "./api/watchSession";
-import { useRoom } from "./hooks/useRoom";
+import { useOnlineGame } from "./hooks/useOnlineGame";
 import { useUsernameGate } from "./hooks/useUsernameGate";
 import { useClaimGate } from "./hooks/useClaimGate";
 import { presetSeats, type SeatsConfig } from "./game";
@@ -79,18 +75,18 @@ type Route =
   // shows it as a target and turns the result into "you beat the challenge".
   | { screen: "realtime"; gameId: RealtimeGameId; challenge?: { score: number } }
   | { screen: "gallery" }
-  // MPG-012: the room creator waits here for the invite link to be opened.
-  | { screen: "invite"; gameId: GameId; roomId: string; inviteUrl: string }
-  // MPG-012: an invite link (`/:gameId/room/:roomId`) was opened directly.
-  | { screen: "join"; gameId: GameId; roomId: string }
-  // MPG-068: a room reached `active` — play over the socket instead of the
-  // local engine. `seats` is a snapshot (for the seat row / rematch presets),
-  // not authoritative — `OnlineGameRoute` gets live state via the socket.
+  // MPG-012: the room creator waits here for the invite link to be opened
+  // (reworked onto peer-to-peer Ably play — `useOnlineGame`, no server room).
+  | { screen: "invite"; gameId: GameId; roomId: string }
+  // MPG-012: an invite link (`/:gameId/room/:roomId#s=...`) was opened
+  // directly. `secret` is the fragment's payload — `undefined` for a
+  // malformed link (`JoinScreen` shows a friendly failure, never a crash).
+  | { screen: "join"; gameId: GameId; roomId: string; secret: string | undefined }
+  // MPG-068: the peer's presence has been seen (or this browser is resuming
+  // its own stored room after a reload) — play over `useOnlineGame` instead
+  // of the local engine. `seats` is a fixed 2-human snapshot (online play is
+  // human-vs-human only, CLAUDE.md) for the seat row.
   | { screen: "online-play"; gameId: GameId; roomId: string; seats: SeatsConfig }
-  // MPG-025: an all-bot room the creator is watching, server-driven — reached
-  // either straight from Setup (see `handlePlayOnline`) or by reopening this
-  // tab's own watch link after a reload (`getStoredCreatorToken`, below).
-  | { screen: "watch"; gameId: GameId; roomId: string }
   // MPG-055: the full leaderboard for a game, reached from the post-game rank
   // preview ("View full leaderboard"). "Home" always exits back to the home
   // screen, not back to the (now-finished) game.
@@ -111,7 +107,7 @@ type Route =
  * surface, and the pinned action bar, with no site chrome below them
  * (MPG-136).
  */
-const IN_GAME_SCREENS = new Set<Route["screen"]>(["play", "realtime", "online-play", "watch"]);
+const IN_GAME_SCREENS = new Set<Route["screen"]>(["play", "realtime", "online-play"]);
 
 const ROOM_PATH_RE = /^\/([^/]+)\/room\/([^/]+)\/?$/;
 const SHARE_PATH_RE = /^\/s\/([^/]+)\/?$/;
@@ -230,15 +226,29 @@ function initialRoute(): Route {
     }
     return { screen: "home" };
   }
-  // MPG-025: a reload of this tab's own all-bot watch room — its creator
-  // credential (persisted the moment the room was created, see `useRoom`'s
-  // `createRoom`) is how we tell "this is the room I'm watching" apart from
-  // "this is an invite link someone opened" (the ordinary `join` case below),
-  // since a watch room has no seat/sessionToken to recognize it by otherwise.
-  if (getStoredCreatorToken(parsed.roomId)) {
-    return { screen: "watch", gameId: parsed.gameId, roomId: parsed.roomId };
+  // A reload of a room THIS browser already has local progress in (creator or
+  // joiner alike — `../api/gameRoomStorage.ts` persists on every move, not
+  // just for the creator) resumes straight into the game rather than
+  // re-running the join flow; its secret comes from local storage, so the
+  // URL doesn't need to carry it for this browser to recover.
+  const stored = loadGameRoom(parsed.roomId);
+  if (stored && stored.gameId === parsed.gameId) {
+    return {
+      screen: "online-play",
+      gameId: parsed.gameId,
+      roomId: parsed.roomId,
+      seats: ONLINE_SEATS,
+    };
   }
-  return { screen: "join", gameId: parsed.gameId, roomId: parsed.roomId };
+  // Otherwise this is an invite link someone opened — the secret rides the
+  // URL fragment (`../api/gameInvite.ts`); missing/malformed degrades to a
+  // friendly failure in `JoinScreen`, never a crash.
+  return {
+    screen: "join",
+    gameId: parsed.gameId,
+    roomId: parsed.roomId,
+    secret: parseInviteSecret(window.location.hash),
+  };
 }
 
 /**
@@ -252,11 +262,8 @@ function isDevMode(): boolean {
   return new URLSearchParams(window.location.search).has("dev");
 }
 
-function buildInviteUrl(gameId: GameId, roomId: string): string {
-  const path = `/${gameId}/room/${roomId}`;
-  if (typeof window === "undefined") return path;
-  return `${window.location.origin}${path}`;
-}
+/** Online play is human-vs-human only (CLAUDE.md — bot seats never leave this device). */
+const ONLINE_SEATS: SeatsConfig = [{ kind: "human" }, { kind: "human" }];
 
 const GAME_ROUTES: Partial<Record<GameId, (props: GameRouteProps) => React.JSX.Element>> = {
   tictactoe: TicTacToeRoute,
@@ -288,9 +295,9 @@ function GameRoute({
   );
 }
 
-// MPG-068: the online (room-backed) counterpart to `GAME_ROUTES`/`GameRoute` —
-// drives gameplay over the socket instead of a local engine once a room
-// reaches `active`.
+// MPG-068 (reworked onto peer-to-peer Ably play): the online counterpart to
+// `GAME_ROUTES`/`GameRoute` — drives gameplay over `useOnlineGame` instead of
+// a local engine.
 const ONLINE_GAME_ROUTES: Partial<
   Record<GameId, (props: OnlineGameRouteProps) => React.JSX.Element>
 > = {
@@ -304,24 +311,6 @@ function OnlineGameRoute({
   ...rest
 }: { gameId: GameId } & OnlineGameRouteProps): React.JSX.Element {
   const Route = ONLINE_GAME_ROUTES[gameId] ?? ConnectFourOnlineRoute;
-  return <Route {...rest} />;
-}
-
-// MPG-025: the read-only, all-bot counterpart to `ONLINE_GAME_ROUTES` — drives
-// a "watch" room over the socket via `WatchGamePlayScreen` instead.
-const WATCH_GAME_ROUTES: Partial<
-  Record<GameId, (props: WatchGameRouteProps) => React.JSX.Element>
-> = {
-  tictactoe: TicTacToeWatchRoute,
-  "tictactoe-move": TicTacToeMoveWatchRoute,
-  connect4: ConnectFourWatchRoute,
-};
-
-function WatchGameRoute({
-  gameId,
-  ...rest
-}: { gameId: GameId } & WatchGameRouteProps): React.JSX.Element {
-  const Route = WATCH_GAME_ROUTES[gameId] ?? ConnectFourWatchRoute;
   return <Route {...rest} />;
 }
 
@@ -348,20 +337,10 @@ export default function App(): React.JSX.Element {
   // and folded into the route's React `key` below.
   const [playNonce, setPlayNonce] = useState(0);
 
-  // MPG-012: room lifecycle (create/join/leave, live seat state) for the
-  // invite/join flow below. A single shared instance — only one online room
-  // is ever "current" for this tab at a time.
-  const {
-    room,
-    yourSlot,
-    sessionToken,
-    creatorToken,
-    error: roomError,
-    clearError: clearRoomError,
-    createRoom,
-    joinRoom,
-    leaveRoom,
-  } = useRoom();
+  // MPG-012/MPG-068: the whole online-play lifecycle (create/join/leave,
+  // live game state), reworked onto peer-to-peer Ably play. A single shared
+  // instance — only one online room is ever "current" for this tab at a time.
+  const online = useOnlineGame();
 
   const goHome = useCallback((): void => {
     setRoute({ screen: "home" });
@@ -437,32 +416,42 @@ export default function App(): React.JSX.Element {
   // backend that's down simply never offers it (offline pillar).
   const claimGate = useClaimGate();
 
-  // MPG-025: `seats` is the Setup screen's real per-seat editor state (human/
-  // bot + difficulty, any combination) — no longer hardcoded to "every seat
-  // an open human". An all-bot config has no seat for the creator to hold,
-  // so the room starts `active` immediately with nobody to invite — that's
-  // the "watch" case, routed straight to the read-only watch screen instead
-  // of the invite-link flow. Any config with at least one human seat is
-  // unchanged from before (MPG-068's normal online-play flow).
+  // MPG-012 (reworked onto peer-to-peer Ably play): creates a room and opens
+  // the invite-link flow. Online play is always exactly 2 human seats
+  // (`SetupScreen` only offers/calls this for an all-human config — bots stay
+  // local-only, CLAUDE.md), so `seats` isn't threaded through room creation
+  // at all here; it's only read back out as `ONLINE_SEATS` once play starts.
   const handlePlayOnline = useCallback(
-    (gameId: GameId, seats: SeatsConfig) => {
+    (gameId: GameId) => {
       usernameGate.requireUsername(() => {
-        void createRoom(gameId, toSeatConfigInput(seats)).then((created) => {
-          if (!created) return;
-          if (typeof window !== "undefined") {
-            window.history.pushState({}, "", `/${gameId}/room/${created.roomId}`);
-          }
-          if (isAllBotRoom(created)) {
-            setRoute({ screen: "watch", gameId, roomId: created.roomId });
-            return;
-          }
-          const inviteUrl = buildInviteUrl(gameId, created.roomId);
-          setRoute({ screen: "invite", gameId, roomId: created.roomId, inviteUrl });
-        });
+        const created = online.createRoom(gameId);
+        if (typeof window !== "undefined") {
+          window.history.pushState({}, "", `/${gameId}/room/${created.roomId}`);
+        }
+        setRoute({ screen: "invite", gameId, roomId: created.roomId });
       });
     },
-    [createRoom, usernameGate],
+    [online, usernameGate],
   );
+
+  // Landing directly on "online-play" — a hard reload of a room this browser
+  // already has local progress in (`initialRoute`/the popstate handler both
+  // route there straight from `../api/gameRoomStorage.ts`, skipping Invite/
+  // Join) — still needs `useOnlineGame` actually connected to that room; its
+  // secret comes back out of the same local record rather than the URL.
+  useEffect(() => {
+    if (route.screen !== "online-play") return;
+    if (online.roomId === route.roomId) return;
+    const stored = loadGameRoom(route.roomId);
+    if (stored && stored.gameId === route.gameId) {
+      online.joinRoom(route.gameId, route.roomId, stored.secret);
+    } else {
+      // Nothing to resume from (storage was cleared, a different browser,
+      // …) — there's no session to recover, so don't strand the player on a
+      // blank play screen.
+      goHome();
+    }
+  }, [route, online, goHome]);
 
   // Session bootstrap (MPG-054, wired in MPG-080). Mints the opaque session
   // token once per browser so username sync, leaderboard writes and the socket
@@ -506,7 +495,22 @@ export default function App(): React.JSX.Element {
       }
       const parsed = parseRoomPath(window.location.pathname);
       if (parsed) {
-        setRoute({ screen: "join", gameId: parsed.gameId, roomId: parsed.roomId });
+        const stored = loadGameRoom(parsed.roomId);
+        if (stored && stored.gameId === parsed.gameId) {
+          setRoute({
+            screen: "online-play",
+            gameId: parsed.gameId,
+            roomId: parsed.roomId,
+            seats: ONLINE_SEATS,
+          });
+          return;
+        }
+        setRoute({
+          screen: "join",
+          gameId: parsed.gameId,
+          roomId: parsed.roomId,
+          secret: parseInviteSecret(window.location.hash),
+        });
         return;
       }
       // Keep bare `/:gameId` deep links working under back/forward too, not just
@@ -520,7 +524,7 @@ export default function App(): React.JSX.Element {
   }, []);
 
   // Opening an invite link directly also needs a username first — gate it
-  // the same way, so `JoinScreen` never fires `room:join` before one exists.
+  // the same way, so `JoinScreen` never starts joining before one exists.
   const joinRoomId = route.screen === "join" ? route.roomId : undefined;
   useEffect(() => {
     if (joinRoomId === undefined) return;
@@ -578,25 +582,26 @@ export default function App(): React.JSX.Element {
             gameId={route.gameId}
             onBack={goHome}
             onStart={(seats) => setRoute({ screen: "play", gameId: route.gameId, seats })}
-            onPlayOnline={(seats) => handlePlayOnline(route.gameId, seats)}
+            onPlayOnline={() => handlePlayOnline(route.gameId)}
           />
         ) : null}
 
         {route.screen === "invite" ? (
           <InviteScreen
             gameId={route.gameId}
-            room={room}
-            inviteUrl={route.inviteUrl}
+            inviteUrl={online.inviteUrl ?? ""}
+            peerConnected={online.peerConnected}
+            unavailable={online.phase === "unavailable"}
             onCancel={() => {
-              void leaveRoom();
+              online.leaveRoom();
               goHome();
             }}
-            onReady={(readyRoom) => {
+            onReady={() => {
               setRoute({
                 screen: "online-play",
                 gameId: route.gameId,
-                roomId: readyRoom.roomId,
-                seats: publicRoomToSeats(readyRoom),
+                roomId: route.roomId,
+                seats: ONLINE_SEATS,
               });
             }}
           />
@@ -607,18 +612,15 @@ export default function App(): React.JSX.Element {
             <JoinScreen
               gameId={route.gameId}
               roomId={route.roomId}
-              joinRoom={joinRoom}
-              error={roomError}
-              onBackHome={() => {
-                clearRoomError();
-                goHome();
-              }}
-              onJoined={(joinedRoom) => {
+              secret={route.secret}
+              joinRoom={(roomId, secret) => online.joinRoom(route.gameId, roomId, secret)}
+              onBackHome={goHome}
+              onJoined={() => {
                 setRoute({
                   screen: "online-play",
                   gameId: route.gameId,
-                  roomId: joinedRoom.roomId,
-                  seats: publicRoomToSeats(joinedRoom),
+                  roomId: route.roomId,
+                  seats: ONLINE_SEATS,
                 });
               }}
             />
@@ -636,34 +638,12 @@ export default function App(): React.JSX.Element {
             key={route.roomId}
             gameId={route.gameId}
             seats={route.seats}
-            roomId={route.roomId}
-            yourSlot={yourSlot}
-            sessionToken={sessionToken}
-            initialRoom={room?.roomId === route.roomId ? room : undefined}
+            online={online}
             onExit={() => {
-              void leaveRoom();
+              online.leaveRoom();
               goHome();
             }}
-            onRematchStart={(newRoomId) => {
-              setRoute({
-                screen: "online-play",
-                gameId: route.gameId,
-                roomId: newRoomId,
-                seats: route.seats,
-              });
-            }}
             onViewLeaderboard={() => setRoute({ screen: "leaderboard", gameId: route.gameId })}
-          />
-        ) : null}
-
-        {route.screen === "watch" ? (
-          <WatchGameRoute
-            key={route.roomId}
-            gameId={route.gameId}
-            roomId={route.roomId}
-            creatorToken={creatorToken ?? getStoredCreatorToken(route.roomId)}
-            initialRoom={room?.roomId === route.roomId ? room : undefined}
-            onExit={goHome}
           />
         ) : null}
 
@@ -674,7 +654,7 @@ export default function App(): React.JSX.Element {
             seats={route.seats}
             navigation={navigationFor(route.gameId)}
             onExit={() => {
-              void leaveRoom();
+              online.leaveRoom();
               goHome();
             }}
             onPlayAgain={(seats) => {
