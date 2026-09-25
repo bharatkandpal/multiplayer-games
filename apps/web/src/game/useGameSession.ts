@@ -33,9 +33,17 @@ export interface UseGameSessionResult<S, M> {
   /**
    * FUTURE NET HOOK: call when the server confirms authoritative state (including
    * echoing back the local player's own move). See `gameSession.ts` for the full
-   * contract this is expected to satisfy once the socket layer exists.
+   * contract this is expected to satisfy once the socket layer exists. `moveLog`
+   * wholesale-replaces `session.moveLog` when given — see `gameSession.ts`.
    */
-  reconcile: (state: S, lastMove?: AppliedMove<M>) => void;
+  reconcile: (state: S, lastMove?: AppliedMove<M>, moveLog?: readonly AppliedMove<M>[]) => void;
+
+  /**
+   * Peer-to-peer online play only: applies a move that arrived from the other
+   * peer, asserting `player` from the wire message. See `gameSession.ts`'s
+   * `apply_remote_move` for the exact anti-cheat contract.
+   */
+  applyRemoteMove: (move: M, player: Player) => void;
 
   /**
    * FUTURE NET HOOK: call on a `move:rejected` event to roll back an optimistic move.
@@ -83,8 +91,18 @@ export function useGameSession<S, M>(
   );
 
   const reconcile = useCallback(
-    (state: S, lastMove?: AppliedMove<M>) =>
-      dispatch({ type: "reconcile", state, ...(lastMove !== undefined ? { lastMove } : {}) }),
+    (state: S, lastMove?: AppliedMove<M>, moveLog?: readonly AppliedMove<M>[]) =>
+      dispatch({
+        type: "reconcile",
+        state,
+        ...(lastMove !== undefined ? { lastMove } : {}),
+        ...(moveLog !== undefined ? { moveLog } : {}),
+      }),
+    [],
+  );
+
+  const applyRemoteMove = useCallback(
+    (move: M, player: Player) => dispatch({ type: "apply_remote_move", move, player }),
     [],
   );
 
@@ -108,7 +126,27 @@ export function useGameSession<S, M>(
   );
 
   return useMemo(
-    () => ({ session, start, applyLocalMove, setThinking, reconcile, revert, clearError, reset }),
-    [session, start, applyLocalMove, setThinking, reconcile, revert, clearError, reset],
+    () => ({
+      session,
+      start,
+      applyLocalMove,
+      applyRemoteMove,
+      setThinking,
+      reconcile,
+      revert,
+      clearError,
+      reset,
+    }),
+    [
+      session,
+      start,
+      applyLocalMove,
+      applyRemoteMove,
+      setThinking,
+      reconcile,
+      revert,
+      clearError,
+      reset,
+    ],
   );
 }

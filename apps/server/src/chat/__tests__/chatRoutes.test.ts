@@ -401,7 +401,7 @@ describe("chat routes (CHAT-002/003)", () => {
       // token to for the same (roomId, secret) — both derive it identically, or
       // a sender would publish where no subscriber is listening. With no
       // `CHAT_PRIVATE_ROOM_KEY` set, the HMAC key is the resolved Ably key.
-      const expected = channelNameFor("room-p", "royal", "keyName.abc:secret");
+      const expected = channelNameFor("chat", "room-p", "royal", "keyName.abc:secret");
       expect(expected).toMatch(/^chat:p-[0-9a-f]{32}$/);
       const [url] = fetchImpl.mock.calls[0] as [string];
       expect(url).toBe(`https://rest.ably.io/channels/${encodeURIComponent(expected)}/messages`);
@@ -497,7 +497,7 @@ describe("chat routes (CHAT-002/003)", () => {
         body: JSON.stringify({ text: "psst", displayName: "Ann", secret: "royal" }),
       });
 
-      const channel = channelNameFor("room-p", "royal", "keyName.abc:secret");
+      const channel = channelNameFor("chat", "room-p", "royal", "keyName.abc:secret");
       const stored = await vi.waitFor(async () => {
         const rows = await store.chat.page(channel, { limit: 10 });
         expect(rows).toHaveLength(1);
@@ -578,7 +578,7 @@ describe("chat routes (CHAT-002/003)", () => {
       // reads the transcript back has to wait for the queue to catch up.
       await vi.waitFor(async () => {
         const channel = secret
-          ? channelNameFor(room, secret, "keyName.abc:secret")
+          ? channelNameFor("chat", room, secret, "keyName.abc:secret")
           : `chat:${room}`;
         expect(await store.chat.page(channel, { limit: count + 1 })).toHaveLength(count);
       });
@@ -795,7 +795,7 @@ describe("chat routes (CHAT-002/003)", () => {
     });
 
     it("attaches subscriber counts, matching a private room by derived channel", async () => {
-      const privateChannel = channelNameFor("room-p", "royal", "keyName.abc:secret");
+      const privateChannel = channelNameFor("chat", "room-p", "royal", "keyName.abc:secret");
       const fetchImpl = vi.fn().mockResolvedValue(
         jsonResponse([
           { channelId: "chat:room-1", status: { occupancy: { metrics: { subscribers: 7 } } } },

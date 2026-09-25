@@ -7,12 +7,9 @@
  * store on every request/connection so `lastSeenAt` stays fresh for
  * retention sweeps.
  *
- * Both an Express middleware (HTTP) and a Socket.IO middleware (realtime)
- * are exported — they share the same extraction/upsert logic.
  */
 
 import type { NextFunction, Request, Response } from "express";
-import type { Socket } from "socket.io";
 
 import type { Store } from "../store/ports.js";
 
@@ -104,44 +101,6 @@ export function createSessionMiddleware(store: Store) {
       next();
     } catch (err) {
       next(err instanceof Error ? err : new Error("session middleware failed"));
-    }
-  };
-}
-
-/**
- * Socket.IO middleware: resolves (or mints) the session token from the
- * handshake `auth` payload, headers, or cookie, and attaches it to
- * `socket.data.sessionToken`.
- */
-export function createSocketSessionMiddleware(store: Store) {
-  return async function socketSessionMiddleware(
-    socket: Socket,
-    next: (err?: Error) => void,
-  ): Promise<void> {
-    try {
-      const auth = socket.handshake.auth as Record<string, unknown> | undefined;
-      const authToken = auth?.["sessionToken"] ?? auth?.["token"];
-
-      let token: string | undefined =
-        typeof authToken === "string" && authToken.length > 0 ? authToken : undefined;
-
-      if (!token) {
-        token = extractSessionToken(
-          socket.handshake.headers as Record<string, string | string[] | undefined>,
-        );
-      }
-
-      if (!token) {
-        token = crypto.randomUUID();
-      }
-
-      await store.sessions.upsert(token);
-      await store.sessions.touch(token);
-
-      socket.data.sessionToken = token;
-      next();
-    } catch (err) {
-      next(err instanceof Error ? err : new Error("socket session middleware failed"));
     }
   };
 }

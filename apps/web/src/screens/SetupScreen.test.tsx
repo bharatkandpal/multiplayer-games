@@ -157,7 +157,7 @@ describe("SetupScreen", () => {
       ] satisfies SeatsConfig);
     });
 
-    it("Customize's online action sends the current per-seat editor state, including a mixed human/bot config", async () => {
+    it("Customize's online action sends the current per-seat editor state, once every seat is human", async () => {
       const user = userEvent.setup();
       const onPlayOnline = vi.fn();
       render(
@@ -170,16 +170,24 @@ describe("SetupScreen", () => {
       );
 
       await user.click(screen.getByRole("button", { name: "Customize seats" }));
+      // Online play is human-vs-human only (bots stay local-only, CLAUDE.md) —
+      // the default Customize state has seat 2 as a bot, so the online action
+      // is hidden until it's switched to Human.
+      expect(
+        screen.queryByRole("button", { name: "Play online — this setup" }),
+      ).not.toBeInTheDocument();
+      const player2Group = screen.getByRole("radiogroup", { name: "Player 2 type" });
+      await user.click(within(player2Group).getByRole("radio", { name: "Human" }));
+
       await user.click(screen.getByRole("button", { name: "Play online — this setup" }));
 
-      // tictactoe's bot is capped at medium (see `botDifficultyFor`).
       expect(onPlayOnline).toHaveBeenCalledExactlyOnceWith([
         { kind: "human" },
-        expect.objectContaining({ kind: "bot", difficulty: "medium" }),
+        { kind: "human" },
       ] satisfies SeatsConfig);
     });
 
-    it("configuring every seat as a bot swaps the online action to a 'Watch online' label, with a plain-language hint", async () => {
+    it("configuring any seat as a bot hides the online action — online play is human-vs-human only", async () => {
       const user = userEvent.setup();
       const onPlayOnline = vi.fn();
       render(
@@ -198,15 +206,7 @@ describe("SetupScreen", () => {
       expect(
         screen.queryByRole("button", { name: /^Play online — this setup/ }),
       ).not.toBeInTheDocument();
-      const watchButton = screen.getByRole("button", { name: /^Watch online/ });
-      expect(screen.getByText(/nobody takes a turn here/i)).toBeInTheDocument();
-
-      await user.click(watchButton);
-
-      expect(onPlayOnline).toHaveBeenCalledExactlyOnceWith([
-        expect.objectContaining({ kind: "bot", difficulty: "medium" }),
-        expect.objectContaining({ kind: "bot", difficulty: "medium" }),
-      ] satisfies SeatsConfig);
+      expect(screen.getByText(/bot seats play locally only/i)).toBeInTheDocument();
     });
 
     it("no online action is shown when onPlayOnline is omitted", async () => {

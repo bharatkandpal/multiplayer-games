@@ -156,7 +156,7 @@ async function resolveRoom(
   if (room.visibility === "public") {
     // A public room has no code; any secret sent alongside is ignored rather
     // than treated as an error, so a stale client can't lock itself out.
-    return { ok: true, room, channelName: channelNameFor(room.id, null, hmacKey) };
+    return { ok: true, room, channelName: channelNameFor("chat", room.id, null, hmacKey) };
   }
 
   // Private. A room marked private with no stored code is a misconfiguration —
@@ -168,7 +168,7 @@ async function resolveRoom(
   if (supplied.secret === null || !secretMatches(supplied.secret, room.secret)) {
     return { ok: false, status: 403, error: "BAD_SECRET" };
   }
-  return { ok: true, room, channelName: channelNameFor(room.id, room.secret, hmacKey) };
+  return { ok: true, room, channelName: channelNameFor("chat", room.id, room.secret, hmacKey) };
 }
 
 interface TokenRequestBody {
@@ -465,6 +465,7 @@ export function createChatRouter(
       // A private room is matched by its derived channel, not by scanning the
       // listing — the hash never has to be recognised, only recomputed.
       const channel = channelNameFor(
+        "chat",
         room.id,
         room.visibility === "private" ? room.secret : null,
         hmacKey,

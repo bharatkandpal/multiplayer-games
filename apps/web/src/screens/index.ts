@@ -24,9 +24,6 @@ export type {
 export { OnlineGamePlayScreen } from "./OnlineGamePlayScreen";
 export type { OnlineGamePlayScreenProps } from "./OnlineGamePlayScreen";
 
-export { WatchGamePlayScreen } from "./WatchGamePlayScreen";
-export type { WatchGamePlayScreenProps } from "./WatchGamePlayScreen";
-
 export { InviteScreen } from "./InviteScreen";
 export type { InviteScreenProps } from "./InviteScreen";
 
@@ -65,11 +62,8 @@ export {
   TicTacToeOnlineRoute,
   TicTacToeMoveOnlineRoute,
   ConnectFourOnlineRoute,
-  TicTacToeWatchRoute,
-  TicTacToeMoveWatchRoute,
-  ConnectFourWatchRoute,
 } from "./games";
-export type { GameRouteProps, OnlineGameRouteProps, WatchGameRouteProps } from "./games";
+export type { GameRouteProps, OnlineGameRouteProps } from "./games";
 
 export { RealtimeGameRoute, REALTIME_GAMES } from "./realtimeGames";
 export type { RealtimeGameRouteProps, RealtimeGameWiring } from "./realtimeGames";

@@ -2,7 +2,7 @@
   "name": "@mpg/server",
   "version": "0.0.0",
   "private": true,
-  "description": "Authoritative Node backend: HTTP + Socket.IO, room/seat manager, server-side bots.",
+  "description": "Stateless HTTP backend: sessions, results, leaderboard, chat, and Ably token minting for peer-to-peer online play.",
   "type": "module",
   "main": "src/index.ts",
   "exports": {
@@ -30,15 +30,13 @@
     "drizzle-orm": "^0.44.0",
     "express": "^5.2.1",
     "nanoid": "^5.1.6",
-    "postgres": "^3.4.0",
-    "socket.io": "^4.8.3"
+    "postgres": "^3.4.0"
   },
   "devDependencies": {
     "@fontsource/nunito": "^5.3.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "drizzle-kit": "^0.30.0",
-    "socket.io-client": "^4.8.3",
     "tsx": "^4.20.6",
     "wawoff2": "^2.0.1"
   }
