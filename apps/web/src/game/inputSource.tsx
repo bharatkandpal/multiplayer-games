@@ -83,7 +83,7 @@ export interface RealtimeControls<I, A extends string = string> {
 const SWIPE_THRESHOLD_PX = 24;
 
 /** Which control modality a source implements — part of the leaderboard key later (ADR §7). */
-export type InputSourceId = "actions" | "pointer-axis" | "tap-target" | "vision-axis";
+export type InputSourceId = "actions" | "pointer-axis" | "tap-target" | "joystick" | "vision-axis";
 
 /** Liveness for the UI: acquiring / calibrating / tracking / lost / failed (ADR §1). */
 export type InputSourceStatus =

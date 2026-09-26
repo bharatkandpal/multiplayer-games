@@ -59,4 +59,7 @@ export { createPointerAxisInputSource } from "./pointerAxisInputSource";
 export type { TapTargetConfig } from "./tapTargetInputSource";
 export { createTapTargetInputSource } from "./tapTargetInputSource";
 
+export type { JoystickDir, VirtualJoystickConfig } from "./virtualJoystickInputSource";
+export { createVirtualJoystickInputSource } from "./virtualJoystickInputSource";
+
 export { clearPersonalBest, loadPersonalBest, recordPersonalBest } from "./personalBest";
