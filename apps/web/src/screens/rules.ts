@@ -171,7 +171,7 @@ export const REALTIME_RULES: Partial<Record<RealtimeGameId, GameRules>> = {
     goal: "Grow the snake as long as you can without crashing it.",
     steps: [
       "The snake moves on its own and never stops — you only choose where it turns.",
-      "Swipe, use the arrow keys, or tap the direction buttons to turn.",
+      "Press and drag anywhere to steer — a joystick appears under your thumb and the snake follows it. Arrow keys and WASD work too.",
       "Eat the food to grow one segment and score. New food appears somewhere else.",
       "Hitting a wall or any part of your own body ends the run.",
     ],

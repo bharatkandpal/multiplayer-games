@@ -1,0 +1,51 @@
+/* The floating virtual joystick for the `joystick` source. Anchor + thumb are
+   positioned by inline `left`/`top` (computed geometry over the surface); how they
+   LOOK lives here, per the project's CSS-Modules convention. Purely an indicator —
+   it must never eat the pointer events that drive it. */
+.joystick {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.base,
+.thumb {
+  position: absolute;
+  /* `left`/`top` are the CENTRE of the control, so pull each back by half. */
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* The ring the thumb travels within — a faint dish under the finger. */
+.base {
+  width: 28%;
+  aspect-ratio: 1 / 1;
+  /* Clamp so the ring stays a sensible size on both tiny and large surfaces. */
+  min-width: 84px;
+  max-width: 168px;
+  border: 2px solid color-mix(in srgb, var(--color-accent, #7c9cff) 55%, transparent);
+  background: color-mix(in srgb, var(--color-accent, #7c9cff) 12%, transparent);
+  box-shadow: inset 0 0 24px color-mix(in srgb, var(--color-accent, #7c9cff) 16%, transparent);
+}
+
+/* The knob under the thumb — solid, so the held direction reads at a glance. */
+.thumb {
+  width: 13%;
+  aspect-ratio: 1 / 1;
+  min-width: 40px;
+  max-width: 78px;
+  background: var(--color-accent, #7c9cff);
+  border: 2px solid color-mix(in srgb, var(--color-accent-hover, #9db4ff) 80%, white 20%);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 35%);
+}
+
+/* The knob chases the finger; a hair of easing keeps it from looking jittery
+   without lagging the steering (which is driven by the raw delta, not this). */
+@media (prefers-reduced-motion: no-preference) {
+  .thumb {
+    transition:
+      left 60ms ease-out,
+      top 60ms ease-out;
+  }
+}

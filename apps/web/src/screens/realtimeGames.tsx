@@ -77,6 +77,7 @@ import {
   createActionInputSource,
   createPointerAxisInputSource,
   createTapTargetInputSource,
+  createVirtualJoystickInputSource,
   type InputSource,
 } from "../game";
 import type { RunComplete } from "../game/useRealtimeLoop";
@@ -283,38 +284,34 @@ const lumberjackControls: RealtimeControls<LumberjackInput, "left" | "right"> = 
   resolveTapAction: (fractionX) => (fractionX < 0.5 ? "left" : "right"),
 };
 
-// Snake steers rather than swipes, but the INPUT shape is 2048's: four discrete
-// directions from a drag, a D-pad, arrows or WASD. Deliberately its own controls
-// object rather than a shared one — the two games agree on gesture vocabulary
-// today and have no reason to stay agreed (2048's swipe applies to a settled
-// board; Snake's turn is queued for the next cell boundary), and the copy below
-// is each game's own words either way.
-const SNAKE_PRIORITY: readonly SnakeDir[] = ["up", "down", "left", "right"];
-const snakeControls: RealtimeControls<SnakeInput, SnakeDir> = {
-  primaryAction: "up",
-  keyMap: {
-    ArrowUp: "up",
-    KeyW: "up",
-    ArrowDown: "down",
-    KeyS: "down",
-    ArrowLeft: "left",
-    KeyA: "left",
-    ArrowRight: "right",
-    KeyD: "right",
-  },
-  toInput: (pressed) => ({ turn: SNAKE_PRIORITY.find((dir) => pressed.has(dir)) ?? null }),
-  actionHint: "Swipe, or use the arrows, WASD, or the buttons, to turn",
-  readyExplainer:
-    "The snake never stops — you only steer. Eat the food to grow and score. Hitting a wall or your own tail ends the run, and you can't turn back on yourself.",
-  resolveSwipeAction: (dx, dy) =>
-    Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up",
-  touchActions: [
-    { action: "up", label: "↑" },
-    { action: "left", label: "←" },
-    { action: "right", label: "→" },
-    { action: "down", label: "↓" },
-  ],
+// Snake is DIRECTION-steered by a floating virtual joystick (MPG-143): press
+// anywhere and the pointer's delta from that anchor becomes a held heading, which
+// suits a snake that travels on its own and only needs "keep steering this way".
+// This replaced the old swipe/D-pad action source — a queued swipe always felt a
+// beat behind the snake it was trying to turn. Keyboard (arrows + WASD) drives the
+// same held heading, so the game stays fully playable and leaderboard-eligible
+// with no pointer. The `SnakeDir` union and the joystick's `JoystickDir` are the
+// same four headings, so `toInput` maps one straight onto the module's turn.
+const SNAKE_KEY_MAP: Readonly<Record<string, SnakeDir>> = {
+  ArrowUp: "up",
+  KeyW: "up",
+  ArrowDown: "down",
+  KeyS: "down",
+  ArrowLeft: "left",
+  KeyA: "left",
+  ArrowRight: "right",
+  KeyD: "right",
 };
+function makeSnakeInputSource(): InputSource<SnakeInput> {
+  return createVirtualJoystickInputSource<SnakeInput>({
+    toInput: (dir) => ({ turn: dir }),
+    keyMap: SNAKE_KEY_MAP,
+    hint: "Drag anywhere to steer — the snake follows your thumb (or use the arrows / WASD)",
+    readyExplainer:
+      "The snake never stops — you only steer. Press and drag to point it where you want; eat the food to grow and score. Hitting a wall or your own tail ends the run, and you can't turn back on yourself.",
+    label: "Joystick & keys",
+  });
+}
 
 // Breakout is POSITION-controlled (MPG-121): the paddle tracks the pointer
 // directly — mouse hover or touch drag — with arrow/A-D keyboard parity. This
@@ -386,10 +383,10 @@ export const REALTIME_GAMES: Partial<Record<RealtimeGameId, RealtimeGameWiring>>
     (props) => <LumberjackScene {...props} />,
     lumberjackControls,
   ),
-  snake: defineRealtimeGame<SnakeState, SnakeInput, SnakeDir>(
+  snake: defineRealtimeAxisGame<SnakeState, SnakeInput>(
     snake,
     (props) => <SnakeScene {...props} />,
-    snakeControls,
+    makeSnakeInputSource,
   ),
   "aim-trainer": defineRealtimeAxisGame<AimTrainerState, AimTrainerInput>(
     aimTrainer,

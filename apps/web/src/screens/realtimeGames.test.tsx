@@ -168,33 +168,23 @@ describe("REALTIME_GAMES wiring map", () => {
     expect(wiring!.controls!.readyExplainer).toMatch(/timer/i);
   });
 
-  it("resolves 'snake' to the real engine module + four-direction steering", () => {
+  it("resolves 'snake' to the real engine module + virtual-joystick steering", () => {
     const wiring = REALTIME_GAMES["snake"];
     expect(wiring).toBeDefined();
     expect(wiring!.module).toBe(snake);
     expect(wiring!.module.id).toBe("snake");
     expect(typeof wiring!.renderScene).toBe("function");
-    expect(wiring!.makeInputSource().id).toBe("actions");
 
-    // Three ways in to the same four actions: a real swipe, on-screen buttons,
-    // and keyboard parity on both arrows and WASD.
-    const resolveSwipe = wiring!.controls!.resolveSwipeAction!;
-    expect(resolveSwipe(40, 5)).toBe("right");
-    expect(resolveSwipe(-40, 5)).toBe("left");
-    expect(resolveSwipe(5, 40)).toBe("down");
-    expect(resolveSwipe(5, -40)).toBe("up");
-    expect(wiring!.controls!.touchActions?.map((a) => a.action).sort()).toEqual([
-      "down",
-      "left",
-      "right",
-      "up",
-    ]);
-    expect(wiring!.controls!.keyMap.ArrowUp).toBe("up");
-    expect(wiring!.controls!.keyMap.KeyW).toBe("up");
-    expect(wiring!.controls!.keyMap.KeyD).toBe("right");
-    // The reversal rule is a losing surprise if nobody says it — so it's in the
-    // explainer the player sees BEFORE starting, not just in the rules sheet.
-    expect(wiring!.controls!.readyExplainer).toMatch(/turn back on yourself/i);
+    // Snake is steered by the floating virtual joystick (MPG-143), not the
+    // discrete-action source — so it brings its own source and carries no
+    // `controls` config.
+    const source = wiring!.makeInputSource();
+    expect(source.id).toBe("joystick");
+    expect(wiring!.controls).toBeUndefined();
+
+    // With nothing held, each tick asks for no turn — the snake coasts on its
+    // current heading (what the end-to-end test below relies on to hit the wall).
+    expect(source.sample()).toEqual({ turn: null });
   });
 });
 
