@@ -97,6 +97,16 @@
   outline-offset: 2px;
 }
 
+/*
+ * In-game the pinned action bar owns the bottom edge (its "next game" control
+ * sits flush bottom-right, exactly under the resting toggle). Lift the toggle
+ * above the bar — its height plus a gap, honouring the iOS safe-area inset the
+ * bar itself pads for — so the two never overlap.
+ */
+.chatFabInGame {
+  bottom: calc(var(--size-action-bar) + var(--space-4) + env(safe-area-inset-bottom, 0px));
+}
+
 .chatFabIcon {
   font-size: var(--font-size-500);
 }

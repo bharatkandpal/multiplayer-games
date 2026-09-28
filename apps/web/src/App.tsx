@@ -825,7 +825,15 @@ export default function App(): React.JSX.Element {
           chat's backend is down, degrades to a quiet "unavailable" inside — it
           never blocks or covers the game it floats over. */}
       {chat.open ? null : (
-        <button type="button" className={styles.chatFab} onClick={openChat} aria-label="Open chat">
+        <button
+          type="button"
+          // In-game the bottom-right corner belongs to the pinned action bar
+          // (prev/opponent/next), so the toggle lifts clear of it rather than
+          // sitting on the "next game" control.
+          className={cx(styles.chatFab, inGame && styles.chatFabInGame)}
+          onClick={openChat}
+          aria-label="Open chat"
+        >
           <ChatIcon className={styles.chatFabIcon} />
         </button>
       )}
