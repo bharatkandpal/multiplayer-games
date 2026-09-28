@@ -125,7 +125,7 @@ export function HomeScreen({
 
   return (
     <div className={styles.main}>
-      <h1 className={styles.heading}>Multiplayer Games</h1>
+      <h1 className={styles.heading}>bkGames</h1>
       <p className={styles.tagline}>
         Tap a game to start playing straight away — you against the bot. Want a friend instead? Use
         Options on any game.

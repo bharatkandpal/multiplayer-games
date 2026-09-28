@@ -20,7 +20,7 @@ const SHELL = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Multiplayer Games</title>
+    <title>bkGames</title>
     <link rel="icon" href="/favicon.svg" />
   </head>
   <body><div id="root"></div></body>
@@ -138,7 +138,7 @@ describe("injectUnfurlMeta", () => {
     );
     const out = injectUnfurlMeta(SHELL, meta);
     expect(out).toContain("<title>999 points on 2048</title>");
-    expect(out).not.toContain("<title>Multiplayer Games</title>");
+    expect(out).not.toContain("<title>bkGames</title>");
     expect(out).toContain('property="og:image"');
     // Shell's own asset tags survive untouched — the human boots the same SPA.
     expect(out).toContain('<link rel="icon" href="/favicon.svg" />');

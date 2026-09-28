@@ -814,7 +814,7 @@ export default function App(): React.JSX.Element {
             none — it ends at the pinned action bar (UX_PRINCIPLES §9: the
             screen is the frame, and the bar is its bottom edge). On a page
             screen it sits below the content, inside the scrolling region. */}
-        {frame ? null : <footer className={styles.footer}>Created by Bharat Kandpal</footer>}
+        {frame ? null : <footer className={styles.footer}>created by BK with ❤️</footer>}
       </div>
 
       {/* CHAT-024: chat rides above every screen. The floating toggle opens it;

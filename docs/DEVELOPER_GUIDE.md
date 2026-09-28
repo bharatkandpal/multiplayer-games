@@ -1,6 +1,6 @@
 # Developer Guide
 
-How to build, test, and work in the Multiplayer Games Platform monorepo.
+How to build, test, and work in the bkGames monorepo.
 For product/architecture context see [PRD.md](PRD.md), [TDD.md](TDD.md), and
 [ARCHITECTURE.md](ARCHITECTURE.md).
 

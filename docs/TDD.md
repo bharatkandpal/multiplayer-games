@@ -1,6 +1,6 @@
 # Technical Design Document (TDD)
 
-**Product:** Multiplayer Games Platform
+**Product:** bkGames
 **Status:** Draft v0.1
 **Last updated:** 2026-08-20
 **Related:** [PRD.md](PRD.md), [ARCHITECTURE.md](ARCHITECTURE.md), [GAME_LOGIC.md](GAME_LOGIC.md), [API_SPEC.md](API_SPEC.md)

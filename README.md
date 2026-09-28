@@ -1,4 +1,4 @@
-# Multiplayer Games Platform
+# bkGames
 
 **A place where a small set of great games become infinitely many, because players
 remix them and share the results.**
