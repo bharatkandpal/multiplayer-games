@@ -355,14 +355,16 @@ describe("MPG-087: a bare /:gameId deep link opens the game (share fallback)", (
   });
 });
 
-// CHAT-004: the standalone chat route.
-describe("CHAT-004: chat routing", () => {
+// CHAT-024: chat as an overlay over whatever screen is active. A `/chat` deep
+// link still works — it opens the overlay on top of Home rather than replacing
+// the page — and a floating toggle opens it from anywhere.
+describe("CHAT-024: chat overlay", () => {
   afterEach(() => {
     window.history.pushState({}, "", "/");
     vi.restoreAllMocks();
   });
 
-  it("opens `/chat` onto the chat screen, defaulting to the Global room", () => {
+  it("opens `/chat` as an overlay on top of Home, defaulting to the Global room", () => {
     window.history.pushState({}, "", "/chat");
 
     render(<App />);
@@ -370,10 +372,11 @@ describe("CHAT-004: chat routing", () => {
     // The header names the room you are in — a bare `/chat` is Global
     // (CHAT-022), the same room the rail marks as current.
     expect(screen.getByRole("heading", { name: /Global/ })).toBeInTheDocument();
-    expect(screen.queryByRole("list", { name: "Featured games" })).not.toBeInTheDocument();
+    // The overlay rides *over* Home, which stays mounted underneath.
+    expect(screen.getByRole("list", { name: "Featured games" })).toBeInTheDocument();
   });
 
-  it("opens `/chat/:roomId` onto the chat screen for that room", () => {
+  it("opens `/chat/:roomId` onto the overlay for that room", () => {
     window.history.pushState({}, "", "/chat/my-room");
 
     render(<App />);
@@ -381,7 +384,26 @@ describe("CHAT-004: chat routing", () => {
     expect(screen.getByRole("heading", { name: /my-room/ })).toBeInTheDocument();
   });
 
-  it("Home offers a labelled entry point into chat that navigates and updates the URL", () => {
+  it("the floating toggle opens the overlay and updates the URL, and collapse closes it", () => {
+    render(<App />);
+    // Closed by default: no chat heading, and the toggle is offered.
+    expect(screen.queryByRole("heading", { name: /Global/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open chat" }));
+
+    expect(screen.getByRole("heading", { name: /Global/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/chat");
+
+    // Collapsing the overlay hides it and restores the underlying URL, leaving
+    // the screen it floated over (Home) in place.
+    fireEvent.click(screen.getByRole("button", { name: "Close chat" }));
+
+    expect(screen.queryByRole("heading", { name: /Global/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Featured games" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("Home's labelled entry point opens the overlay and updates the URL", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Chat" }));
@@ -390,19 +412,9 @@ describe("CHAT-004: chat routing", () => {
     expect(window.location.pathname).toBe("/chat");
   });
 
-  it("Home is reachable from chat via the labelled Home control", () => {
-    window.history.pushState({}, "", "/chat");
+  it("back/forward navigation (popstate) toggles the overlay from a chat URL", () => {
     render(<App />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Home" }));
-
-    expect(screen.getByRole("list", { name: "Featured games" })).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/");
-  });
-
-  it("back/forward navigation (popstate) re-parses a chat URL", () => {
-    render(<App />);
-    expect(screen.getByRole("list", { name: "Featured games" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Global/ })).not.toBeInTheDocument();
 
     act(() => {
       window.history.pushState({}, "", "/chat");
@@ -410,5 +422,13 @@ describe("CHAT-004: chat routing", () => {
     });
 
     expect(screen.getByRole("heading", { name: /Global/ })).toBeInTheDocument();
+
+    // Navigating back off the chat URL closes the overlay again.
+    act(() => {
+      window.history.pushState({}, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(screen.queryByRole("heading", { name: /Global/ })).not.toBeInTheDocument();
   });
 });

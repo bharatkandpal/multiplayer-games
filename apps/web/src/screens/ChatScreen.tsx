@@ -6,9 +6,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, UIEvent } from "react";
 import {
-  BackArrowIcon,
   Button,
-  HomeIcon,
+  CollapseIcon,
   Modal,
   ShareAction,
   StatusBadge,
@@ -61,6 +60,11 @@ export interface ChatScreenProps {
    * connecting, unless one is already held for this tab.
    */
   isPrivate?: boolean;
+  /**
+   * Collapse the chat overlay back to its floating toggle. Chat rides as an
+   * overlay over whatever screen is underneath (a game keeps running), so
+   * dismissing it never leaves the current screen — it just hides the panel.
+   */
   onBack: () => void;
   /**
    * Navigate to another room. When provided, the room rail can switch rooms and
@@ -326,12 +330,11 @@ export function ChatScreen({
               <span className={styles.railToggleLabel}>Rooms</span>
             </Button>
           ) : null}
-          <Button variant="ghost" size="sm" onClick={onBack} aria-label="Home">
+          <Button variant="ghost" size="sm" onClick={onBack} aria-label="Close chat">
             <span className={styles.homeIcons} aria-hidden="true">
-              <BackArrowIcon />
-              <HomeIcon />
+              <CollapseIcon />
             </span>
-            <span className={styles.homeLabel}>Home</span>
+            <span className={styles.homeLabel}>Close</span>
           </Button>
         </div>
 
