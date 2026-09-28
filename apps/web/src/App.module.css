@@ -59,6 +59,98 @@
   padding: var(--space-2) var(--space-2);
 }
 
+/*
+ * CHAT-024: the floating chat toggle. Present on every screen (Home, setup, and
+ * mid-game), pinned to the bottom-right so it never enters the top bar's crowded
+ * row or the pinned action bar. It sits below modals (`--z-overlay` < `--z-modal`)
+ * so a dialog always covers it.
+ */
+.chatFab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: var(--z-overlay);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.chatFab:hover {
+  background: var(--color-accent-hover);
+}
+
+.chatFab:active {
+  transform: scale(0.94);
+}
+
+.chatFab:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.chatFabIcon {
+  font-size: var(--font-size-500);
+}
+
+/*
+ * The overlay layer. It spans the viewport but is click-through
+ * (`pointer-events: none`) so that, in the wide docked-panel layout, the game to
+ * the left of the panel stays interactive — you can keep playing while chat is
+ * open. Only the panel itself re-enables pointer events.
+ */
+.chatOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+/*
+ * The chat panel. On a phone it is a full-screen sheet (nothing else is usable
+ * behind it at that width anyway); at ≥ 64rem it docks to the right edge as a
+ * fixed-width side panel, leaving the board visible and playable beside it.
+ * `ChatScreen`'s own root is a flex column that fills this box.
+ */
+.chatPanel {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--color-bg);
+  animation: chat-panel-in var(--duration-base) var(--ease-standard);
+}
+
+@keyframes chat-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(2%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (min-width: 64rem) {
+  .chatPanel {
+    width: min(26rem, 100%);
+    border-left: var(--border-width-hairline) solid var(--color-border);
+    box-shadow: var(--shadow-lg);
+  }
+}
+
 .galleryWrap {
   max-width: var(--container-md);
   margin: 0 auto;

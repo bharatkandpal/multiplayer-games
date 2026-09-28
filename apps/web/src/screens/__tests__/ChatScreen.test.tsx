@@ -229,12 +229,12 @@ describe("ChatScreen", () => {
     ).toBeInTheDocument();
   });
 
-  it("calls onBack when Home is activated", async () => {
+  it("calls onBack when the collapse control is activated", async () => {
     const onBack = vi.fn();
     const user = userEvent.setup();
     render(<ChatScreen roomId="lobby" onBack={onBack} />);
 
-    await user.click(screen.getByRole("button", { name: "Home" }));
+    await user.click(screen.getByRole("button", { name: "Close chat" }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   hasGame,
   hasRealtimeGame,
@@ -10,7 +10,7 @@ import {
 import type { GameId, RealtimeGameId } from "@mpg/engine";
 import { useTheme } from "./lib/useTheme";
 import { UiGallery } from "./components/UiGallery";
-import { Button, ClaimHandlePrompt, ThemeSwitch, UsernamePrompt } from "./components/ui";
+import { Button, ChatIcon, ClaimHandlePrompt, ThemeSwitch, UsernamePrompt } from "./components/ui";
 import { cx } from "./components/ui/cx";
 import {
   ChatScreen,
@@ -96,11 +96,21 @@ type Route =
   // MPG-056: a durable share link (`/s/:token`) was opened. Unlike the room
   // invite above, this outlives every room — the token resolves to a finished
   // result, a replay, or a leaderboard view, and needs no session to read.
-  | { screen: "shared"; token: string }
-  // CHAT-004: a standalone chat room, reached from Home or a deep link.
-  // `/chat` (no id) defaults to the shared "lobby" room. `private` (CHAT-020,
-  // set by a `?p=1` link) makes the room prompt for a shared secret first.
-  | { screen: "chat"; roomId: string; private?: boolean };
+  | { screen: "shared"; token: string };
+
+/**
+ * The chat overlay's state (CHAT-024). Chat is no longer a screen you navigate
+ * *to* — it rides as an overlay over whatever screen is underneath (a game keeps
+ * running below it), toggled by a floating button and collapsed back to it. A
+ * `/chat` (or room-share) deep link still works: it opens this overlay over Home
+ * rather than replacing the page. `private` (CHAT-020, set by a `?p=1` link)
+ * makes the room prompt for a shared secret first.
+ */
+interface ChatOverlayState {
+  open: boolean;
+  roomId: string;
+  private: boolean;
+}
 
 /**
  * The screens that are a *game*, not a page: a top bar, the board or play
@@ -210,10 +220,9 @@ function initialRoute(): Route {
     markColdArrival();
     return { screen: "shared", token: shareToken };
   }
-  const chatPath = parseChatPath(window.location.pathname, window.location.search);
-  if (chatPath) {
-    return { screen: "chat", roomId: chatPath.roomId, private: chatPath.private };
-  }
+  // A `/chat` deep link doesn't get its own screen anymore — it opens the chat
+  // overlay (see `initialChat`) over Home, so the underlying screen here is just
+  // Home. Fall through to the room/slug/home resolution below.
   const parsed = parseRoomPath(window.location.pathname);
   if (!parsed) {
     // A bare `/:gameId` deep link — the fallback a shared score link uses when
@@ -249,6 +258,25 @@ function initialRoute(): Route {
     roomId: parsed.roomId,
     secret: parseInviteSecret(window.location.hash),
   };
+}
+
+/** The overlay's resting state — closed, on the default room. */
+const CLOSED_CHAT: ChatOverlayState = {
+  open: false,
+  roomId: DEFAULT_CHAT_ROOM_ID,
+  private: false,
+};
+
+/**
+ * The chat overlay's initial state from the URL (CHAT-024): a `/chat` (or
+ * `/chat/:roomId`, `?p=1`) deep link opens the overlay straight away, on that
+ * room; anything else starts closed on the default room.
+ */
+function initialChat(): ChatOverlayState {
+  if (typeof window === "undefined") return CLOSED_CHAT;
+  const chatPath = parseChatPath(window.location.pathname, window.location.search);
+  if (!chatPath) return CLOSED_CHAT;
+  return { open: true, roomId: chatPath.roomId, private: chatPath.private };
 }
 
 /**
@@ -342,9 +370,52 @@ export default function App(): React.JSX.Element {
   // instance — only one online room is ever "current" for this tab at a time.
   const online = useOnlineGame();
 
+  // CHAT-024: the chat overlay, layered over whatever screen is active. Kept out
+  // of `route` on purpose — the screen underneath (a live game especially) must
+  // stay mounted while chat is open, so this is its own bit of state.
+  const [chat, setChat] = useState<ChatOverlayState>(initialChat);
+  // The path to restore when the overlay is dismissed. Opening chat pushes a
+  // `/chat` history entry (so the panel is shareable and the back button closes
+  // it); collapsing returns to whatever was showing underneath.
+  const chatReturnPathRef = useRef(
+    typeof window !== "undefined" && !chat.open
+      ? window.location.pathname + window.location.search
+      : "/",
+  );
+
   const goHome = useCallback((): void => {
     setRoute({ screen: "home" });
     if (typeof window !== "undefined") window.history.pushState({}, "", "/");
+  }, []);
+
+  const openChat = useCallback((): void => {
+    setChat((prev) => {
+      const next = { ...prev, open: true };
+      if (typeof window !== "undefined") {
+        chatReturnPathRef.current = window.location.pathname + window.location.search;
+        window.history.pushState({}, "", roomPath(next.roomId, { private: next.private }));
+      }
+      return next;
+    });
+  }, []);
+
+  const closeChat = useCallback((): void => {
+    setChat((prev) => ({ ...prev, open: false }));
+    if (typeof window !== "undefined") {
+      window.history.pushState({}, "", chatReturnPathRef.current || "/");
+    }
+  }, []);
+
+  // Switch rooms from inside the overlay. `replaceState` (not push) keeps the
+  // URL shareable — so "Share room" copies the right link — without stacking a
+  // history entry per room hop; the single `/chat` entry from `openChat` is what
+  // the back button collapses.
+  const openChatRoom = useCallback((roomId: string, opts?: { private?: boolean }): void => {
+    const isPrivate = opts?.private ?? false;
+    setChat({ open: true, roomId, private: isPrivate });
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, "", roomPath(roomId, { private: isPrivate }));
+    }
   }, []);
 
   // The one ordered catalog behind both the Home grid and the prev/next game
@@ -488,11 +559,15 @@ export default function App(): React.JSX.Element {
   // also produce one — keep the route in sync with the URL either way.
   useEffect(() => {
     const onPopState = (): void => {
+      // A chat URL toggles the overlay, not the screen underneath — so back/
+      // forward across the `/chat` entry opens or closes the panel while the
+      // game or page beneath it stays exactly where it was.
       const chatPath = parseChatPath(window.location.pathname, window.location.search);
       if (chatPath) {
-        setRoute({ screen: "chat", roomId: chatPath.roomId, private: chatPath.private });
+        setChat({ open: true, roomId: chatPath.roomId, private: chatPath.private });
         return;
       }
+      setChat((prev) => (prev.open ? { ...prev, open: false } : prev));
       const parsed = parseRoomPath(window.location.pathname);
       if (parsed) {
         const stored = loadGameRoom(parsed.roomId);
@@ -538,11 +613,10 @@ export default function App(): React.JSX.Element {
   // MPG-136/137: an in-game screen is a frame, not a page — it carries only its
   // own top bar, the board and the pinned action bar.
   const inGame = IN_GAME_SCREENS.has(route.screen);
-  // Chat is an app surface, not a page: like any messaging app it takes the
-  // whole canvas and brings its own header, so it gets the frame treatment too
-  // — no site chrome row, no footer credit, no outer scrolling region. The
-  // theme switch is handed to its header instead of being dropped.
-  const frame = inGame || route.screen === "chat";
+  // Chat no longer takes over the canvas (CHAT-024) — it rides above whatever
+  // screen is active as an overlay — so the frame treatment is purely about
+  // whether the underlying screen is a game.
+  const frame = inGame;
 
   return (
     <main className={styles.main}>
@@ -568,10 +642,7 @@ export default function App(): React.JSX.Element {
             onSelectGame={(gameId) => quickStart({ kind: "turn-based", id: gameId, title: gameId })}
             onSelectRealtimeGame={(gameId) => setRoute({ screen: "realtime", gameId })}
             onConfigureGame={(gameId) => setRoute({ screen: "setup", gameId })}
-            onOpenChat={() => {
-              setRoute({ screen: "chat", roomId: DEFAULT_CHAT_ROOM_ID });
-              if (typeof window !== "undefined") window.history.pushState({}, "", "/chat");
-            }}
+            onOpenChat={openChat}
             onShowGallery={() => setRoute({ screen: "gallery" })}
             devMode={isDevMode()}
           />
@@ -730,30 +801,6 @@ export default function App(): React.JSX.Element {
           />
         ) : null}
 
-        {route.screen === "chat" ? (
-          <ChatScreen
-            // Keep private/public variants of one room as distinct mounts, so a
-            // switch re-reads the stored secret (CHAT-020) rather than reusing
-            // stale locked/unlocked state.
-            key={`${route.roomId}:${route.private ? "private" : "public"}`}
-            roomId={route.roomId}
-            isPrivate={route.private ?? false}
-            toolbar={
-              <ThemeSwitch dark={resolvedTheme === "dark"} onChange={(next) => setTheme(next)} />
-            }
-            onBack={() => {
-              goHome();
-            }}
-            onOpenRoom={(nextRoomId, opts) => {
-              const isPrivate = opts?.private ?? false;
-              setRoute({ screen: "chat", roomId: nextRoomId, private: isPrivate });
-              if (typeof window !== "undefined") {
-                window.history.pushState({}, "", roomPath(nextRoomId, { private: isPrivate }));
-              }
-            }}
-          />
-        ) : null}
-
         {route.screen === "gallery" ? (
           <div className={styles.galleryWrap}>
             <Button variant="ghost" size="sm" onClick={() => setRoute({ screen: "home" })}>
@@ -769,6 +816,39 @@ export default function App(): React.JSX.Element {
             screen it sits below the content, inside the scrolling region. */}
         {frame ? null : <footer className={styles.footer}>Created by Bharat Kandpal</footer>}
       </div>
+
+      {/* CHAT-024: chat rides above every screen. The floating toggle opens it;
+          the overlay itself is a full-screen sheet on a phone and a docked side
+          panel on a wide screen (so a game stays visible and playable beside
+          it), collapsing back to the toggle. Chat is an enhancement layered on
+          the game (CLAUDE.md offline pillar): the panel connects lazily and, if
+          chat's backend is down, degrades to a quiet "unavailable" inside — it
+          never blocks or covers the game it floats over. */}
+      {chat.open ? null : (
+        <button type="button" className={styles.chatFab} onClick={openChat} aria-label="Open chat">
+          <ChatIcon className={styles.chatFabIcon} />
+        </button>
+      )}
+
+      {chat.open ? (
+        <div className={styles.chatOverlay} role="dialog" aria-modal="false" aria-label="Chat">
+          <div className={styles.chatPanel}>
+            <ChatScreen
+              // Keep private/public variants of one room as distinct mounts, so a
+              // switch re-reads the stored secret (CHAT-020) rather than reusing
+              // stale locked/unlocked state.
+              key={`${chat.roomId}:${chat.private ? "private" : "public"}`}
+              roomId={chat.roomId}
+              isPrivate={chat.private}
+              toolbar={
+                <ThemeSwitch dark={resolvedTheme === "dark"} onChange={(next) => setTheme(next)} />
+              }
+              onBack={closeChat}
+              onOpenRoom={openChatRoom}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <UsernamePrompt
         isOpen={usernameGate.isOpen}

@@ -53,6 +53,50 @@ export function HomeIcon(props: IconProps): React.JSX.Element {
   );
 }
 
+/** Rounded speech bubble — "chat" / open the conversation. A single tail on the
+ * lower-left so it reads as a message at the small size the floating toggle
+ * renders it. */
+export function ChatIcon(props: IconProps): React.JSX.Element {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M20 4H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h3v4l5-4h8a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1z" />
+    </svg>
+  );
+}
+
+/** Rightward chevron — used to "collapse"/dismiss the chat panel back to its
+ * floating toggle (the panel docks to the right edge, so it slides out that
+ * way). */
+export function CollapseIcon(props: IconProps): React.JSX.Element {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  );
+}
+
 /** Circled question mark — "help" / "how does this work". */
 export function HelpIcon(props: IconProps): React.JSX.Element {
   return (
