@@ -143,7 +143,7 @@ export function subline(label: string, g: CardGround): string {
  */
 export function footer(dateLabel: string, g: CardGround): string {
   const parts = [
-    text("multiplayer games", {
+    text("bkgames", {
       x: PAD,
       y: FOOTER_Y,
       size: FOOTER_SIZE,

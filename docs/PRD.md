@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD)
 
-**Product:** Multiplayer Games Platform
+**Product:** bkGames
 **Status:** Draft v1.0 — **product-direction rewrite (virality / creator focus)**
 **Last updated:** 2026-09-07
 **Owner:** Bharat

@@ -21,7 +21,7 @@ read `<meta og:* / twitter:*>` **out of the initial HTML response**. They do not
 JavaScript.
 
 Our client is a pure Vite SPA. `apps/web/index.html` is a static shell with one generic
-`<title>Multiplayer Games</title>` and no OG tags at all; every screen — including the share
+`<title>bkGames</title>` and no OG tags at all; every screen — including the share
 screen — is rendered client-side after the bundle boots (`createRoot` in `main.tsx`, route
 parsed from `window.location.pathname` in `App.tsx`). Confirmed against trunk:
 `git grep 'og:image\|twitter:card' -- apps` returns **nothing**.

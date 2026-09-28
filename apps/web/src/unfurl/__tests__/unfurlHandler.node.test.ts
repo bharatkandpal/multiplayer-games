@@ -24,7 +24,7 @@ const SHELL = [
   '<html lang="en">',
   "  <head>",
   '    <meta charset="UTF-8" />',
-  "    <title>Multiplayer Games</title>",
+  "    <title>bkGames</title>",
   '    <script type="module" crossorigin src="/assets/index-abc123.js"></script>',
   "  </head>",
   '  <body><div id="root"></div></body>',
@@ -161,7 +161,7 @@ describe("unfurl shim — a resolvable link", () => {
       '<script type="module" crossorigin src="/assets/index-abc123.js">',
     );
     expect(reply.body).toContain('<div id="root">');
-    expect(reply.body).not.toContain("<title>Multiplayer Games</title>");
+    expect(reply.body).not.toContain("<title>bkGames</title>");
   });
 
   it("serves HTML with a short shared-cache TTL, because links are revocable", async () => {

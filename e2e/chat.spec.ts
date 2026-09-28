@@ -60,7 +60,7 @@ test.describe("Chat — degrades to absence when unconfigured", () => {
 
     // Not a dead end: Home is still one click away.
     await page.getByRole("button", { name: "Home" }).click();
-    await expect(page.getByRole("heading", { name: "Multiplayer Games" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "bkGames" })).toBeVisible();
   });
 
   test("a single-player game plays start to finish while chat is down", async ({ page }) => {
