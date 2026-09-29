@@ -6,9 +6,11 @@ name: Verify
 #
 # It is kept, and kept dispatchable, for the two things a local hook cannot do:
 #
-#   1. Run the FULL suite including packages/engine/src/ai/difficulty.test.ts —
-#      a depth-7 minimax sweep that `test:fast` excludes, so pre-push never sees
-#      it. Without this workflow that test has no home at all (MPG-151).
+#   1. Run the FULL suite including packages/engine/src/ai/difficulty.exhaustive.test.ts
+#      — an N=20, depth-7 minimax sweep that `test:fast` excludes, so pre-push never sees
+#      it. (A cheap N=6 sample of the same "Hard is actually hard" claim, in
+#      difficulty.test.ts, DOES run on every pre-push — see MPG-151. Only this larger,
+#      statistically stronger sample is dispatch-only.)
 #   2. Verify a MERGED result. Hooks only ever see one developer's working tree;
 #      they cannot catch two independently-green branches that conflict once
 #      combined.

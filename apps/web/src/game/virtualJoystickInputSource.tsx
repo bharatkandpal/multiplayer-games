@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { InputBinding, InputSource, InputSourceHost } from "./inputSource";
-import styles from "./virtualJoystickInputSource.module.css";
 
 /**
  * MPG-143 — the `joystick` input source: a floating virtual controller driven by
@@ -26,6 +25,12 @@ import styles from "./virtualJoystickInputSource.module.css";
  * Keyboard parity is real: arrows/WASD set the same held heading and start a
  * `ready` run, so the game is fully playable — and leaderboard-eligible — with no
  * pointer at all (what Playwright drives).
+ *
+ * No on-screen stick is drawn (MPG-151b): the earlier floating base/thumb
+ * graphic sat directly over the play surface right where a player was
+ * steering, which on a small board obscured the very cells the turn depended
+ * on. The gesture (anchor + delta) is tracked exactly as before; it just
+ * isn't painted.
  */
 
 /** The four headings a joystick can be pushed toward. */
@@ -50,17 +55,7 @@ export interface VirtualJoystickConfig<I> {
   readonly deadZoneFraction?: number;
 }
 
-/** Live geometry the overlay draws — anchor and thumb, in surface-relative px. */
-interface Stick {
-  readonly baseX: number;
-  readonly baseY: number;
-  readonly thumbX: number;
-  readonly thumbY: number;
-}
-
 const DEFAULT_DEAD_ZONE = 0.04; // ~4% of the surface — a couple of px of drift is ignored
-/** Max thumb travel from the anchor, as a fraction of the surface's smaller side. */
-const STICK_RADIUS_FRACTION = 0.14;
 
 /** The dominant-axis heading of a delta, or `null` inside the dead zone. */
 function headingOf(dx: number, dy: number, deadZonePx: number): JoystickDir | null {
@@ -75,30 +70,23 @@ export function createVirtualJoystickInputSource<I>(
   // A plain closure ref so it stays stable across the screen's re-renders.
   const dirRef: { current: JoystickDir | null } = { current: null };
 
-  // The in-flight gesture's geometry. It lives in the SOURCE closure, not the
-  // pointer effect, on purpose: drawing the thumb calls `setStick`, which
-  // re-renders the screen and re-runs the effect — effect-local `let`s would be
-  // wiped mid-drag. Stable closure state (like the axis source's ref) survives.
+  // The in-flight gesture's anchor. A plain closure object (like `dirRef`), not
+  // component state — nothing here is drawn, so there's no re-render to drive.
   const gesture = {
     pointerId: null as number | null,
     baseX: 0,
     baseY: 0,
     deadZonePx: 0,
-    radiusPx: 0,
   };
 
   const sample = (): I => config.toInput(dirRef.current);
 
   function useBinding(host: InputSourceHost): InputBinding {
     const { surfaceRef } = host;
-    // The joystick's on-screen geometry. React state (not a ref) so the overlay
-    // re-renders as the thumb moves; `null` until a press, so a keyboard-only or
-    // idle player never sees a control they didn't summon.
-    const [stick, setStick] = useState<Stick | null>(null);
 
-    // Pointer: press anchors the stick and starts a `ready` run; drag sets the
-    // held heading from the delta; release re-centres the thumb and stops
-    // steering (the snake keeps its heading — `null` just means "no new turn").
+    // Pointer: press anchors the gesture and starts a `ready` run; drag sets the
+    // held heading from the delta; release stops steering (the snake keeps its
+    // heading — `null` just means "no new turn").
     useEffect(() => {
       const el = surfaceRef.current;
       if (!el) return;
@@ -118,11 +106,9 @@ export function createVirtualJoystickInputSource<I>(
         gesture.pointerId = e.pointerId;
         el.setPointerCapture?.(e.pointerId);
         gesture.deadZonePx = minSide * (config.deadZoneFraction ?? DEFAULT_DEAD_ZONE);
-        gesture.radiusPx = minSide * STICK_RADIUS_FRACTION;
         const p = localPoint(e);
         gesture.baseX = p.x;
         gesture.baseY = p.y;
-        setStick({ baseX: p.x, baseY: p.y, thumbX: p.x, thumbY: p.y });
         host.onGameplayInput();
       };
 
@@ -133,23 +119,12 @@ export function createVirtualJoystickInputSource<I>(
         const dy = p.y - gesture.baseY;
         const heading = headingOf(dx, dy, gesture.deadZonePx);
         if (heading !== null) dirRef.current = heading;
-        // Clamp the drawn thumb to the stick's travel so the knob rides the ring
-        // rather than flying off with the finger.
-        const dist = Math.hypot(dx, dy);
-        const scale = dist > gesture.radiusPx && dist > 0 ? gesture.radiusPx / dist : 1;
-        setStick({
-          baseX: gesture.baseX,
-          baseY: gesture.baseY,
-          thumbX: gesture.baseX + dx * scale,
-          thumbY: gesture.baseY + dy * scale,
-        });
       };
 
       const end = (e: PointerEvent): void => {
         if (gesture.pointerId !== e.pointerId) return;
         gesture.pointerId = null;
         dirRef.current = null; // let go → stop requesting turns; the snake coasts on
-        setStick(null);
       };
 
       el.addEventListener("pointerdown", onDown);
@@ -182,22 +157,8 @@ export function createVirtualJoystickInputSource<I>(
       return () => window.removeEventListener("keydown", onKeyDown);
     }, [host]);
 
-    const overlay =
-      stick === null ? null : (
-        <div className={styles.joystick} aria-hidden="true">
-          <span
-            className={styles.base}
-            style={{ left: `${stick.baseX}px`, top: `${stick.baseY}px` }}
-          />
-          <span
-            className={styles.thumb}
-            style={{ left: `${stick.thumbX}px`, top: `${stick.thumbY}px` }}
-          />
-        </div>
-      );
-
     return {
-      overlay,
+      overlay: null,
       controls: null,
       // Pointer-down is handled by the native listener above (it needs the raw
       // event for geometry and pointer capture), so the screen wires no handler.

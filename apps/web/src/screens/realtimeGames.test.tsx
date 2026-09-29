@@ -264,11 +264,12 @@ describe("RealtimeGameRoute — Snake end-to-end", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Start" }));
 
-    // No steering: the snake runs straight into the right wall in a handful of
-    // steps. Pump 250ms frames until the run reaches its terminal state.
+    // No steering: the snake runs straight into the right wall. On the 100×100
+    // board (MPG-151b) that's ~50 cells at the slowest step rate (4/s), so pump
+    // enough 250ms frames to cover the worst case with room to spare.
     let clock = 1000;
     frame(clock);
-    for (let i = 0; i < 20 && screen.queryByRole("button", { name: /Play again/ }) === null; i++) {
+    for (let i = 0; i < 120 && screen.queryByRole("button", { name: /Play again/ }) === null; i++) {
       clock += 250;
       frame(clock);
     }

@@ -340,10 +340,15 @@ tests, so a change can pass every test and still fail `tsc`.
 
 Three real gaps — know them rather than assume green means green:
 
-1. **`packages/engine/src/ai/difficulty.test.ts` never runs on pre-push.** `test:fast`
-   excludes this depth-7 minimax sweep because it alone takes ~45s and times out on
-   loaded machines. Run `pnpm verify` (full `pnpm test`) before opening a PR, or
-   dispatch the `Verify` workflow. Tracked as MPG-151.
+1. **`packages/engine/src/ai/difficulty.exhaustive.test.ts` never runs on pre-push.**
+   `test:fast` excludes this N=20, depth-7 minimax sweep because it alone takes ~25s and
+   could time out on loaded machines (MPG-151 — it used to be the _entire_
+   `difficulty.test.ts`, silently skipping the "Hard is actually hard" claim altogether
+   on every push). The claim itself is no longer pre-push-blind: `difficulty.test.ts`
+   keeps a cheap N=6 sample of the same Hard-vs-random simulation (same production
+   "hard" config, just fewer seeded games) and runs it on every push. Only the larger,
+   statistically stronger N=20 sample is deferred — run `pnpm verify` (full `pnpm test`)
+   before opening a PR, or dispatch the `Verify` workflow, to also cover it.
 2. **Hooks are bypassable.** `git commit --no-verify` / `git push --no-verify` skip
    everything, and a hook only ever sees one working tree.
 3. **Nothing verifies the merged result.** Two branches can each be green and still

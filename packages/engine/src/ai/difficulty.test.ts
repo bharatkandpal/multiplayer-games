@@ -3,67 +3,30 @@
 // All randomness in this file flows through a seeded PRNG (mulberry32) — never
 // Math.random — so every simulated game is reproducible. No sleeps: everything here is
 // synchronous and driven purely by seeded state.
+//
+// MPG-151: this file is the cheap, every-pre-push half of the AI strength suite — it
+// runs in `test:fast` (and therefore on every `git push`), so every strength claim in
+// here uses a small sample sized to fit that budget. The full, larger-sample sweep
+// (identical simulation logic, more seeds) lives in difficulty.exhaustive.test.ts, which
+// `test:fast` excludes and only `pnpm test` / the dispatch-only `Verify` workflow run.
+// Both files share their simulation helpers via difficulty-test-support.ts so the two
+// suites can never drift apart in what they're actually testing — only in sample size.
 
 import { describe, it, expect } from "vitest";
-import type { GameModule, Difficulty, Player } from "../types";
-import type { TicTacToeState, TicTacToeMove } from "../tictactoe";
+import type { TicTacToeMove } from "../tictactoe";
 import { ticTacToe } from "../tictactoe";
 import type { ConnectFourMove } from "../connect4";
 import { connectFour } from "../connect4";
 import { pickMove, getDifficultyConfig, DIFFICULTY_TABLE, DEFAULT_DIFFICULTY } from "./difficulty";
-import type { Rng } from "./difficulty";
-
-/**
- * Deterministic PRNG (mulberry32): given the same seed, produces the same sequence of
- * floats in `[0, 1)` every time, in every environment. Used instead of `Math.random` for
- * every source of randomness in this file (blunder rolls and any test-side coin flips).
- */
-function mulberry32(seed: number): Rng {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** Outcome of a single simulated game, from `playerA`'s perspective (seat 1). */
-type GameOutcome = "a_win" | "b_win" | "draw";
-
-/**
- * Plays one full game between two difficulty "policies" using a single shared seeded
- * `rng` (so the whole game is reproducible from the seed alone). `firstMover` picks
- * whether policy A or B occupies seat 1 (moves first).
- */
-function playGame<S, M>(
-  game: GameModule<S, M>,
-  policyA: Difficulty,
-  policyB: Difficulty,
-  rng: Rng,
-  firstMover: "a" | "b" = "a",
-): GameOutcome {
-  let state = game.createInitialState();
-  // seat 1 (moves first) <-> policy; seat 2 <-> the other policy.
-  const policyForSeat: Record<Player, Difficulty> =
-    firstMover === "a" ? { 1: policyA, 2: policyB } : { 1: policyB, 2: policyA };
-
-  let result = game.getResult(state);
-  while (result.status === "in_progress") {
-    const mover = game.currentPlayer(state);
-    const difficulty = policyForSeat[mover];
-    if (difficulty === undefined) {
-      throw new Error(`playGame: no policy configured for seat ${mover}.`);
-    }
-    const move = pickMove(game, state, difficulty, rng);
-    state = game.applyMove(state, move, mover);
-    result = game.getResult(state);
-  }
-
-  if (result.status === "draw") return "draw";
-  const aSeat = firstMover === "a" ? 1 : 2;
-  return result.winner === aSeat ? "a_win" : "b_win";
-}
+import type { Difficulty } from "../types";
+import {
+  mulberry32,
+  playGame,
+  hardVsRandomWinRate,
+  scoreC4AgainstEasy,
+  scoreTTTAgainstEasy,
+  MONOTONIC_TOLERANCE,
+} from "./difficulty-test-support";
 
 describe("difficulty: TTT Hard never loses", () => {
   const opponents: Difficulty[] = ["hard", "medium", "easy"];
@@ -90,54 +53,19 @@ describe("difficulty: TTT Hard never loses", () => {
   );
 });
 
-describe("difficulty: Connect Four Hard beats a random player >= 95%", () => {
-  // Connect Four Hard searches depth 7 (~40-50ms/move per docs/GAME_LOGIC.md §4), so we
-  // keep N modest to bound suite runtime while still comfortably demonstrating dominance
-  // above the 95% bar. "random" is a uniformly-random legal move each turn (via the
-  // shared seeded rng), independent of `pickMove`'s own blunder mechanism.
-  const gamesPerSide = 10; // 10 with Hard moving first + 10 moving second = 20 total.
+// MPG-151: cheap, every-pre-push sample of the "Hard is actually hard" claim. Runs the
+// *same* real "hard" config (depth 7, no shortcuts) as the full sweep — it just samples
+// fewer seeded games to fit `test:fast`'s budget (~2s here vs ~13s for the full N=20
+// sweep in difficulty.exhaustive.test.ts). Empirically Hard has not lost or drawn a
+// single sampled game across 60+ seeds (see the exhaustive file), so requiring zero
+// non-wins in this small sample is a real, non-flaky regression guard, not a rubber
+// stamp — it just doesn't claim the full >=95%-of-20 statistic on its own.
+describe("difficulty: Connect Four Hard beats a random player (cheap per-push smoke check)", () => {
+  const gamesPerSide = 3; // 3 with Hard moving first + 3 moving second = 6 total.
 
-  function playHardVsRandom(rng: Rng, hardFirst: boolean): GameOutcome {
-    let state = connectFour.createInitialState();
-    let result = connectFour.getResult(state);
-    const hardSeat = hardFirst ? 1 : 2;
-    while (result.status === "in_progress") {
-      const mover = connectFour.currentPlayer(state);
-      const move =
-        mover === hardSeat
-          ? pickMove(connectFour, state, "hard", rng)
-          : randomLegalMove(connectFour, state, rng);
-      state = connectFour.applyMove(state, move, mover);
-      result = connectFour.getResult(state);
-    }
-    if (result.status === "draw") return "draw";
-    return result.winner === hardSeat ? "a_win" : "b_win";
-  }
-
-  function randomLegalMove<S, M>(game: GameModule<S, M>, state: S, rng: Rng): M {
-    const moves = game.legalMoves(state);
-    const index = Math.min(Math.floor(rng() * moves.length), moves.length - 1);
-    const move = moves[index];
-    if (move === undefined) throw new Error("randomLegalMove: index out of range.");
-    return move;
-  }
-
-  // Depth-7 minimax over ~20 games can approach the default 5s test timeout on slower CI
-  // runners; this is compute-bound, not flaky, so a generous fixed budget (below) is safe.
-  it(`Hard wins >= 95% of games against a uniformly random opponent (N=${gamesPerSide * 2})`, () => {
-    let wins = 0;
-    let total = 0;
-    for (let seed = 1; seed <= gamesPerSide; seed++) {
-      for (const hardFirst of [true, false]) {
-        const rng = mulberry32(seed * 1000 + (hardFirst ? 1 : 0));
-        const outcome = playHardVsRandom(rng, hardFirst);
-        if (outcome === "a_win") wins++;
-        total++;
-      }
-    }
-    const winRate = wins / total;
-    expect(winRate).toBeGreaterThanOrEqual(0.95);
-  }, 20_000);
+  it(`Hard beats a uniformly random opponent every game in this sample (N=${gamesPerSide * 2}); see difficulty.exhaustive.test.ts for the full >=95%-of-20 sweep`, () => {
+    expect(hardVsRandomWinRate(gamesPerSide)).toBe(1);
+  });
 });
 
 describe("difficulty: monotonic strength (Hard >= Medium >= Easy)", () => {
@@ -146,59 +74,31 @@ describe("difficulty: monotonic strength (Hard >= Medium >= Easy)", () => {
   // a stable, cheap common yardstick). We allow a small tolerance since Medium/Easy are
   // themselves randomized, so a single sample of N games is a noisy estimator; the
   // inequality should still hold clearly given a rate difference this large.
-  const TOLERANCE = 0.05;
-
-  function scoreAgainstEasy(
-    game: GameModule<TicTacToeState, TicTacToeMove>,
-    difficulty: Difficulty,
-    games: number,
-  ): number {
-    let score = 0;
-    for (let seed = 1; seed <= games; seed++) {
-      for (const firstMover of ["a", "b"] as const) {
-        const rng = mulberry32(seed * 7919 + (firstMover === "a" ? 0 : 1));
-        const outcome = playGame(game, difficulty, "easy", rng, firstMover);
-        if (outcome === "a_win") score += 1;
-        else if (outcome === "draw") score += 0.5;
-      }
-    }
-    return score / (games * 2);
-  }
+  const TOLERANCE = MONOTONIC_TOLERANCE;
 
   it("TTT: Hard scores >= Medium scores >= Easy scores against Easy, over seeded games", () => {
     const games = 40;
-    const hardScore = scoreAgainstEasy(ticTacToe, "hard", games);
-    const mediumScore = scoreAgainstEasy(ticTacToe, "medium", games);
-    const easyScore = scoreAgainstEasy(ticTacToe, "easy", games); // Easy vs Easy: ~0.5 by symmetry.
+    const hardScore = scoreTTTAgainstEasy("hard", games);
+    const mediumScore = scoreTTTAgainstEasy("medium", games);
+    const easyScore = scoreTTTAgainstEasy("easy", games); // Easy vs Easy: ~0.5 by symmetry.
 
     expect(hardScore).toBeGreaterThanOrEqual(mediumScore - TOLERANCE);
     expect(mediumScore).toBeGreaterThanOrEqual(easyScore - TOLERANCE);
   });
 
+  // MPG-151: cheap per-push sample (games=2). The full games=6 version of this same
+  // check lives in difficulty.exhaustive.test.ts (dispatch-only `Verify` workflow) —
+  // split out because Hard plays every move at depth 7 here, and even this modest N
+  // costs a few seconds per difficulty tier.
   it("Connect Four: Hard scores >= Medium scores >= Easy scores against Easy, over seeded games", () => {
-    function scoreC4AgainstEasy(difficulty: Difficulty, games: number): number {
-      let score = 0;
-      for (let seed = 1; seed <= games; seed++) {
-        for (const firstMover of ["a", "b"] as const) {
-          const rng = mulberry32(seed * 104729 + (firstMover === "a" ? 0 : 1));
-          const outcome = playGame(connectFour, difficulty, "easy", rng, firstMover);
-          if (outcome === "a_win") score += 1;
-          else if (outcome === "draw") score += 0.5;
-        }
-      }
-      return score / (games * 2);
-    }
-
-    // Kept modest: Connect Four Hard is the slow tier (depth 7), so this suite uses a
-    // smaller N than TTT's while remaining large enough to show a clear ordering.
-    const games = 6;
+    const games = 2;
     const hardScore = scoreC4AgainstEasy("hard", games);
     const mediumScore = scoreC4AgainstEasy("medium", games);
     const easyScore = scoreC4AgainstEasy("easy", games);
 
     expect(hardScore).toBeGreaterThanOrEqual(mediumScore - TOLERANCE);
     expect(mediumScore).toBeGreaterThanOrEqual(easyScore - TOLERANCE);
-  }, 20_000); // flaky, so a generous fixed budget avoids CI timeouts without masking real hangs. // Hard plays every move at depth 7 across dozens of games here; compute-bound, not
+  });
 });
 
 describe("difficulty: determinism", () => {

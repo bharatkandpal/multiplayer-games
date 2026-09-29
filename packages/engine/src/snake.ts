@@ -68,8 +68,14 @@ export interface SnakeState {
 }
 
 export const SNAKE = {
-  /** Grid dimension — a square `size × size` board. */
-  size: 12,
+  /**
+   * Grid dimension — a square `size × size` board. 100 (MPG-151b, up from 12):
+   * at 20Hz a step still only ever crosses one cell, so a finer grid shrinks
+   * the cell relative to the board without changing the tick math — the same
+   * step cadence now reads as smooth, continuous travel instead of a few big
+   * jumps.
+   */
+  size: 100,
   /** Cells the snake starts with. */
   startLength: 3,
   /** Points per food eaten. */
