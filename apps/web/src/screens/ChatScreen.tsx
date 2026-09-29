@@ -7,6 +7,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, UIEvent } from "react";
 import {
   Button,
+  ChevronDownIcon,
   CollapseIcon,
   Modal,
   ShareAction,
@@ -313,23 +314,6 @@ export function ChatScreen({
           pixel below it belongs to the conversation (docs/CHAT_UI.md §1.1). */}
       <header className={styles.topBar}>
         <div className={styles.topBarSide}>
-          {/* Hidden when there is no list to open — chat degrades to absence,
-              never to a control that does nothing. */}
-          {hasRooms ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className={styles.railToggle}
-              onClick={() => setRailOpen((open) => !open)}
-              aria-expanded={railOpen}
-              aria-controls={railId}
-            >
-              <span className={styles.railToggleGlyph} aria-hidden="true">
-                ☰
-              </span>
-              <span className={styles.railToggleLabel}>Rooms</span>
-            </Button>
-          ) : null}
           <Button variant="ghost" size="sm" onClick={onBack} aria-label="Close chat">
             <span className={styles.homeIcons} aria-hidden="true">
               <CollapseIcon />
@@ -338,19 +322,27 @@ export function ChatScreen({
           </Button>
         </div>
 
+        {/* The centred room name is the room selector: tapping it (or its
+            chevron) expands the room list. When there is no list to open —
+            chat degrades to absence — it falls back to a plain, static title
+            rather than a control that does nothing. */}
         <h1 className={styles.heading}>
-          {isPrivate ? (
-            <span className={styles.roomLock} title="Private room">
-              <span aria-hidden="true">🔒</span> <span>{currentRoomLabel}</span>
-              <span className={styles.srOnly}> (private)</span>
-            </span>
+          {hasRooms ? (
+            <button
+              type="button"
+              className={styles.roomSelector}
+              onClick={() => setRailOpen((open) => !open)}
+              aria-expanded={railOpen}
+              aria-controls={railId}
+            >
+              <RoomName isPrivate={isPrivate} label={currentRoomLabel} />
+              <ChevronDownIcon
+                className={styles.roomSelectorChevron}
+                data-open={railOpen ? "true" : "false"}
+              />
+            </button>
           ) : (
-            <>
-              <span className={styles.roomHash} aria-hidden="true">
-                #
-              </span>
-              <span>{currentRoomLabel}</span>
-            </>
+            <RoomName isPrivate={isPrivate} label={currentRoomLabel} />
           )}
         </h1>
 
@@ -577,6 +569,27 @@ export function ChatScreen({
         onUnmuteAll={unmuteAll}
       />
     </div>
+  );
+}
+
+/**
+ * The room's name as shown in the header — a lock glyph + "(private)" for a
+ * private room, a `#` for a public one. Shared by the room-selector button and
+ * the static-title fallback so both read identically.
+ */
+function RoomName({ isPrivate, label }: { isPrivate: boolean; label: string }): React.JSX.Element {
+  return isPrivate ? (
+    <span className={styles.roomLock} title="Private room">
+      <span aria-hidden="true">🔒</span> <span>{label}</span>
+      <span className={styles.srOnly}> (private)</span>
+    </span>
+  ) : (
+    <>
+      <span className={styles.roomHash} aria-hidden="true">
+        #
+      </span>
+      <span>{label}</span>
+    </>
   );
 }
 
