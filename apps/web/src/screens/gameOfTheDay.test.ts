@@ -38,4 +38,29 @@ describe("pickGameOfTheDay", () => {
       expect(items).toContainEqual(pick);
     }
   });
+
+  // Regression for MPG-149: a fixed stride of 7 only cycles through the full
+  // catalog when 7 and the catalog length are coprime. At 14 games
+  // gcd(7, 14) = 7, so the old code could only ever land on two indices and
+  // the spotlight never reached most of the catalog. Assert full coverage
+  // over a year for a couple of sizes, including one (14) that collides with
+  // the old hardcoded stride.
+  describe("covers the whole catalog over a year", () => {
+    it.each([3, 7, 14, 20])("catalog of size %i", (size) => {
+      const catalog: { id: string }[] = Array.from({ length: size }, (_, i) => ({
+        id: `game-${i}`,
+      }));
+
+      const seen = new Set<string>();
+      const start = new Date("2026-01-01T12:00:00");
+      for (let d = 0; d < 365; d += 1) {
+        const date = new Date(start);
+        date.setDate(start.getDate() + d);
+        const pick = pickGameOfTheDay(catalog, date);
+        if (pick) seen.add(pick.id);
+      }
+
+      expect(seen.size).toBe(size);
+    });
+  });
 });
