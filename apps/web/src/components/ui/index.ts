@@ -49,6 +49,7 @@ export type { ThemeSwitchProps } from "./ThemeSwitch";
 export {
   BackArrowIcon,
   ChatIcon,
+  ChevronDownIcon,
   CollapseIcon,
   GearIcon,
   HelpIcon,

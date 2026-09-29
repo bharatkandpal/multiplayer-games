@@ -275,13 +275,13 @@ describe("ChatScreen", () => {
       expect(onOpenRoom).toHaveBeenCalledWith("pvt", { private: true });
     });
 
-    it("starts with the room list collapsed, and the Rooms control opens it", async () => {
+    it("starts with the room list collapsed, and the room selector opens it", async () => {
       state.status = "live";
       const user = userEvent.setup();
       render(<ChatScreen roomId="global" onBack={() => {}} onOpenRoom={() => {}} />);
 
       // Collapsed is the default — you land in the conversation, not a lobby.
-      const toggle = screen.getByRole("button", { name: "Rooms" });
+      const toggle = screen.getByRole("button", { name: "Global" });
       expect(toggle).toHaveAttribute("aria-expanded", "false");
 
       await user.click(toggle);
@@ -297,7 +297,7 @@ describe("ChatScreen", () => {
       const user = userEvent.setup();
       render(<ChatScreen roomId="global" onBack={() => {}} onOpenRoom={() => {}} />);
 
-      const toggle = screen.getByRole("button", { name: "Rooms" });
+      const toggle = screen.getByRole("button", { name: "Global" });
       await user.click(toggle);
       const rail = screen.getByRole("navigation", { name: "Chat rooms" });
       await user.click(within(rail).getByText("Private"));
@@ -305,13 +305,15 @@ describe("ChatScreen", () => {
       expect(toggle).toHaveAttribute("aria-expanded", "false");
     });
 
-    it("offers no Rooms control when there is no list to open", () => {
+    it("shows a static room name, not a selector, when there is no list to open", () => {
       state.status = "live";
       state.rooms = null;
       render(<ChatScreen roomId="global" onBack={() => {}} onOpenRoom={() => {}} />);
 
-      // Degrades to absence — never a control that does nothing.
-      expect(screen.queryByRole("button", { name: "Rooms" })).not.toBeInTheDocument();
+      // Degrades to absence — the name stays as a plain title, never a control
+      // that does nothing.
+      expect(screen.queryByRole("button", { name: "Global" })).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /Global/ })).toBeInTheDocument();
     });
 
     it("renders no rail at all when the room list is unavailable", () => {

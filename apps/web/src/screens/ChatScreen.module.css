@@ -92,19 +92,6 @@
   justify-content: flex-end;
 }
 
-.railToggle {
-  flex: 0 0 auto;
-}
-
-.railToggleGlyph {
-  font-size: var(--font-size-300);
-  line-height: 1;
-}
-
-.railToggleLabel {
-  margin-left: var(--space-1);
-}
-
 .statusSlot,
 .toolbarSlot {
   display: inline-flex;
@@ -123,7 +110,6 @@
  *   withholds it (MPG-137).
  */
 @media (max-width: 30rem) {
-  .railToggleLabel,
   .homeLabel {
     position: absolute;
     width: 1px;
@@ -177,6 +163,54 @@
 .roomHash {
   color: var(--color-text-muted);
   margin-right: 0.125em;
+}
+
+/* The room name doubles as the room-list toggle: it looks like the title (no
+   button chrome) but carries a chevron and behaves as a control — tap it to
+   expand the list. It centres itself inside the heading and truncates the same
+   way the plain title did, so a long room name never pushes the chevron out. */
+.roomSelector {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  min-height: var(--size-touch-target);
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+/* Keep the label on one line and let it ellipsize; the chevron holds its size. */
+.roomSelector > :not(.roomSelectorChevron) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roomSelector:hover {
+  background: var(--color-bg-subtle);
+}
+
+.roomSelector:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.roomSelectorChevron {
+  flex: 0 0 auto;
+  font-size: var(--font-size-200);
+  color: var(--color-text-muted);
+  transition: transform var(--duration-base) var(--ease-standard);
+}
+
+.roomSelectorChevron[data-open="true"] {
+  transform: rotate(180deg);
 }
 
 .unavailableSlot {

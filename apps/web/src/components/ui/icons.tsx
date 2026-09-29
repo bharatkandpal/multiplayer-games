@@ -97,6 +97,26 @@ export function CollapseIcon(props: IconProps): React.JSX.Element {
   );
 }
 
+/** Downward chevron — "expand this" (e.g. the chat room selector). */
+export function ChevronDownIcon(props: IconProps): React.JSX.Element {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
 /** Circled question mark — "help" / "how does this work". */
 export function HelpIcon(props: IconProps): React.JSX.Element {
   return (
