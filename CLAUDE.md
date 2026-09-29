@@ -21,9 +21,11 @@ Two consequences to respect rather than work around:
 - **Never pass `--no-verify`.** It skips the only gate this repo has left. If a hook
   fails, fix the cause; don't bypass it.
 - **`pnpm verify:fast` is not sufficient before a PR.** `test:fast` excludes
-  `packages/engine/src/ai/difficulty.test.ts` (a ~45s minimax sweep), so a green push
-  says nothing about it. Run the full `pnpm verify`, or dispatch the manual `Verify`
-  workflow (`gh workflow run ci.yml`).
+  `packages/engine/src/ai/difficulty.exhaustive.test.ts` (a ~25s, N=20 depth-7 minimax
+  sweep), so a green push doesn't cover that larger sample — though a cheap N=6 version of
+  the same "Hard beats random" claim, in `difficulty.test.ts`, does run every push
+  (MPG-151). Run the full `pnpm verify`, or dispatch the manual `Verify` workflow
+  (`gh workflow run ci.yml`), to also cover the exhaustive sweep.
 
 See `docs/DEVELOPER_GUIDE.md` §9 for the full picture, including what the local gate
 cannot catch.
