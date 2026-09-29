@@ -43,6 +43,7 @@ import { initSession } from "./api/session";
 import { installFlushOnHide } from "./api/events";
 import { markColdArrival } from "./analytics/firstInput";
 import { useOnlineGame } from "./hooks/useOnlineGame";
+import { useVisualViewportBox } from "./hooks/useVisualViewportBox";
 import { useUsernameGate } from "./hooks/useUsernameGate";
 import { useClaimGate } from "./hooks/useClaimGate";
 import { presetSeats, type SeatsConfig } from "./game";
@@ -382,6 +383,11 @@ export default function App(): React.JSX.Element {
       ? window.location.pathname + window.location.search
       : "/",
   );
+  // Pin the full-screen chat sheet to the visual viewport so a phone's soft
+  // keyboard shrinks it from the bottom instead of pushing its header off the
+  // top (see useVisualViewportBox).
+  const chatOverlayRef = useRef<HTMLDivElement>(null);
+  useVisualViewportBox(chatOverlayRef, chat.open);
 
   const goHome = useCallback((): void => {
     setRoute({ screen: "home" });
@@ -839,7 +845,13 @@ export default function App(): React.JSX.Element {
       )}
 
       {chat.open ? (
-        <div className={styles.chatOverlay} role="dialog" aria-modal="false" aria-label="Chat">
+        <div
+          ref={chatOverlayRef}
+          className={styles.chatOverlay}
+          role="dialog"
+          aria-modal="false"
+          aria-label="Chat"
+        >
           <div className={styles.chatPanel}>
             <ChatScreen
               // Keep private/public variants of one room as distinct mounts, so a
