@@ -14,15 +14,6 @@
   font-family: var(--font-family-base);
 }
 
-.heading {
-  font-family: var(--font-family-display);
-  font-size: var(--font-size-700);
-  letter-spacing: var(--letter-spacing-display);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-tight);
-  margin: 0 0 var(--space-2);
-}
-
 .tagline {
   color: var(--color-text-muted);
   margin: 0 0 var(--space-5);
