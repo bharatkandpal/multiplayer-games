@@ -15,6 +15,7 @@ import {
   Button,
   ChatIcon,
   ClaimHandlePrompt,
+  ProfileMenu,
   ThemeSwitch,
   UsernamePrompt,
 } from "./components/ui";
@@ -640,10 +641,11 @@ export default function App(): React.JSX.Element {
       {frame ? null : (
         <div className={styles.chromeBar}>
           {route.screen === "home" ? (
-            // MPG-145: Home's bar carries the brand; the MPG-147 avatar joins the
-            // switch in this same trailing slot.
+            // MPG-145/147: Home's bar carries the brand, the theme switch and the
+            // profile avatar (the switch is NOT repeated inside the avatar's menu).
             <BrandBar>
               <ThemeSwitch dark={resolvedTheme === "dark"} onChange={(next) => setTheme(next)} />
+              <ProfileMenu />
             </BrandBar>
           ) : (
             <ThemeSwitch dark={resolvedTheme === "dark"} onChange={(next) => setTheme(next)} />
