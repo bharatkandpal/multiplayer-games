@@ -257,4 +257,54 @@ describe("LeaderboardScreen", () => {
 
     expect(onBack).toHaveBeenCalledTimes(1);
   });
+
+  describe("pinned own row (MPG-115-c)", () => {
+    const mk = (n: number, owner: string) => ({
+      id: `e${n}`,
+      gameId: "tictactoe",
+      metric: "wld",
+      eventId: null,
+      timeBucket: null,
+      ownerToken: owner,
+      wins: 50 - n,
+      losses: 0,
+      draws: 0,
+      bestScore: null,
+      totalGames: 50 - n,
+      runId: null,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    const longList = (youAt: number | null) =>
+      Array.from({ length: 50 }, (_, i) => mk(i, i === youAt ? "tok-me" : `tok-other-${i}`));
+
+    it("marks exactly the viewer's row for pinning in a long list", async () => {
+      window.localStorage.setItem(STORAGE_KEY, "tok-me");
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(jsonResponse({ entries: longList(37), yourRank: 38 })),
+      );
+      render(<LeaderboardScreen gameId="tictactoe" gameTitle="Tic-Tac-Toe" onBack={() => {}} />);
+      await waitFor(() => expect(screen.getByRole("table")).toBeInTheDocument());
+      const pinned = document.querySelectorAll('tr[data-pinned="true"]');
+      expect(pinned).toHaveLength(1);
+      expect(pinned[0]).toHaveAttribute("aria-current", "true");
+      expect(pinned[0]).toHaveTextContent("38");
+    });
+
+    it("pins nothing when the viewer has no score", async () => {
+      window.localStorage.setItem(STORAGE_KEY, "tok-me");
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ entries: longList(null) })));
+      render(<LeaderboardScreen gameId="tictactoe" gameTitle="Tic-Tac-Toe" onBack={() => {}} />);
+      await waitFor(() => expect(screen.getByRole("table")).toBeInTheDocument());
+      expect(document.querySelector("[data-pinned]")).toBeNull();
+    });
+
+    it("pins nothing and shows no table when the backend is down", async () => {
+      window.localStorage.setItem(STORAGE_KEY, "tok-me");
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+      render(<LeaderboardScreen gameId="tictactoe" gameTitle="Tic-Tac-Toe" onBack={() => {}} />);
+      await waitFor(() => expect(screen.getByText(/Couldn't load/)).toBeInTheDocument());
+      expect(document.querySelector("[data-pinned]")).toBeNull();
+    });
+  });
 });
