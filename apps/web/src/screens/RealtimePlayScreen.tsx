@@ -5,6 +5,7 @@ import {
   GameActionBar,
   HelpIcon,
   HomeIcon,
+  ResultCard,
   RulesSheet,
   ShareAction,
   StatusBadge,
@@ -385,18 +386,24 @@ export function RealtimePlayScreen<S, I>({
               ) : null}
 
               {phase === "over" ? (
-                <div className={styles.overlayInner}>
-                  <p className={styles.overlayTitle}>
-                    {verdict?.won ? "You won the challenge!" : "Game over"}
-                  </p>
-                  <p className={styles.overlayText}>
-                    Final score: <strong>{score}</strong>
-                  </p>
-                  {verdict ? (
-                    <p className={cx(styles.verdict, verdict.won && styles.verdictWon)}>
-                      {verdict.text}
-                    </p>
-                  ) : null}
+                <ResultCard
+                  align="center"
+                  size="md"
+                  headingAs="p"
+                  headline={verdict?.won ? "You won the challenge!" : "Game over"}
+                  detail={
+                    <>
+                      <p className={styles.overlayText}>
+                        Final score: <strong>{score}</strong>
+                      </p>
+                      {verdict ? (
+                        <p className={cx(styles.verdict, verdict.won && styles.verdictWon)}>
+                          {verdict.text}
+                        </p>
+                      ) : null}
+                    </>
+                  }
+                >
                   <Button ref={playAgainBtnRef} variant="primary" onClick={handlePlayAgain}>
                     <span className={styles.playAgainIcon} aria-hidden="true">
                       ↻
@@ -423,7 +430,7 @@ export function RealtimePlayScreen<S, I>({
                     />
                   ) : null}
                   {resultExtra}
-                </div>
+                </ResultCard>
               ) : null}
             </div>
           ) : null}

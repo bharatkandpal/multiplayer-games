@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Button, Skeleton, SkeletonGroup, StatusBadge, Toast } from "../components/ui";
+import { Button, ResultCard, Skeleton, SkeletonGroup, StatusBadge, Toast } from "../components/ui";
 import { DeadShareLinkError, fetchSharedView, type SharedView } from "../api/share";
 import { storeCosmetics } from "../cosmetics";
 import { GAME_CATALOG, REALTIME_CATALOG } from "./catalog";
@@ -167,36 +167,42 @@ export function SharedResultScreen({
 
       {status === "ready" && (view?.kind === "result" || view?.kind === "replay") ? (
         <div className={styles.slot}>
-          <p className={styles.eyebrow}>{gameTitle(view.result.gameId)}</p>
-          <h1 className={styles.headline}>{headline(view)}</h1>
-          <p className={styles.meta}>
-            <time dateTime={view.result.createdAt}>
-              {new Date(view.result.createdAt).toLocaleDateString()}
-            </time>
-          </p>
-          {/* Primary action is to PLAY, not to admire someone else's score —
-              the shared link exists to pull a new player into the loop. For a
-              scored (real-time) result that becomes a direct challenge: "Beat
-              this score" drops the visitor into the game with this score as the
-              target (MPG-087). Turn-based results have no score, so they keep the
-              plain "Play" — there's nothing to beat, only to play. */}
-          <div className={styles.actions}>
-            {view.result.score !== null ? (
-              <Button
-                variant="primary"
-                onClick={() => onPlayGame(view.result.gameId, view.result.score ?? undefined)}
-              >
-                Beat this score
+          <ResultCard
+            eyebrow={gameTitle(view.result.gameId)}
+            headline={headline(view)}
+            headingAs="h1"
+            detail={
+              <p className={styles.meta}>
+                <time dateTime={view.result.createdAt}>
+                  {new Date(view.result.createdAt).toLocaleDateString()}
+                </time>
+              </p>
+            }
+          >
+            {/* Primary action is to PLAY, not to admire someone else's score —
+                the shared link exists to pull a new player into the loop. For a
+                scored (real-time) result that becomes a direct challenge: "Beat
+                this score" drops the visitor into the game with this score as the
+                target (MPG-087). Turn-based results have no score, so they keep the
+                plain "Play" — there's nothing to beat, only to play. */}
+            <div className={styles.actions}>
+              {view.result.score !== null ? (
+                <Button
+                  variant="primary"
+                  onClick={() => onPlayGame(view.result.gameId, view.result.score ?? undefined)}
+                >
+                  Beat this score
+                </Button>
+              ) : (
+                <Button variant="primary" onClick={() => onPlayGame(view.result.gameId)}>
+                  Play {gameTitle(view.result.gameId)}
+                </Button>
+              )}
+              <Button variant="ghost" onClick={() => onViewLeaderboard(view.result.gameId)}>
+                View leaderboard
               </Button>
-            ) : (
-              <Button variant="primary" onClick={() => onPlayGame(view.result.gameId)}>
-                Play {gameTitle(view.result.gameId)}
-              </Button>
-            )}
-            <Button variant="ghost" onClick={() => onViewLeaderboard(view.result.gameId)}>
-              View leaderboard
-            </Button>
-          </div>
+            </div>
+          </ResultCard>
         </div>
       ) : null}
     </div>
