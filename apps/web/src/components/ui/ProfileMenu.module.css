@@ -1,0 +1,97 @@
+/* Profile avatar + popover (MPG-147). The trigger is a 44px target around a
+   32px disc; the panel anchors to its trailing edge and is capped to the
+   viewport so it fits a 320px frame without scrolling. */
+.root {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--size-touch-target);
+  min-height: var(--size-touch-target);
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.trigger:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: var(--z-overlay);
+  box-sizing: border-box;
+  width: 16rem;
+  max-width: calc(100vw - var(--space-4));
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.18));
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-200);
+}
+
+.name {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-400);
+  font-weight: var(--font-weight-bold);
+  overflow-wrap: anywhere;
+}
+
+.body {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-200);
+  color: var(--color-text-muted);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: var(--size-touch-target);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-300);
+}
+
+.input:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+.error {
+  min-height: 1.25em;
+  margin: var(--space-1) 0 var(--space-2);
+  color: var(--color-danger-text);
+  font-size: var(--font-size-200);
+}

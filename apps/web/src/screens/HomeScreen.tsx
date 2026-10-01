@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import { ENGINE_VERSION } from "@mpg/engine";
 import type { GameId, RealtimeGameId } from "@mpg/engine";
-import { Button, UsernameBadge } from "../components/ui";
+import { Button } from "../components/ui";
 import { loadPersonalBest } from "../game/personalBest";
 import { GameThumbnail } from "./gameThumbnails";
 import {
@@ -130,18 +130,16 @@ export function HomeScreen({
         Options on any game.
       </p>
 
-      <div className={styles.identityRow}>
-        <UsernameBadge compact className={styles.identityBadge} />
-        {/* CHAT-004: the one entry point into chat — a labelled button, not a
-            glyph a first-timer has to guess at (UX_PRINCIPLES §9). Pinned beside
-            the badge on one row; the badge truncates before this ever wraps, so
-            the header stays inside the frame at 320px (MPG-137). */}
-        {onOpenChat ? (
+      {/* CHAT-004: the one entry point into chat — a labelled button, not a
+          glyph a first-timer has to guess at (UX_PRINCIPLES §9). Identity moved
+          to the brand bar's profile menu (MPG-147). Absent entirely when chat is. */}
+      {onOpenChat ? (
+        <div className={styles.identityRow}>
           <Button variant="secondary" size="sm" className={styles.chatButton} onClick={onOpenChat}>
             Chat
           </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {/* The browse controls: narrow the shelf, or skip choosing entirely. Kept
           on one row because they answer the same question ("what do I play?")

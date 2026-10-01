@@ -20,26 +20,18 @@
   max-width: 34rem;
 }
 
-/* CHAT-004: the username badge and the Chat entry point share a row — both
-   are "who/where you are" controls, not the game catalogue itself. */
+/* CHAT-004: the Chat entry point's row. Identity now lives in the brand bar's
+   profile menu (MPG-147). */
 .identityRow {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
 }
 
-/* The badge yields horizontal space (truncating its label) so the Chat button
-   never wraps to a second line — the wrap is what pushed Home past the frame at
-   320px (MPG-137, layout-frame.spec.ts). */
-.identityBadge {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-/* The Chat entry point keeps its full label; only the badge shrinks. */
+/* The Chat entry point keeps its full label. */
 .chatButton {
   flex: 0 0 auto;
 }

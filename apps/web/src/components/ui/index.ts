@@ -60,8 +60,11 @@ export {
 } from "./icons";
 export type { IconProps } from "./icons";
 
-export { UsernameBadge } from "./UsernameBadge";
-export type { UsernameBadgeProps } from "./UsernameBadge";
+export { Avatar, initialsOf } from "./Avatar";
+export type { AvatarProps } from "./Avatar";
+
+export { ProfileMenu } from "./ProfileMenu";
+export type { ProfileMenuProps } from "./ProfileMenu";
 
 export { BrandBar, BRAND_PROMISE } from "./BrandBar";
 export type { BrandBarProps } from "./BrandBar";
