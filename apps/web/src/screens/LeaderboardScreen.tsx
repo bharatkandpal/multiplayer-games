@@ -1,7 +1,7 @@
 // MPG-055: leaderboard view — top entries for a game, the current player's
 // row highlighted. Fetches `GET /api/leaderboard/:gameId` on mount.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import {
   BackArrowIcon,
@@ -73,6 +73,17 @@ export function LeaderboardScreen({
   }, [load]);
 
   const sessionToken = getSessionToken();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const headRef = useRef<HTMLTableRowElement>(null);
+
+  // The viewer's row pins just under the sticky header, so it needs the
+  // header's real height (it varies with font scaling). Falls back in CSS.
+  useLayoutEffect(() => {
+    const head = headRef.current;
+    const box = scrollRef.current;
+    if (!head || !box) return;
+    box.style.setProperty("--lb-head-h", `${head.offsetHeight}px`);
+  }, [status, entries]);
   const isScore = metric === "score";
 
   return (
@@ -115,14 +126,14 @@ export function LeaderboardScreen({
           frame, so they are the one thing that scrolls — inside it, with the
           top bar and Home pinned above (UX_PRINCIPLES §9). */}
       {status === "ready" && entries.length > 0 ? (
-        <div className={styles.tableScroll}>
+        <div className={styles.tableScroll} ref={scrollRef}>
           <table className={styles.table}>
             <caption className={styles.caption}>
               {gameTitle} — top {entries.length} {isScore ? "scores" : "players"}
               {yourRank !== undefined ? ` · your rank: #${yourRank}` : ""}
             </caption>
             <thead>
-              <tr>
+              <tr ref={headRef}>
                 <th scope="col">Rank</th>
                 <th scope="col">Player</th>
                 <th scope="col">{isScore ? "Best score" : "Wins"}</th>
@@ -137,6 +148,7 @@ export function LeaderboardScreen({
                   <tr
                     key={entry.id}
                     className={isYou ? styles.selfRow : undefined}
+                    data-pinned={isYou ? "true" : undefined}
                     aria-current={isYou ? "true" : undefined}
                   >
                     <td className={styles.numeric}>{rank}</td>
