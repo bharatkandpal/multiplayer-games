@@ -1,0 +1,32 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.center {
+  align-items: center;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-200);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.headline {
+  font-family: var(--font-family-display);
+  margin: 0;
+  font-size: var(--font-size-600);
+  letter-spacing: var(--letter-spacing-display);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
+}
+
+.headlineMd {
+  font-size: var(--font-size-500);
+  line-height: inherit;
+}

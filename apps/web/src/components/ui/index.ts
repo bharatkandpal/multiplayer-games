@@ -69,3 +69,6 @@ export type { ProfileMenuProps } from "./ProfileMenu";
 export { BrandBar, BRAND_PROMISE } from "./BrandBar";
 export type { BrandBarProps } from "./BrandBar";
 export { BrandMark } from "./BrandMark";
+
+export { ResultCard } from "./ResultCard";
+export type { ResultCardProps } from "./ResultCard";

@@ -55,6 +55,10 @@ describe("SharedResultScreen (MPG-056)", () => {
     const props = renderScreen();
 
     expect(await screen.findByText("Scored 42")).toBeInTheDocument();
+    // MPG-115-a: the shared-link view renders the same ResultCard as post-game.
+    expect(document.querySelector("[data-result-card]")).toContainElement(
+      screen.getByText("Scored 42"),
+    );
     expect(screen.getByText("Floppy Birds")).toBeInTheDocument();
 
     // A scored (real-time) result turns the shared link into a challenge: the

@@ -168,6 +168,10 @@ describe("RealtimePlayScreen — four explicit states", () => {
 
     expect(screen.getByText("Game over")).toBeInTheDocument();
     expect(screen.getByText(/Final score:/)).toBeInTheDocument();
+    // MPG-115-a: the post-game overlay is the shared ResultCard.
+    expect(container.querySelector("[data-result-card]")).toContainElement(
+      screen.getByText("Game over"),
+    );
     const playAgain = screen.getByRole("button", { name: /Play again/ });
     expect(playAgain).toHaveFocus();
     expect(scoreText(container)).toBe("3");
