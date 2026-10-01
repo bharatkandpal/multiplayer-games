@@ -10,7 +10,14 @@ import {
 import type { GameId, RealtimeGameId } from "@mpg/engine";
 import { useTheme } from "./lib/useTheme";
 import { UiGallery } from "./components/UiGallery";
-import { Button, ChatIcon, ClaimHandlePrompt, ThemeSwitch, UsernamePrompt } from "./components/ui";
+import {
+  BrandBar,
+  Button,
+  ChatIcon,
+  ClaimHandlePrompt,
+  ThemeSwitch,
+  UsernamePrompt,
+} from "./components/ui";
 import { cx } from "./components/ui/cx";
 import {
   ChatScreen,
@@ -632,7 +639,15 @@ export default function App(): React.JSX.Element {
           from the frame, exactly like the footer credit below. */}
       {frame ? null : (
         <div className={styles.chromeBar}>
-          <ThemeSwitch dark={resolvedTheme === "dark"} onChange={(next) => setTheme(next)} />
+          {route.screen === "home" ? (
+            // MPG-145: Home's bar carries the brand; the MPG-147 avatar joins the
+            // switch in this same trailing slot.
+            <BrandBar>
+              <ThemeSwitch dark={resolvedTheme === "dark"} onChange={(next) => setTheme(next)} />
+            </BrandBar>
+          ) : (
+            <ThemeSwitch dark={resolvedTheme === "dark"} onChange={(next) => setTheme(next)} />
+          )}
         </div>
       )}
 

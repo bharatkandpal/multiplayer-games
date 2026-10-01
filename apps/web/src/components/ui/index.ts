@@ -62,3 +62,7 @@ export type { IconProps } from "./icons";
 
 export { UsernameBadge } from "./UsernameBadge";
 export type { UsernameBadgeProps } from "./UsernameBadge";
+
+export { BrandBar, BRAND_PROMISE } from "./BrandBar";
+export type { BrandBarProps } from "./BrandBar";
+export { BrandMark } from "./BrandMark";

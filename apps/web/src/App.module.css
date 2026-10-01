@@ -49,7 +49,7 @@
 }
 
 /* The site chrome above the scrolling screen. Today it carries only the theme
-   switch; MPG-145 gives it the mark and wordmark. Fixed height: it must not
+   switch (and on Home the brand bar, MPG-145). Fixed height: it must not
    absorb slack or be squeezed by a tall screen below it. */
 .chromeBar {
   flex: 0 0 auto;
