@@ -695,7 +695,10 @@ export function GamePlayScreenView<S, M, L = unknown>({
                         className={styles.endAction}
                         onClick={() => onPlayAgain(presetSeats(preset, seats.length, gameId))}
                       >
-                        <span aria-hidden="true">{icon}</span> {label}
+                        <span className={styles.endActionContent}>
+                          <span aria-hidden="true">{icon}</span>
+                          <span>{label}</span>
+                        </span>
                       </Button>
                     );
                   })
@@ -706,7 +709,10 @@ export function GamePlayScreenView<S, M, L = unknown>({
                 // unrelated "leave to a different game" action, not a third
                 // same-game option — the lighter weight keeps that distinction.
                 <Button variant="ghost" size="sm" className={styles.endAction} onClick={onNextGame}>
-                  Next game <span aria-hidden="true">›</span>
+                  <span className={styles.endActionContent}>
+                    <span>Next game</span>
+                    <span aria-hidden="true">›</span>
+                  </span>
                 </Button>
               ) : null}
             </div>

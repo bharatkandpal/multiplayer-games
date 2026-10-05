@@ -233,8 +233,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin-bottom: var(--space-3);
+  /* MPG-153: this block is a scroll container, so it clips at its padding box.
+     A hairline of inset keeps the outer button borders and focus rings from
+     being shaved off at its edges. */
+  padding-inline: var(--space-1);
+  padding-bottom: var(--space-1);
 
   /* MPG-137: at game over this block (Rematch + the two end actions + a share
      row + a rank preview) arrives all at once under an already-full column.
@@ -293,8 +298,18 @@
   gap: var(--space-2);
   width: 100%;
   max-width: 20rem;
-  padding-top: var(--space-3);
+  padding-top: var(--space-2);
   border-top: var(--border-width-hairline) solid var(--color-border);
+}
+
+/* MPG-153: glyph and label as flex items with a real gap — a literal space
+   between inline children collapses inside a flex button. */
+.endActionContent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  white-space: nowrap;
 }
 
 .endAction {

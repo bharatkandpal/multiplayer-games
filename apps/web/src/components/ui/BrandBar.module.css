@@ -1,7 +1,6 @@
-/* Home brand bar (MPG-145). One row, fixed height: the text block truncates
-   rather than wraps, so nothing shifts between 320px and wider frames. The
-   controls slot is fixed-size and never shrinks (theme switch now, profile
-   avatar from MPG-147). */
+/* Home brand bar (MPG-145). The promise wraps to at most two lines (MPG-153),
+   never truncating mid-phrase. The controls slot is fixed-size and never
+   shrinks (theme switch now, profile avatar from MPG-147). */
 
 .bar {
   display: flex;
@@ -43,9 +42,16 @@
   font-size: var(--font-size-200);
   line-height: var(--line-height-tight);
   color: var(--color-text-muted);
-  white-space: nowrap;
+  /* MPG-153: at 320px the line can't fit beside the controls on one row, and
+     an ellipsis cut it mid-phrase ("Quick games, solo ..."). Let it wrap
+     (balanced, so the break lands on a phrase) and clamp at two lines as a
+     backstop for longer copy or larger text sizes. */
+  text-wrap: balance;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .controls {
