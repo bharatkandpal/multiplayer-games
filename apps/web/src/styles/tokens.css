@@ -225,6 +225,7 @@
      44px target plus its padding. Shared so a screen can reserve exactly the
      space the bar takes instead of guessing at it. */
   --size-action-bar: 3.75rem; /* 60px */
+  --size-chat-fab: 3.25rem; /* 52px — the floating chat toggle */
 
   /* ---------------------------------------------------------------- */
   /* Radius / border / elevation                                      */

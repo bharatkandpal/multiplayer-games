@@ -50,6 +50,34 @@ function expectFramed(report: FrameReport, screen: string): void {
   expect(report.pageScrollX, `${screen}: the page scrolls horizontally`).toBeLessThanOrEqual(0);
 }
 
+/**
+ * MPG-152 — the chat FAB is a floating control, so it must never sit on top of
+ * another one. Returns the labels of every visible interactive control whose box
+ * intersects the FAB's.
+ */
+async function controlsUnderChatFab(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const fab = document.querySelector('button[aria-label="Open chat"]');
+    if (!fab) return ["(chat fab not found)"];
+    const f = fab.getBoundingClientRect();
+    const hits: string[] = [];
+    const sel = 'a[href], button, [role="button"], [role="gridcell"], input, select, textarea';
+    document.querySelectorAll(sel).forEach((node) => {
+      if (node === fab) return;
+      const el = node as HTMLElement;
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) return;
+      const style = getComputedStyle(el);
+      if (style.visibility === "hidden" || style.display === "none") return;
+      const overlaps = r.left < f.right && r.right > f.left && r.top < f.bottom && r.bottom > f.top;
+      if (overlaps) {
+        hits.push(el.getAttribute("aria-label") || el.textContent?.trim() || el.tagName);
+      }
+    });
+    return hits;
+  });
+}
+
 for (const frame of FRAMES) {
   test.describe(`${frame.name}`, () => {
     test.use({ viewport: { width: frame.width, height: frame.height } });
@@ -115,6 +143,40 @@ for (const frame of FRAMES) {
       // the one primary action — is still where the player is looking.
       await expect(page.getByRole("grid")).toBeInViewport();
       await expect(page.getByRole("button", { name: "Rematch" })).toBeInViewport();
+
+      // MPG-152: the floating chat button must not sit on any of it.
+      expect(await controlsUnderChatFab(page), "chat FAB covers a control (game-over)").toEqual([]);
+      // "Next game" is in the frame and its centre actually hits it (not the FAB).
+      const next = page.getByRole("button", { name: /Next game/ });
+      await expect(next).toBeInViewport();
+      expect(
+        await next.evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return el.contains(hit);
+        }),
+        "Next game is covered at its centre",
+      ).toBe(true);
+    });
+
+    test("the chat FAB covers no control on Home or in-game", async ({ page }) => {
+      await page.goto("/");
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+      // Home scrolls, so a card may pass under the FAB mid-scroll — but at the end
+      // of the shelf the last card must be reachable clear of it.
+      await page.evaluate(() => {
+        document.querySelectorAll("*").forEach((el) => {
+          const o = getComputedStyle(el).overflowY;
+          if ((o === "auto" || o === "scroll") && el.scrollHeight > el.clientHeight) {
+            el.scrollTop = el.scrollHeight;
+          }
+        });
+      });
+      expect(await controlsUnderChatFab(page), "chat FAB covers a control (home)").toEqual([]);
+
+      await page.goto("/tictactoe");
+      await dismissDialogIfShown(page);
+      expect(await controlsUnderChatFab(page), "chat FAB covers a control (in-game)").toEqual([]);
     });
   });
 }

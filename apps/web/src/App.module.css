@@ -37,6 +37,10 @@
   /* Don't hand an over-scroll at the end of a shelf to the browser as a
      page-level pull-to-refresh. */
   overscroll-behavior: contain;
+  /* MPG-152: the floating chat toggle rides over the corner of a page screen, so
+     the end of the scroll reserves its footprint — the last row of anything can
+     always be scrolled clear of it. */
+  padding-bottom: calc(var(--size-chat-fab) + var(--space-8) + env(safe-area-inset-bottom, 0px));
 }
 
 /*
@@ -46,6 +50,7 @@
  */
 .screenInGame {
   overflow: hidden;
+  padding-bottom: 0;
 }
 
 /* The site chrome above the scrolling screen. Today it carries only the theme
@@ -73,8 +78,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 3.25rem;
-  height: 3.25rem;
+  width: var(--size-chat-fab);
+  height: var(--size-chat-fab);
   border: none;
   border-radius: var(--radius-full);
   background: var(--color-accent);
@@ -98,13 +103,18 @@
 }
 
 /*
- * In-game the pinned action bar owns the bottom edge (its "next game" control
- * sits flush bottom-right, exactly under the resting toggle). Lift the toggle
- * above the bar — its height plus a gap, honouring the iOS safe-area inset the
- * bar itself pads for — so the two never overlap.
+ * MPG-152: in-game the pinned action bar owns the bottom edge, and the screen
+ * above it is full (board, result, "Play a friend" / "Next game"). A toggle
+ * floating over that content covers controls, so it lives *in* the bar instead:
+ * the bar reserves a right-hand gutter for it (`GameActionBar.module.css`), and
+ * the toggle is centred vertically in the bar's height, honouring the iOS
+ * safe-area inset the bar pads for. Nothing it can cover is ever there.
  */
 .chatFabInGame {
-  bottom: calc(var(--size-action-bar) + var(--space-4) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(
+    (var(--size-action-bar) - var(--size-chat-fab)) / 2 + env(safe-area-inset-bottom, 0px)
+  );
+  right: var(--space-2);
 }
 
 .chatFabIcon {
