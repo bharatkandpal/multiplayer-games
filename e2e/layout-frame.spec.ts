@@ -159,6 +159,48 @@ for (const frame of FRAMES) {
       ).toBe(true);
     });
 
+    test("game-over end actions are fully visible and their content fits", async ({ page }) => {
+      await page.goto("/tictactoe");
+      await dismissDialogIfShown(page);
+      for (let attempt = 0; attempt < 20; attempt++) {
+        if (await page.getByRole("button", { name: "Rematch" }).count()) break;
+        const open = page.locator('[role="gridcell"]:not([aria-disabled="true"])');
+        if ((await open.count()) === 0) {
+          await page.waitForTimeout(300);
+          continue;
+        }
+        await clickPast(page, open.first());
+        await page.waitForTimeout(400);
+      }
+      await dismissDialogIfShown(page);
+
+      // MPG-153: "Play a friend" sat in a scroll region that shaved its border,
+      // and its glyph/label touched. The whole box must sit inside the region
+      // that clips it, and the label must not overflow the button.
+      const friend = page.getByRole("button", { name: /Play a friend/ });
+      await expect(friend).toBeInViewport();
+      const fit = await friend.evaluate((el) => {
+        const b = el.getBoundingClientRect();
+        let region: HTMLElement | null = el.parentElement;
+        while (region && getComputedStyle(region).overflowY === "visible") {
+          region = region.parentElement;
+        }
+        const r = region ? region.getBoundingClientRect() : b;
+        const content = el.querySelector("[class*=endActionContent]")!;
+        const [glyph, label] = Array.from(content.children) as HTMLElement[];
+        const g = glyph!.getBoundingClientRect();
+        const l = label!.getBoundingClientRect();
+        return {
+          clipped: b.left < r.left || b.right > r.right || b.top < r.top || b.bottom > r.bottom,
+          overflowsX: el.scrollWidth > el.clientWidth,
+          gap: l.left - g.right,
+        };
+      });
+      expect(fit.clipped, "Play a friend is clipped by its scroll region").toBe(false);
+      expect(fit.overflowsX, "Play a friend content overflows its box").toBe(false);
+      expect(fit.gap, "no space between the glyph and label").toBeGreaterThanOrEqual(4);
+    });
+
     test("the chat FAB covers no control on Home or in-game", async ({ page }) => {
       await page.goto("/");
       await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
