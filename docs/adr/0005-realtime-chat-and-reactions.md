@@ -243,7 +243,7 @@ Delivery and persistence have different deadlines, so they no longer share a lat
 - Reaction/chat volume outgrowing single-node aggregation → move coalescing behind the
   Socket.IO Redis adapter / a fan-out worker (same scaling path as ADR 0001/ARCHITECTURE §7).
 - Abuse that light client-side filtering can't hold → server-authoritative moderation earlier.
-- **Encryption at rest for durable chat (CHAT-021 follow-up, planned).** Now that message
+- **Encryption at rest for durable chat (CHAT-021 follow-up — now [ADR 0011](0011-chat-encryption-at-rest.md), Proposed).** Now that message
   content persists (see the CHAT-021 addendum), a later phase should encrypt it at rest with a
   **key-rotation mechanism** whose master key lives **off this service** — on the maintainer's
   machine or a separate key-generator/KMS application that mints and rotates keys. This service
