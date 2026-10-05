@@ -87,16 +87,17 @@ multiplayer-games/
 
 ## Documentation
 
-| Doc                                                                                        | Purpose                                                                                        |
-| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)                                         | How to build, test, and work in this repo                                                      |
-| [docs/PRD.md](docs/PRD.md)                                                                 | Product requirements — what we're building and why                                             |
-| [docs/TDD.md](docs/TDD.md)                                                                 | Technical design — how we build it                                                             |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)                                               | System architecture & data flows                                                               |
-| [docs/GAME_LOGIC.md](docs/GAME_LOGIC.md)                                                   | Game rules + minimax AI design                                                                 |
-| [docs/UX_PRINCIPLES.md](docs/UX_PRINCIPLES.md)                                             | UX quality bar (P0 pillar) + per-task Definition of Done                                       |
-| [docs/API_SPEC.md](docs/API_SPEC.md)                                                       | REST + WebSocket contract                                                                      |
-| [docs/ROADMAP.md](docs/ROADMAP.md)                                                         | Milestones & phased delivery                                                                   |
-| [docs/adr/0001-tech-stack.md](docs/adr/0001-tech-stack.md)                                 | ADR: core tech stack decision (TypeScript both ends)                                           |
-| [docs/adr/0002-realtime-games.md](docs/adr/0002-realtime-games.md)                         | ADR (Accepted): real-time arcade games alongside turn-based (`RealtimeModule`)                 |
-| [docs/adr/0007-variants-and-customization.md](docs/adr/0007-variants-and-customization.md) | ADR (Accepted): Variants — the customization/UGC ladder (L1 cosmetics → L2 params → L3 assets) |
+| Doc                                                                                        | Purpose                                                                                            |
+| ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)                                         | How to build, test, and work in this repo                                                          |
+| [docs/PRD.md](docs/PRD.md)                                                                 | Product requirements — what we're building and why                                                 |
+| [docs/TDD.md](docs/TDD.md)                                                                 | Technical design — how we build it                                                                 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)                                               | System architecture & data flows                                                                   |
+| [docs/GAME_LOGIC.md](docs/GAME_LOGIC.md)                                                   | Game rules + minimax AI design                                                                     |
+| [docs/UX_PRINCIPLES.md](docs/UX_PRINCIPLES.md)                                             | UX quality bar (P0 pillar) + per-task Definition of Done                                           |
+| [docs/API_SPEC.md](docs/API_SPEC.md)                                                       | REST + WebSocket contract                                                                          |
+| [docs/ROADMAP.md](docs/ROADMAP.md)                                                         | Milestones & phased delivery                                                                       |
+| [docs/adr/0001-tech-stack.md](docs/adr/0001-tech-stack.md)                                 | ADR: core tech stack decision (TypeScript both ends)                                               |
+| [docs/adr/0002-realtime-games.md](docs/adr/0002-realtime-games.md)                         | ADR (Accepted): real-time arcade games alongside turn-based (`RealtimeModule`)                     |
+| [docs/adr/0007-variants-and-customization.md](docs/adr/0007-variants-and-customization.md) | ADR (Accepted): Variants — the customization/UGC ladder (L1 cosmetics → L2 params → L3 assets)     |
+| [docs/adr/0011-chat-encryption-at-rest.md](docs/adr/0011-chat-encryption-at-rest.md)       | ADR (Proposed): encrypt durable chat at rest via envelope scheme with an off-service key authority |
