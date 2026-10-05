@@ -103,6 +103,36 @@ describe("POST /api/leaderboard/:gameId/submit", () => {
     expect(rankBody.rank).toBe(1);
   });
 
+  // MPG-115-b: additive rank fields on the submit response.
+  it("returns rank, and omits previousRank on a player's first run", async () => {
+    const { inputLog, score } = buildGenuineRun(7);
+    const res = await fetch(`${baseUrl}/api/leaderboard/floppy-birds/submit`, {
+      method: "POST",
+      headers: { "content-type": "application/json", [SESSION_HEADER]: "tok-rank1" },
+      body: JSON.stringify({ seed: 7, inputLog, runId: "run-rank1", score }),
+    });
+    const body = (await res.json()) as { rank?: number; previousRank?: number };
+    expect(body.rank).toBe(1);
+    expect(body).not.toHaveProperty("previousRank");
+  });
+
+  it("returns previousRank on a repeat run so the client can show a delta", async () => {
+    const { inputLog, score } = buildGenuineRun(7);
+    const submit = async (token: string, runId: string): Promise<Record<string, unknown>> => {
+      const res = await fetch(`${baseUrl}/api/leaderboard/floppy-birds/submit`, {
+        method: "POST",
+        headers: { "content-type": "application/json", [SESSION_HEADER]: token },
+        body: JSON.stringify({ seed: 7, inputLog, runId, score }),
+      });
+      return (await res.json()) as Record<string, unknown>;
+    };
+    await submit("tok-rival", "run-rival");
+    await submit("tok-me", "run-me-1");
+    const second = await submit("tok-me", "run-me-2");
+    expect(typeof second["rank"]).toBe("number");
+    expect(typeof second["previousRank"]).toBe("number");
+  });
+
   // MPG-133. `game_results.seats_snapshot` is NOT NULL, and this route used to
   // write `null` for a solo run — so on Postgres every submission failed its
   // insert and took the result row, the share target and (being sequenced after

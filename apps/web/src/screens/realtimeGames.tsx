@@ -449,17 +449,27 @@ function makeRunId(): string {
  * only tells the caller WHEN the server's view is settled, so the post-game rank
  * preview can read it (see `useSettledRun`) instead of racing the write.
  */
-function submitRun(result: RunComplete<unknown>): Promise<string | undefined> {
+interface SubmittedRun {
+  readonly resultId: string | undefined;
+  readonly rank: number | undefined;
+  readonly previousRank: number | undefined;
+}
+
+function submitRun(result: RunComplete<unknown>): Promise<SubmittedRun> {
   return submitRealtimeScore(result.gameId, {
     runId: makeRunId(),
     seed: result.seed,
     score: result.score,
     inputLog: result.inputLog,
   })
-    .then((res) => res.resultId)
+    .then((res) => ({
+      resultId: res.resultId,
+      rank: res.rank,
+      previousRank: res.previousRank,
+    }))
     .catch((error: unknown) => {
       console.warn("[leaderboard] score submission failed", error);
-      return undefined;
+      return { resultId: undefined, rank: undefined, previousRank: undefined };
     });
 }
 
@@ -496,6 +506,7 @@ function useSettledRun(): {
   settled: boolean;
   shareToken: string | undefined;
   lastScore: number | undefined;
+  rankDelta: { rank: number; previousRank: number } | undefined;
   onRunComplete: (r: RunComplete<unknown>) => void;
 } {
   // `runKey` is bumped per run so the preview remounts (and refetches) on every
@@ -511,6 +522,12 @@ function useSettledRun(): {
   // surface so it's the same authoritative number that gets submitted.
   const [lastScore, setLastScore] = useState<number | undefined>(undefined);
 
+  // MPG-115-b: rank movement from the submit response; cleared per run like the
+  // share link, and simply never set when offline or on a first run.
+  const [rankDelta, setRankDelta] = useState<{ rank: number; previousRank: number } | undefined>(
+    undefined,
+  );
+
   const onRunComplete = (result: RunComplete<unknown>): void => {
     // Local first, and synchronously: the Home personal-best chip must reflect
     // the run the player just finished even if the score submission never
@@ -519,7 +536,11 @@ function useSettledRun(): {
     setLastScore(result.score);
     setRun((prev) => ({ ...prev, settled: false }));
     setShareToken(undefined);
-    void submitRun(result).then(async (resultId) => {
+    setRankDelta(undefined);
+    void submitRun(result).then(async ({ resultId, rank, previousRank }) => {
+      if (rank !== undefined && previousRank !== undefined) {
+        setRankDelta({ rank, previousRank });
+      }
       // The rank is readable the moment the score write lands; don't make it
       // wait on the share link, which is a separate, optional round-trip.
       setRun((prev) => ({ runKey: prev.runKey + 1, settled: true }));
@@ -533,7 +554,7 @@ function useSettledRun(): {
     });
   };
 
-  return { runKey, settled, shareToken, lastScore, onRunComplete };
+  return { runKey, settled, shareToken, lastScore, rankDelta, onRunComplete };
 }
 
 /**
@@ -556,7 +577,7 @@ export function RealtimeGameRoute({
   // Same reason as `challengeProps`: an optional prop can't be passed as
   // `undefined` under `exactOptionalPropertyTypes`.
   const navProps = navigation ? { navigation } : {};
-  const { runKey, settled, shareToken, lastScore, onRunComplete } = useSettledRun();
+  const { runKey, settled, shareToken, lastScore, rankDelta, onRunComplete } = useSettledRun();
   // Only meaningful for "drunk-walk" (the one game with a character to
   // customize), but declared unconditionally so this component's hook
   // count/order stays stable across `gameId` values.
@@ -607,6 +628,7 @@ export function RealtimeGameRoute({
           onRunComplete={onRunComplete}
           shareUrl={shareToken ?? buildShareUrl(gameId, lastScore)}
           resultExtra={rankPreview}
+          {...(rankDelta ? { rankDelta } : {})}
           {...challengeProps}
           {...navProps}
           surfaceExtra={
@@ -666,6 +688,7 @@ export function RealtimeGameRoute({
           onRunComplete={onRunComplete}
           shareUrl={shareToken ?? buildShareUrl(gameId, lastScore)}
           resultExtra={rank2048}
+          {...(rankDelta ? { rankDelta } : {})}
           {...challengeProps}
           {...navProps}
           surfaceExtra={
@@ -700,6 +723,7 @@ export function RealtimeGameRoute({
       onRunComplete={onRunComplete}
       shareUrl={shareToken ?? buildShareUrl(gameId, lastScore)}
       resultExtra={rankPreview}
+      {...(rankDelta ? { rankDelta } : {})}
       {...challengeProps}
       {...navProps}
     />

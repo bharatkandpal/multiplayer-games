@@ -106,6 +106,11 @@ export interface RealtimePlayScreenProps<S, I> {
    */
   resultExtra?: ReactNode;
   /**
+   * MPG-115-b: rank movement for the run just finished, from the score-submit
+   * response. Absent until (and unless) the server answers — never awaited.
+   */
+  rankDelta?: { rank?: number | null; previousRank?: number | null };
+  /**
    * A score to beat — the challenge a player arrived on from someone else's
    * shared result (the "Beat this score" entry on `SharedResultScreen`). When
    * set, the screen shows a live `Target` readout, celebrates the moment the
@@ -145,6 +150,7 @@ export function RealtimePlayScreen<S, I>({
   surfaceExtra,
   shareUrl,
   resultExtra,
+  rankDelta,
   challengeTarget,
   navigation,
 }: RealtimePlayScreenProps<S, I>): React.JSX.Element {
@@ -391,6 +397,7 @@ export function RealtimePlayScreen<S, I>({
                   size="md"
                   headingAs="p"
                   headline={verdict?.won ? "You won the challenge!" : "Game over"}
+                  {...(rankDelta ? { rankDelta } : {})}
                   detail={
                     <>
                       <p className={styles.overlayText}>

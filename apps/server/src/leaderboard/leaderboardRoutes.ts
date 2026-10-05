@@ -64,6 +64,21 @@ async function fetchOwnEntry(
   return entries[rank - 1];
 }
 
+/** The caller's score rank across their linked sessions, or `undefined` if unranked/unavailable. */
+async function rankOrUndefined(
+  store: Store,
+  token: string,
+  gameId: string,
+  filter: LeaderboardFilter,
+): Promise<number | undefined> {
+  try {
+    const ownerTokens = await resolveOwnerTokens(store, token);
+    return await store.leaderboard.rankOfBest(gameId, "score", ownerTokens, filter);
+  } catch {
+    return undefined;
+  }
+}
+
 function parseLimit(raw: unknown): number {
   const value = Array.isArray(raw) ? raw[0] : raw;
   const parsed = typeof value === "string" ? Number.parseInt(value, 10) : NaN;
@@ -223,6 +238,10 @@ export function createLeaderboardRouter(
         return;
       }
 
+      // MPG-115-b: the rank BEFORE this run lands, so the client can show a rank
+      // delta. Best-effort — a failed lookup just means no delta, never a failed submit.
+      const previousRank = await rankOrUndefined(store, token, gameId, filter);
+
       const saved = await writeGameResult(
         store,
         {
@@ -258,7 +277,17 @@ export function createLeaderboardRouter(
       // `resultId` is what a durable share link points at (MPG-056) — returning it
       // here saves the client a lookup it has no other way to perform (it knows
       // only its own client-minted `runId`).
-      res.json({ ok: true, entry, resultId: saved.id });
+      // Additive fields (MPG-115-b), each omitted when unknown: `rank` is the
+      // caller's rank now, `previousRank` their rank before this run (absent on a
+      // first run).
+      const rank = await rankOrUndefined(store, token, gameId, filter);
+      res.json({
+        ok: true,
+        entry,
+        resultId: saved.id,
+        ...(rank !== undefined ? { rank } : {}),
+        ...(previousRank !== undefined ? { previousRank } : {}),
+      });
     },
   );
 

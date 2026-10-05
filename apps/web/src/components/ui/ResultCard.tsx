@@ -10,6 +10,7 @@
 import type { ReactNode } from "react";
 
 import { cx } from "./cx";
+import { RankDelta } from "./RankDelta";
 import styles from "./ResultCard.module.css";
 
 export interface ResultCardProps {
@@ -26,6 +27,11 @@ export interface ResultCardProps {
    * later card art (MPG-085). Not implemented here; renders nothing when absent.
    */
   context?: ReactNode;
+  /**
+   * MPG-115-b: how the run moved the player's rank. Renders "▲3 since last run"
+   * only when both ranks are known and differ — absent otherwise.
+   */
+  rankDelta?: { rank?: number | null; previousRank?: number | null };
   /** Actions and extras (buttons, share, rank preview), stacked below. */
   children?: ReactNode;
   /** `start` for a page, `center` inside the game-over overlay. */
@@ -41,6 +47,7 @@ export function ResultCard({
   headingAs: Heading = "h2",
   detail,
   context,
+  rankDelta,
   children,
   align = "start",
   size = "lg",
@@ -57,6 +64,7 @@ export function ResultCard({
       </Heading>
       {detail}
       {context}
+      {rankDelta ? <RankDelta {...rankDelta} /> : null}
       {children}
     </div>
   );

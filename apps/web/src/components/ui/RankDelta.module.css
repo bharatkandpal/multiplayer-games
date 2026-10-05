@@ -1,0 +1,16 @@
+.delta {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-bold);
+}
+
+/* Colour reinforces, never carries: the ▲/▼ shape and the text say it too. */
+.up {
+  color: var(--color-success-text);
+}
+
+.down {
+  color: var(--color-text-muted);
+}
