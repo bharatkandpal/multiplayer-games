@@ -70,5 +70,7 @@ export { BrandBar, BRAND_PROMISE } from "./BrandBar";
 export type { BrandBarProps } from "./BrandBar";
 export { BrandMark } from "./BrandMark";
 
+export { RankDelta } from "./RankDelta";
+export type { RankDeltaProps } from "./RankDelta";
 export { ResultCard } from "./ResultCard";
 export type { ResultCardProps } from "./ResultCard";

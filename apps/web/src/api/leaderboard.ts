@@ -104,6 +104,10 @@ export interface SubmitScoreResponse {
    * (MPG-056); the client knows only its own `runId`, so the server returns it.
    */
   readonly resultId?: string;
+  /** MPG-115-b: the caller's rank after this run (1-based). Absent if unknown. */
+  readonly rank?: number;
+  /** MPG-115-b: the caller's rank before this run. Absent on a first run. */
+  readonly previousRank?: number;
 }
 
 /**

@@ -178,8 +178,11 @@ score if it equals `getScore(finalState)` **and** `isGameOver(finalState)` is `t
   (mirrors `GameResult`'s `runId` uniqueness), not a duplicate `bestScore` bump.
 - `eventId?`, `timeBucket?` — same leaderboard scoping as the GET endpoints above.
 
-**Response `200`** → `{ "ok": true, "entry": LeaderboardEntry }`, or on a duplicate `runId`,
-`{ "ok": true, "duplicate": true, "entry": LeaderboardEntry | null }`.
+**Response `200`** → `{ "ok": true, "entry": LeaderboardEntry, "resultId": "…", "rank"?: 2, "previousRank"?: 5 }`,
+or on a duplicate `runId`, `{ "ok": true, "duplicate": true, "entry": LeaderboardEntry | null }`.
+`rank` (MPG-115-b) is the caller's 1-based rank after this run; `previousRank` is their rank
+before it, omitted on a first run. Both are additive and omitted when unknown (a lower number
+is better, so `previousRank - rank` is places gained).
 
 **Errors**
 
