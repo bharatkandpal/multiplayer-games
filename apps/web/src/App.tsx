@@ -850,9 +850,8 @@ export default function App(): React.JSX.Element {
       {chat.open ? null : (
         <button
           type="button"
-          // In-game the bottom-right corner belongs to the pinned action bar
-          // (prev/opponent/next), so the toggle lifts clear of it rather than
-          // sitting on the "next game" control.
+          // In-game the toggle docks into a gutter reserved in the pinned action
+          // bar (MPG-152) rather than floating over the screen's controls.
           className={cx(styles.chatFab, inGame && styles.chatFabInGame)}
           onClick={openChat}
           aria-label="Open chat"
