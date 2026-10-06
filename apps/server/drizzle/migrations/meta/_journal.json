@@ -64,6 +64,13 @@
       "when": 1790098771325,
       "tag": "0008_natural_enchantress",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791268075021,
+      "tag": "0009_spotty_master_mold",
+      "breakpoints": true
     }
   ]
 }

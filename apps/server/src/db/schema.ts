@@ -17,6 +17,7 @@ import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -27,6 +28,17 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+
+/**
+ * Postgres `citext` — case-insensitive text. Requires the `citext` extension,
+ * which migration 0009 creates (`CREATE EXTENSION IF NOT EXISTS citext`).
+ * Used for `account.email` so a plain UNIQUE constraint is case-insensitive.
+ */
+const citext = customType<{ data: string }>({
+  dataType() {
+    return "citext";
+  },
+});
 
 // ---------------------------------------------------------------------------
 // sessions
@@ -49,11 +61,19 @@ export const sessions = pgTable(
     }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    // Nullable — set when a session is logged in to an account (ADR 0012,
+    // CRTR-001b). Mirrors `identity_id`: `set null` on account delete reverts the
+    // session to anonymous. Ownership is NOT re-pointed — owner_token stays the
+    // key on every durable row; account ownership is a read-time union.
+    accountId: uuid("account_id").references((): AnyPgColumn => account.id, {
+      onDelete: "set null",
+    }),
     metadata: jsonb("metadata"),
   },
   (t) => [
     uniqueIndex("sessions_username_lower_idx").on(sql`lower(${t.username})`),
     index("sessions_identity_idx").on(t.identityId),
+    index("sessions_account_idx").on(t.accountId),
   ],
 );
 
@@ -85,6 +105,84 @@ export const identities = pgTable(
   (t) => [
     uniqueIndex("identities_handle_lower_idx").on(sql`lower(${t.handle})`),
     index("identities_recovery_idx").on(t.recoveryCodeHash),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// account / creator_request / auth_session (ADR 0012, CRTR-001b)
+// ---------------------------------------------------------------------------
+
+/**
+ * An email + password account. Deliberately NOT folded into `identities`
+ * (the passwordless device-key handle): different credential, different PII
+ * obligations, different lifecycle.
+ *
+ *  - `email` is **PII** (ADR 0012 §2): never logged, never in share cards.
+ *    `citext` makes the UNIQUE constraint case-insensitive.
+ *  - `password_hash` is a memory-hard KDF output (argon2id/bcrypt); never the
+ *    password. Hashing code is out of scope here.
+ *  - `role` is text, not an enum (cf. chat_rooms.visibility), so adding a tier
+ *    needs no migration. Values today: `user` | `creator` | `admin`.
+ */
+export const account = pgTable("account", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: citext("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  role: text("role").notNull().default("user"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * A request to become a creator. The PARTIAL unique index allows at most one
+ * `pending` request per account (so filing is idempotent, CRTR-002a) while
+ * keeping unlimited decided history (decline is reversible: re-request later).
+ * `decided_by` is the deciding admin account; set null if that admin is deleted
+ * so the audit row survives.
+ */
+export const creatorRequest = pgTable(
+  "creator_request",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => account.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("pending"), // pending | approved | declined
+    decidedBy: uuid("decided_by").references(() => account.id, { onDelete: "set null" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("creator_request_one_pending_idx")
+      .on(t.accountId)
+      .where(sql`${t.status} = 'pending'`),
+    // Admin queue: pending requests, oldest first.
+    index("creator_request_status_idx").on(t.status, t.createdAt),
+  ],
+);
+
+/**
+ * A login session for an account. The cookie carries a random secret; only its
+ * hash is stored (like `identities.recovery_code_hash`), so a DB leak cannot
+ * mint a session. Cascades with the account.
+ */
+export const authSession = pgTable(
+  "auth_session",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => account.id, { onDelete: "cascade" }),
+    secretHash: text("secret_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("auth_session_secret_idx").on(t.secretHash),
+    index("auth_session_account_idx").on(t.accountId),
+    // Expiry sweeps.
+    index("auth_session_expires_idx").on(t.expiresAt),
   ],
 );
 
